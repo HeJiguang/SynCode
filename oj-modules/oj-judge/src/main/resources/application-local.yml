@@ -1,13 +1,7 @@
-# 本地 profile 下的默认配置，用于 IDEA 直接运行。
-# 若 Nacos 中 oj-judge-local 已配置 spring.datasource，会优先使用 Nacos 的配置。
-# 本地兜底也应指向 bitoj_dev，避免直接运行时与 oj-friend 落库库名不一致。
-# Spring Cloud 2022 + Boot 3.2.5 需关闭兼容性校验
 server:
-  port: 9204  # 避免与默认 8080 冲突，与 system(9201)/friend(9202)/job(9203) 同系列
+  port: 9204
+
 spring:
-  cloud:
-    compatibility-verifier:
-      enabled: false
   rabbitmq:
     publisher-confirm-type: correlated
     publisher-returns: true
@@ -27,3 +21,7 @@ spring:
 sandbox:
   docker:
     volume: /usr/share/java
+
+judge:
+  runtime-state:
+    ttl-minutes: 1440

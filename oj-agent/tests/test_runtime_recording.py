@@ -44,10 +44,12 @@ def test_execute_chat_request_records_trace_query_and_eval_artifacts():
 
     assert run.trace_id == "trace-recording-001"
     assert node_events
-    assert any(event.node_name == "tutor_graph" for event in node_events)
+    assert any(event.node_name in {"tutor_graph", "diagnose_graph"} for event in node_events)
     assert ledger_entries[-1].run_id == state.execution.run_id
+    assert ledger_entries[-1].route_names
+    assert ledger_entries[-1].risk_level in {"low", "medium", "high"}
     assert eval_records[-1]["trace_id"] == "trace-recording-001"
-    assert eval_records[-1]["task_type"] == "chat"
+    assert eval_records[-1]["task_type"] in {"chat", "diagnosis"}
 
 
 def test_stream_chat_request_records_trace_query_and_eval_artifacts(monkeypatch):
@@ -124,3 +126,65 @@ def test_stream_chat_request_records_trace_query_and_eval_artifacts(monkeypatch)
     assert any(event.node_name == "tutor_graph" for event in node_events)
     assert ledger_entries[-1].run_id == "run-stream-recording-001"
     assert eval_records[-1]["trace_id"] == "trace-stream-recording-001"
+
+
+def test_stream_chat_request_uses_existing_phase2_answer_without_llm_stream(monkeypatch):
+    import app.runtime.streaming as streaming_module  # noqa: WPS433
+
+    monkeypatch.setattr(
+        streaming_module,
+        "prepare_chat_stream_state",
+        lambda request, headers: UnifiedAgentState(
+            request=RequestContext(
+                trace_id="trace-stream-phase2-001",
+                user_id="u-1",
+                task_type=TaskType.REVIEW,
+                user_message=request.user_message or "Summarize my recent practice.",
+            ),
+            execution=ExecutionState(
+                run_id="run-stream-phase2-001",
+                graph_name="supervisor_graph",
+                status=RunStatus.SUCCEEDED,
+                active_node="review_graph",
+            ),
+            evidence=EvidenceState(route_names=["review"]),
+            guardrail=GuardrailState(
+                risk_level=RiskLevel.LOW,
+                completeness_ok=True,
+                policy_ok=True,
+            ),
+            outcome=OutcomeState(
+                intent="review_summary",
+                answer="Review summary:\nFocus on edge-case review before increasing difficulty.",
+                confidence=0.84,
+                next_action="Review your last two wrong answers before starting new problems.",
+                status_events=[
+                    {"node": "review_graph", "message": "Prepared phase 2 review state."},
+                ],
+                response_payload={},
+            ),
+        ),
+    )
+
+    def _unexpected_llm_call(*args, **kwargs):
+        raise AssertionError("phase 2 streaming path should not call chat assistant")
+
+    monkeypatch.setattr(streaming_module.chat_assistant, "stream_chat_answer", _unexpected_llm_call)
+    monkeypatch.setattr(streaming_module.chat_assistant, "generate_chat_answer", _unexpected_llm_call)
+
+    events = list(
+        stream_chat_request(
+            ChatRequest(
+                trace_id="trace-stream-phase2-001",
+                user_id="u-1",
+                user_message="Summarize my recent practice.",
+            ),
+            {
+                "X-User-Id": "u-1",
+            },
+        )
+    )
+
+    assert not any("event: delta" in event for event in events)
+    assert any("event: final" in event for event in events)
+    assert any("Review summary:" in event for event in events)

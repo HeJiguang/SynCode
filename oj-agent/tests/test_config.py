@@ -73,3 +73,52 @@ def test_load_settings_reads_nacos_bootstrap_config(monkeypatch):
     assert settings.nacos_port == 8015
     assert settings.rag_enabled is True
     assert settings.rag_top_k == 3
+
+
+def test_load_settings_reads_qdrant_settings_from_nacos_bootstrap(monkeypatch):
+    nacos_yaml = "\n".join(
+        [
+            "server:",
+            "  port: 8015",
+            "llm:",
+            "  provider: openai_compatible",
+            "  base-url: https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "  api-key: nacos-test-key",
+            "  chat-model: qwen-turbo",
+            "  training-model: qwen-plus",
+            "  embedding-provider: local_hash",
+            "  embedding-model: text-embedding-v4",
+            "  embedding-dimensions: 16",
+            "qdrant:",
+            "  enabled: true",
+            "  url: http://127.0.0.1:6333",
+            "  collection: oj-agent-knowledge",
+            "  top-k: 5",
+            "  chunk-size: 240",
+        ]
+    )
+
+    monkeypatch.delenv("OJ_AGENT_LLM_API_KEY", raising=False)
+    monkeypatch.setenv("OJ_AGENT_NACOS_SERVER_ADDR", "http://localhost:8848")
+    monkeypatch.setenv("OJ_AGENT_NACOS_NAMESPACE", "test-namespace")
+    monkeypatch.setenv("OJ_AGENT_NACOS_CONFIG_ENABLED", "true")
+    monkeypatch.setenv("OJ_AGENT_NACOS_CONFIG_DATA_ID", "oj-agent-local.yaml")
+
+    from app.core import config as config_module  # noqa: WPS433
+
+    monkeypatch.setattr(
+        config_module,
+        "_load_nacos_config",
+        lambda: {"raw": nacos_yaml},
+    )
+
+    settings = load_settings()
+
+    assert settings.embedding_provider == "local_hash"
+    assert settings.embedding_model == "text-embedding-v4"
+    assert settings.embedding_dimensions == 16
+    assert settings.qdrant_enabled is True
+    assert settings.qdrant_url == "http://127.0.0.1:6333"
+    assert settings.qdrant_collection == "oj-agent-knowledge"
+    assert settings.qdrant_top_k == 5
+    assert settings.qdrant_chunk_size == 240

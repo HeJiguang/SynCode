@@ -1,9 +1,4 @@
-# Spring Cloud 2022.0.0 officially supports Boot 3.0.x.
-# This project uses Boot 3.2.5, so compatibility verification is disabled locally.
 spring:
-  cloud:
-    compatibility-verifier:
-      enabled: false
   rabbitmq:
     publisher-confirm-type: correlated
     publisher-returns: true
@@ -31,3 +26,11 @@ training:
     base-url:
     plan-path: /api/training/plan
     candidate-limit: 40
+    client:
+      connect-timeout-ms: 1000
+      request-timeout-ms: 5000
+      max-attempts: 3
+      retry-backoff-ms: 200
+      circuit-failure-threshold: 5
+      circuit-open-ms: 30000
+      rate-limit-per-minute: 60

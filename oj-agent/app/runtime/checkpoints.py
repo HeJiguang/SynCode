@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 from app.runtime.models import UnifiedAgentState
 
-
+# 检查点负载
 class CheckpointPayload(BaseModel):
     checkpoint_id: str
     run_id: str

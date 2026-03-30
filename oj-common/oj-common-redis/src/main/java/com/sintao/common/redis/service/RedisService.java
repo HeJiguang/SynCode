@@ -239,6 +239,18 @@ public class RedisService {
         }
     }
 
+    public <K, T> void setCacheMap(final String key,
+                                   final Map<K, T> dataMap,
+                                   final Long timeout,
+                                   final TimeUnit timeUnit) {
+        if (dataMap != null) {
+            redisTemplate.opsForHash().putAll(key, dataMap);
+            if (timeout != null && timeUnit != null) {
+                redisTemplate.expire(key, timeout, timeUnit);
+            }
+        }
+    }
+
     public Long deleteCacheMapValue(final String key, final String hKey) {
         return redisTemplate.opsForHash().delete(key, hKey);
     }

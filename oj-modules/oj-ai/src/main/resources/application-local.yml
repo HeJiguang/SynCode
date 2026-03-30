@@ -1,20 +1,15 @@
-# 本地覆盖：兼容性校验、RAG 开关等。AI 主体配置请在 Nacos 中配置（如 oj-ai.yaml）。
-# 若使用通义千问（Qwen/DashScope），可开启 RAG；参考 nacos-oj-ai-qwen-example.yaml。
+# Local overrides: keep RAG toggles and AI facade settings here, while model/provider settings stay in Nacos.
+# If you use Qwen / DashScope, see nacos-oj-ai-qwen-example.yaml.
 spring:
-  cloud:
-    compatibility-verifier:
-      enabled: false
-  # Token 续期需 Redis，与网关/友端一致（无 Redis 时可注释掉，并依赖网关白名单 /ai/** 免鉴权）
+  # Token refresh relies on Redis and is aligned with gateway / friend services.
   data:
     redis:
       host: localhost
       port: 16379
       password: ${REDIS_PASSWORD:change-me-local}
-  # RAG：使用 Qwen/DashScope 时设为 true（通义提供 embedding）；使用 DeepSeek 时保持 false
   ai:
     rag:
       enabled: true
-    # 通义 DashScope：base-url 不要带 /v1，否则 Chat 会拼成 .../v1/v1/chat/completions 导致 404（与 embedding 同理）
     openai:
       base-url: https://dashscope.aliyuncs.com/compatible-mode
       embedding:
@@ -31,5 +26,4 @@ ai:
       stream-path: /api/chat/stream
 
 jwt:
-  # Local-only placeholder so oj-ai can start without extra JWT flags during facade smoke tests.
   secret: ${JWT_SECRET:change-me-local-jwt-secret}

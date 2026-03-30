@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+       Copyright 2015-2023 the original author or authors.
+
+       Licensed under the Apache License, Version 2.0 (the "License");
+       you may not use this file except in compliance with the License.
+       You may obtain a copy of the License at
+
+          https://www.apache.org/licenses/LICENSE-2.0
+
+       Unless required by applicable law or agreed to in writing, software
+       distributed under the License is distributed on an "AS IS" BASIS,
+       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+       See the License for the specific language governing permissions and
+       limitations under the License.
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.mybatis</groupId>
+    <artifactId>mybatis-parent</artifactId>
+    <version>36</version>
+    <relativePath />
+  </parent>
+
+  <groupId>org.mybatis.spring.boot</groupId>
+  <artifactId>mybatis-spring-boot</artifactId>
+  <version>2.3.1</version>
+  <packaging>pom</packaging>
+
+  <name>mybatis-spring-boot</name>
+  <description>Spring Boot Support for MyBatis</description>
+  <url>https://www.mybatis.org/spring-boot-starter/</url>
+  <inceptionYear>2015</inceptionYear>
+
+  <modules>
+    <module>mybatis-spring-boot-autoconfigure</module>
+    <module>mybatis-spring-boot-starter</module>
+    <module>mybatis-spring-boot-samples</module>
+    <module>mybatis-spring-boot-starter-test</module>
+    <module>mybatis-spring-boot-test-autoconfigure</module>
+  </modules>
+
+  <scm>
+    <connection>scm:git:git@github.com:mybatis/spring-boot-starter.git</connection>
+    <developerConnection>scm:git:git@github.com:mybatis/spring-boot-starter.git</developerConnection>
+    <url>https://github.com/mybatis/spring-boot-starter/tree/master</url>
+    <tag>mybatis-spring-boot-2.3.1</tag>
+  </scm>
+  <issueManagement>
+    <system>GitHub Issue Management</system>
+    <url>https://github.com/mybatis/spring-boot-starter/issues</url>
+  </issueManagement>
+  <ciManagement>
+    <system>GitHub Actions</system>
+    <url>https://github.com/mybatis/spring-boot-starter/actions</url>
+  </ciManagement>
+  <distributionManagement>
+    <site>
+      <id>gh-pages</id>
+      <name>Mybatis GitHub Pages</name>
+      <url>git:ssh://git@github.com/mybatis/spring-boot-starter.git?gh-pages#</url>
+    </site>
+  </distributionManagement>
+
+  <properties>
+    <mybatis.version>3.5.13</mybatis.version>
+    <mybatis-spring.version>2.1.1</mybatis-spring.version>
+    <mybatis-freemarker.version>1.2.4</mybatis-freemarker.version>
+    <mybatis-velocity.version>2.1.1</mybatis-velocity.version>
+    <mybatis-thymeleaf.version>1.0.4</mybatis-thymeleaf.version>
+    <spring-boot.version>2.7.12</spring-boot.version>
+
+    <argLine>-Djdk.attach.allowAttachSelf --add-opens java.base/java.lang=ALL-UNNAMED -Dfile.encoding=UTF-8</argLine>
+
+    <!-- Reproducible Builds -->
+    <project.build.outputTimestamp>1684564501</project.build.outputTimestamp>
+  </properties>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-resources-plugin</artifactId>
+          <executions>
+            <!-- prepare site content by filtering ${project.*} values-->
+            <execution>
+              <id>filter-site</id>
+              <phase>pre-site</phase>
+              <goals>
+                <goal>copy-resources</goal>
+              </goals>
+              <configuration>
+                <outputDirectory>${project.build.directory}/site-src</outputDirectory>
+                <resources>
+                  <resource>
+                    <directory>src/site</directory>
+                    <filtering>true</filtering>
+                  </resource>
+                </resources>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-site-plugin</artifactId>
+          <configuration>
+            <locales>en,zh_CN</locales>
+            <siteDirectory>${project.build.directory}/site-src</siteDirectory>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.mybatis</groupId>
+        <artifactId>mybatis</artifactId>
+        <version>${mybatis.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mybatis</groupId>
+        <artifactId>mybatis-spring</artifactId>
+        <version>${mybatis-spring.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mybatis.scripting</groupId>
+        <artifactId>mybatis-freemarker</artifactId>
+        <version>${mybatis-freemarker.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mybatis.scripting</groupId>
+        <artifactId>mybatis-velocity</artifactId>
+        <version>${mybatis-velocity.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mybatis.scripting</groupId>
+        <artifactId>mybatis-thymeleaf</artifactId>
+        <version>${mybatis-thymeleaf.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mybatis.spring.boot</groupId>
+        <artifactId>mybatis-spring-boot-autoconfigure</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mybatis.spring.boot</groupId>
+        <artifactId>mybatis-spring-boot-starter</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mybatis.spring.boot</groupId>
+        <artifactId>mybatis-spring-boot-test-autoconfigure</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mybatis.spring.boot</groupId>
+        <artifactId>mybatis-spring-boot-starter-test</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring-boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-test</artifactId>
+        <version>${spring-boot.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <repositories>
+    <repository>
+      <id>sonatype-oss-snapshots</id>
+      <name>Sonatype OSS Snapshots Repository</name>
+      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+    </repository>
+    <repository>
+      <id>spring-milestone</id>
+      <name>Spring Milestone</name>
+      <url>https://repo.spring.io/milestone</url>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>spring-snapshot</id>
+      <name>Spring Snapshot</name>
+      <url>https://repo.spring.io/snapshot</url>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
+  <pluginRepositories>
+    <pluginRepository>
+      <id>spring-milestone</id>
+      <name>Spring Milestone</name>
+      <url>https://repo.spring.io/milestone</url>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </pluginRepository>
+    <pluginRepository>
+      <id>spring-snapshot</id>
+      <name>Spring Snapshot</name>
+      <url>https://repo.spring.io/snapshot</url>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </pluginRepository>
+  </pluginRepositories>
+
+</project>

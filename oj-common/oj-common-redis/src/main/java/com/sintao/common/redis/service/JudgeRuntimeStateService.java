@@ -1,6 +1,7 @@
 package com.sintao.common.redis.service;
 
 import com.sintao.common.core.constants.CacheConstants;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -13,8 +14,16 @@ public class JudgeRuntimeStateService {
 
     private final RedisService redisService;
 
+    private final long runtimeStateTtlMinutes;
+
     public JudgeRuntimeStateService(RedisService redisService) {
+        this(redisService, 1440);
+    }
+
+    public JudgeRuntimeStateService(RedisService redisService,
+                                    @Value("${judge.runtime-state.ttl-minutes:1440}") long runtimeStateTtlMinutes) {
         this.redisService = redisService;
+        this.runtimeStateTtlMinutes = runtimeStateTtlMinutes;
     }
 
     public void markAccepted(String requestId) {
@@ -64,6 +73,11 @@ public class JudgeRuntimeStateService {
         if (lastError != null) {
             state.put("lastError", lastError);
         }
-        redisService.setCacheMap(CacheConstants.JUDGE_RUNTIME_STATE + requestId, state);
+        redisService.setCacheMap(
+                CacheConstants.JUDGE_RUNTIME_STATE + requestId,
+                state,
+                runtimeStateTtlMinutes,
+                TimeUnit.MINUTES
+        );
     }
 }

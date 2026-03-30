@@ -138,19 +138,6 @@ def test_chat_reuses_conversation_context_for_follow_up_request():
 
 
 def test_chat_accepts_gateway_headers_and_camel_case_payload(monkeypatch):
-    from app.services import chat_assistant  # noqa: WPS433
-
-    monkeypatch.setattr(
-        chat_assistant,
-        "generate_chat_answer",
-        lambda state: (
-            "Model-backed answer",
-            0.91,
-            "Keep tracing the smallest failing input.",
-            "mock-stream-model",
-        ),
-    )
-
     response = client.post(
         "/api/chat",
         headers={
@@ -167,10 +154,45 @@ def test_chat_accepts_gateway_headers_and_camel_case_payload(monkeypatch):
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["answer"] == "Model-backed answer"
     assert payload["intent"] == "analyze_failure"
-    assert payload["confidence"] == 0.91
-    assert payload["next_action"] == "Keep tracing the smallest failing input."
+    assert "Diagnosis summary:" in payload["answer"]
+    assert "Question: Two Sum" in payload["answer"]
+    assert payload["confidence"] >= 0.8
+    assert payload["next_action"]
+
+
+def test_chat_routes_review_requests_to_phase2_review_graph():
+    response = client.post(
+        "/api/chat",
+        json={
+            "trace_id": "trace-006",
+            "user_id": "u-1",
+            "user_message": "Summarize my recent practice and mistakes.",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == "review_summary"
+    assert "Review summary:" in payload["answer"]
+    assert payload["next_action"]
+
+
+def test_chat_routes_profile_requests_to_phase2_profile_graph():
+    response = client.post(
+        "/api/chat",
+        json={
+            "trace_id": "trace-007",
+            "user_id": "u-1",
+            "user_message": "Update my learning profile based on recent submissions.",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == "profile_update"
+    assert "Profile update summary:" in payload["answer"]
+    assert payload["next_action"]
 
 
 def test_chat_sync_uses_runtime_engine(monkeypatch):

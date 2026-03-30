@@ -10,6 +10,9 @@ import yaml
 DEFAULT_RAG_DOC_GLOB = str(
     Path(__file__).resolve().parents[2] / "resources" / "knowledge" / "algorithm-docs" / "*.md"
 )
+DEFAULT_RUNTIME_DATA_DIR = str(
+    Path(__file__).resolve().parents[2] / "runtime-artifacts"
+)
 
 
 @dataclass(frozen=True)
@@ -20,6 +23,9 @@ class AgentSettings:
     llm_api_key: str | None
     chat_model: str | None
     training_model: str | None
+    embedding_provider: str
+    embedding_model: str | None
+    embedding_dimensions: int
     llm_timeout_seconds: float
     llm_temperature: float
     llm_max_tokens: int
@@ -30,6 +36,12 @@ class AgentSettings:
     rag_doc_globs: tuple[str, ...]
     rag_top_k: int
     rag_max_snippet_chars: int
+    qdrant_enabled: bool
+    qdrant_url: str | None
+    qdrant_api_key: str | None
+    qdrant_collection: str
+    qdrant_top_k: int
+    qdrant_chunk_size: int
     nacos_config_enabled: bool
     nacos_config_data_id: str
     nacos_enabled: bool
@@ -41,6 +53,10 @@ class AgentSettings:
     nacos_service_name: str
     nacos_ip: str
     nacos_port: int
+    runtime_data_dir: str = DEFAULT_RUNTIME_DATA_DIR
+    trace_store_backend: str = "memory"
+    query_ledger_store_backend: str = "memory"
+    evaluation_store_backend: str = "memory"
 
 
 def _to_bool(raw: str | bool | None, default: bool) -> bool:
@@ -145,6 +161,9 @@ def load_settings() -> AgentSettings:
     llm_api_key = _read_str(nacos_config, "OJ_AGENT_LLM_API_KEY", ("llm", "api-key"))
     chat_model = _read_str(nacos_config, "OJ_AGENT_CHAT_MODEL", ("llm", "chat-model"))
     training_model = _read_str(nacos_config, "OJ_AGENT_TRAINING_MODEL", ("llm", "training-model"))
+    embedding_provider = _read_str(nacos_config, "OJ_AGENT_EMBEDDING_PROVIDER", ("llm", "embedding-provider"), "openai_compatible")
+    embedding_model = _read_str(nacos_config, "OJ_AGENT_EMBEDDING_MODEL", ("llm", "embedding-model"))
+    embedding_dimensions = _read_int(nacos_config, "OJ_AGENT_EMBEDDING_DIMENSIONS", ("llm", "embedding-dimensions"), 256)
 
     return AgentSettings(
         port=port,
@@ -153,6 +172,9 @@ def load_settings() -> AgentSettings:
         llm_api_key=llm_api_key,
         chat_model=chat_model,
         training_model=training_model,
+        embedding_provider=embedding_provider or "openai_compatible",
+        embedding_model=embedding_model,
+        embedding_dimensions=embedding_dimensions,
         llm_timeout_seconds=_read_float(nacos_config, "OJ_AGENT_LLM_TIMEOUT_SECONDS", ("llm", "timeout-seconds"), 30.0),
         llm_temperature=_read_float(nacos_config, "OJ_AGENT_LLM_TEMPERATURE", ("llm", "temperature"), 0.2),
         llm_max_tokens=_read_int(nacos_config, "OJ_AGENT_LLM_MAX_TOKENS", ("llm", "max-tokens"), 1200),
@@ -163,6 +185,16 @@ def load_settings() -> AgentSettings:
         rag_doc_globs=_read_globs(nacos_config),
         rag_top_k=_read_int(nacos_config, "OJ_AGENT_RAG_TOP_K", ("rag", "top-k"), 3),
         rag_max_snippet_chars=_read_int(nacos_config, "OJ_AGENT_RAG_MAX_SNIPPET_CHARS", ("rag", "max-snippet-chars"), 420),
+        qdrant_enabled=_read_bool(nacos_config, "OJ_AGENT_QDRANT_ENABLED", ("qdrant", "enabled"), False),
+        qdrant_url=_read_str(nacos_config, "OJ_AGENT_QDRANT_URL", ("qdrant", "url")),
+        qdrant_api_key=_read_str(nacos_config, "OJ_AGENT_QDRANT_API_KEY", ("qdrant", "api-key")),
+        qdrant_collection=_read_str(nacos_config, "OJ_AGENT_QDRANT_COLLECTION", ("qdrant", "collection"), "oj-agent-knowledge") or "oj-agent-knowledge",
+        qdrant_top_k=_read_int(nacos_config, "OJ_AGENT_QDRANT_TOP_K", ("qdrant", "top-k"), 3),
+        qdrant_chunk_size=_read_int(nacos_config, "OJ_AGENT_QDRANT_CHUNK_SIZE", ("qdrant", "chunk-size"), 240),
+        runtime_data_dir=_read_str(nacos_config, "OJ_AGENT_RUNTIME_DATA_DIR", ("runtime", "data-dir"), DEFAULT_RUNTIME_DATA_DIR) or DEFAULT_RUNTIME_DATA_DIR,
+        trace_store_backend=_read_str(nacos_config, "OJ_AGENT_TRACE_STORE", ("runtime", "trace-store"), "memory") or "memory",
+        query_ledger_store_backend=_read_str(nacos_config, "OJ_AGENT_QUERY_LEDGER_STORE", ("runtime", "query-ledger-store"), "memory") or "memory",
+        evaluation_store_backend=_read_str(nacos_config, "OJ_AGENT_EVALUATION_STORE", ("runtime", "evaluation-store"), "memory") or "memory",
         nacos_config_enabled=_to_bool(os.getenv("OJ_AGENT_NACOS_CONFIG_ENABLED"), bool(os.getenv("OJ_AGENT_NACOS_SERVER_ADDR"))),
         nacos_config_data_id=os.getenv("OJ_AGENT_NACOS_CONFIG_DATA_ID", "oj-agent-local.yaml"),
         nacos_enabled=_read_bool(nacos_config, "OJ_AGENT_NACOS_ENABLED", ("nacos", "enabled"), False),

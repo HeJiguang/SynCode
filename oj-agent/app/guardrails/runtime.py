@@ -18,47 +18,74 @@ class GuardrailOutput(BaseModel):
     policy_ok: bool
     missing_fields: list[str] = Field(default_factory=list)
     risk_reasons: list[str] = Field(default_factory=list)
+    triggered_verifiers: list[str] = Field(default_factory=list)
 
 
 class GuardrailRuntime:
-    def evaluate(self, guardrail_input: GuardrailInput) -> GuardrailOutput:
+    def __init__(self) -> None:
+        from app.guardrails.verifiers import EvidenceVerifier, OutputVerifier, RequestVerifier
+
+        self.request_verifiers = [RequestVerifier()]
+        self.evidence_verifiers = [EvidenceVerifier()]
+        self.output_verifiers = [OutputVerifier()]
+
+    def _merge_outputs(self, outputs: list[GuardrailOutput]) -> GuardrailOutput:
+        highest_risk = RiskLevel.LOW
+        for output in outputs:
+            if output.risk_level is RiskLevel.HIGH:
+                highest_risk = RiskLevel.HIGH
+                break
+            if output.risk_level is RiskLevel.MEDIUM:
+                highest_risk = RiskLevel.MEDIUM
+
         missing_fields: list[str] = []
-        if not guardrail_input.question_title and not guardrail_input.question_content:
-            missing_fields.append("question statement")
-        if not guardrail_input.user_code:
-            missing_fields.append("code")
-        if not guardrail_input.judge_result:
-            missing_fields.append("judge result")
+        risk_reasons: list[str] = []
+        triggered_verifiers: list[str] = []
+        policy_ok = True
+        completeness_ok = True
+        for output in outputs:
+            missing_fields.extend(output.missing_fields)
+            risk_reasons.extend(output.risk_reasons)
+            triggered_verifiers.extend(output.triggered_verifiers)
+            policy_ok = policy_ok and output.policy_ok
+            completeness_ok = completeness_ok and output.completeness_ok
 
         return GuardrailOutput(
-            risk_level=RiskLevel.MEDIUM if missing_fields else RiskLevel.LOW,
-            completeness_ok=not missing_fields,
-            policy_ok=True,
+            risk_level=highest_risk,
+            completeness_ok=completeness_ok,
+            policy_ok=policy_ok,
             missing_fields=missing_fields,
-            risk_reasons=["missing critical context"] if missing_fields else [],
+            risk_reasons=risk_reasons,
+            triggered_verifiers=triggered_verifiers,
         )
+
+    def evaluate(self, guardrail_input: GuardrailInput) -> GuardrailOutput:
+        outputs = [verifier.verify(guardrail_input) for verifier in self.request_verifiers]
+        return self._merge_outputs(outputs)
 
     def evaluate_output(self, *, answer: str, evidence_count: int) -> GuardrailOutput:
-        normalized_answer = answer.lower()
-        direct_code_leak = "full ac code" in normalized_answer or "submit directly" in normalized_answer
-        unsupported_answer = evidence_count <= 0 and bool(answer.strip())
+        outputs = [
+            verifier.verify(
+                answer=answer,
+                evidence_count=evidence_count,
+            )
+            for verifier in self.output_verifiers
+        ]
+        return self._merge_outputs(outputs)
 
-        risk_level = RiskLevel.LOW
-        policy_ok = True
-        risk_reasons: list[str] = []
-
-        if direct_code_leak:
-            risk_level = RiskLevel.HIGH
-            policy_ok = False
-            risk_reasons.append("direct solution leakage")
-        elif unsupported_answer:
-            risk_level = RiskLevel.MEDIUM
-            risk_reasons.append("answer lacks evidence support")
-
-        return GuardrailOutput(
-            risk_level=risk_level,
-            completeness_ok=True,
-            policy_ok=policy_ok,
-            missing_fields=[],
-            risk_reasons=risk_reasons,
-        )
+    def evaluate_evidence(
+        self,
+        *,
+        task_type: str,
+        evidence_count: int,
+        route_names: list[str] | None = None,
+    ) -> GuardrailOutput:
+        outputs = [
+            verifier.verify(
+                task_type=task_type,
+                evidence_count=evidence_count,
+                route_names=route_names,
+            )
+            for verifier in self.evidence_verifiers
+        ]
+        return self._merge_outputs(outputs)

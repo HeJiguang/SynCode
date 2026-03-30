@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-dependencies</artifactId>
+    <version>3.2.4</version>
+    <relativePath></relativePath>
+  </parent>
+  <groupId>org.springframework.cloud</groupId>
+  <artifactId>spring-cloud-build-dependencies</artifactId>
+  <version>4.1.1</version>
+  <packaging>pom</packaging>
+  <name>spring-cloud-build-dependencies</name>
+  <description>Spring Cloud Build Dependencies: an internal BOM for use with Spring
+		Cloud projects. Use as a BOM or by inheriting from the spring-cloud build parent.</description>
+  <url>https://spring.io/projects/spring-boot/spring-cloud-build-dependencies</url>
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <name>Spring</name>
+      <email>ask@spring.io</email>
+      <organization>VMware, Inc.</organization>
+      <organizationUrl>https://www.spring.io</organizationUrl>
+    </developer>
+  </developers>
+  <scm>
+    <url>https://github.com/spring-projects/spring-boot/spring-cloud-build-dependencies</url>
+  </scm>
+  <distributionManagement>
+    <repository>
+      <id>repo.spring.io</id>
+      <name>Spring Release Repository</name>
+      <url>https://repo.spring.io/libs-release-local</url>
+    </repository>
+    <snapshotRepository>
+      <id>repo.spring.io</id>
+      <name>Spring Snapshot Repository</name>
+      <url>https://repo.spring.io/libs-snapshot-local</url>
+    </snapshotRepository>
+    <site>
+      <id>spring-docs</id>
+      <url>https:/docs.spring.io/spring-cloud-build-dependencies/docs/4.1.1/reference/html/</url>
+    </site>
+    <downloadUrl>https://github.com/spring-cloud</downloadUrl>
+  </distributionManagement>
+  <properties>
+    <maven-gpg-plugin.version>3.0.1</maven-gpg-plugin.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <spring-boot.version>3.2.4</spring-boot.version>
+  </properties>
+  <profiles>
+    <profile>
+      <id>spring</id>
+      <repositories>
+        <repository>
+          <snapshots>
+            <enabled>true</enabled>
+          </snapshots>
+          <id>spring-snapshots</id>
+          <name>Spring Snapshots</name>
+          <url>https://repo.spring.io/snapshot</url>
+        </repository>
+        <repository>
+          <snapshots>
+            <enabled>false</enabled>
+          </snapshots>
+          <id>spring-milestones</id>
+          <name>Spring Milestones</name>
+          <url>https://repo.spring.io/milestone</url>
+        </repository>
+        <repository>
+          <snapshots>
+            <enabled>false</enabled>
+          </snapshots>
+          <id>spring-releases</id>
+          <name>Spring Releases</name>
+          <url>https://repo.spring.io/release</url>
+        </repository>
+      </repositories>
+    </profile>
+  </profiles>
+</project>

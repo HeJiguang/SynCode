@@ -3,6 +3,7 @@ package com.sintao.common.redis.config;
 import com.sintao.common.redis.service.JudgeRuntimeStateService;
 import com.sintao.common.redis.service.JudgeResultPushService;
 import com.sintao.common.redis.service.RedisService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
@@ -38,8 +39,9 @@ public class RedisConfig extends CachingConfigurerSupport {
     }
 
     @Bean
-    public JudgeRuntimeStateService judgeRuntimeStateService(RedisService redisService) {
-        return new JudgeRuntimeStateService(redisService);
+    public JudgeRuntimeStateService judgeRuntimeStateService(RedisService redisService,
+                                                             @Value("${judge.runtime-state.ttl-minutes:1440}") long runtimeStateTtlMinutes) {
+        return new JudgeRuntimeStateService(redisService, runtimeStateTtlMinutes);
     }
 
     @Bean

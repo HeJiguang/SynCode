@@ -1,0 +1,9 @@
+from typing import Protocol
+
+
+class EvaluationRepository(Protocol):
+    def append(self, record: dict) -> None: ...
+
+    def list_records(self) -> list[dict]: ...
+
+    def clear(self) -> None: ...
