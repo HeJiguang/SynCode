@@ -1,0 +1,114 @@
+x-runtime-deploy: &runtime-deploy
+  replicas: ${SYNCODE_RUNTIME_REPLICAS:-1}
+  placement:
+    constraints:
+      - node.labels.syncode.role == runtime
+  restart_policy:
+    condition: on-failure
+
+services:
+  gateway:
+    image: ghcr.io/hejiguang/syncode-gateway:${IMAGE_TAG:-main}
+    environment:
+      TZ: Asia/Shanghai
+      HOST_IP: ${RUNTIME_HOST_IP:-127.0.0.1}
+      NACOS_SERVER_ADDR: http://syncode-nacos:8848
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+    ports:
+      - target: 19090
+        published: 19090
+        protocol: tcp
+        mode: host
+    networks:
+      syncode-app:
+        aliases:
+          - syncode-gateway
+      syncode-data:
+    deploy: *runtime-deploy
+
+  friend:
+    image: ghcr.io/hejiguang/syncode-friend:${IMAGE_TAG:-main}
+    environment:
+      TZ: Asia/Shanghai
+      HOST_IP: ${RUNTIME_HOST_IP:-127.0.0.1}
+      NACOS_SERVER_ADDR: http://syncode-nacos:8848
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+    ports:
+      - target: 9202
+        published: 9202
+        protocol: tcp
+        mode: host
+    networks:
+      - syncode-app
+      - syncode-data
+    deploy: *runtime-deploy
+
+  system:
+    image: ghcr.io/hejiguang/syncode-system:${IMAGE_TAG:-main}
+    environment:
+      TZ: Asia/Shanghai
+      HOST_IP: ${RUNTIME_HOST_IP:-127.0.0.1}
+      NACOS_SERVER_ADDR: http://syncode-nacos:8848
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+    ports:
+      - target: 9201
+        published: 9201
+        protocol: tcp
+        mode: host
+    networks:
+      - syncode-app
+      - syncode-data
+    deploy: *runtime-deploy
+
+  judge:
+    image: ghcr.io/hejiguang/syncode-judge:${IMAGE_TAG:-main}
+    environment:
+      TZ: Asia/Shanghai
+      HOST_IP: ${RUNTIME_HOST_IP:-127.0.0.1}
+      NACOS_SERVER_ADDR: http://syncode-nacos:8848
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+    ports:
+      - target: 9204
+        published: 9204
+        protocol: tcp
+        mode: host
+    volumes:
+      - judge-code-pool:/user-code-pool
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - syncode-app
+      - syncode-data
+    deploy: *runtime-deploy
+
+  oj-agent:
+    image: ghcr.io/hejiguang/syncode-oj-agent:${IMAGE_TAG:-main}
+    environment:
+      APP_ENV: ${APP_ENV:-swarm}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      OJ_AGENT_NACOS_CONFIG_ENABLED: "true"
+      OJ_AGENT_NACOS_SERVER_ADDR: http://syncode-nacos:8848
+      OJ_AGENT_NACOS_CONFIG_DATA_ID: oj-agent-local.yaml
+      OJ_AGENT_NACOS_NAMESPACE: ${NACOS_NAMESPACE:-c30aa94a-3644-48d8-9beb-20978bdd133b}
+      OJ_AGENT_NACOS_SERVICE_NAME: oj-agent
+      OJ_AGENT_NACOS_ENABLED: "true"
+      OJ_AGENT_NACOS_IP: ${RUNTIME_HOST_IP:-127.0.0.1}
+      OJ_AGENT_NACOS_PORT: 8015
+      QDRANT_URL: http://qdrant:6333
+    ports:
+      - target: 8015
+        published: 8015
+        protocol: tcp
+        mode: host
+    networks:
+      - syncode-app
+      - syncode-data
+    deploy: *runtime-deploy
+
+volumes:
+  judge-code-pool:
+
+networks:
+  syncode-app:
+    external: true
+  syncode-data:
+    external: true

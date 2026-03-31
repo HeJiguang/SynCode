@@ -1,0 +1,160 @@
+services:
+  mysql:
+    image: mysql:5.7
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me-runtime}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-bitoj_dev}
+      MYSQL_USER: ${MYSQL_APP_USER:-ojtest}
+      MYSQL_PASSWORD: ${MYSQL_APP_PASSWORD:-change-me-runtime}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    configs:
+      - source: mysql-init-base
+        target: /docker-entrypoint-initdb.d/10-init.sql
+      - source: mysql-init-email-login
+        target: /docker-entrypoint-initdb.d/20-email-login.sql
+      - source: mysql-init-learning-platform
+        target: /docker-entrypoint-initdb.d/30-learning-platform.sql
+      - source: mysql-init-rabbitmq-reliability
+        target: /docker-entrypoint-initdb.d/40-rabbitmq-reliability.sql
+      - source: mysql-init-notice-history
+        target: /docker-entrypoint-initdb.d/50-notice-history.sql
+    networks:
+      - syncode-data
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-change-me-runtime}"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    deploy:
+      placement:
+        constraints:
+          - node.labels.syncode.role == runtime
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-change-me-runtime}"]
+    volumes:
+      - redis-data:/data
+    networks:
+      - syncode-data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-change-me-runtime}", "PING"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    deploy:
+      placement:
+        constraints:
+          - node.labels.syncode.role == runtime
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-change-me-runtime}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - syncode-data
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+    deploy:
+      placement:
+        constraints:
+          - node.labels.syncode.role == runtime
+
+  qdrant:
+    image: qdrant/qdrant:v1.13.4
+    volumes:
+      - qdrant-data:/qdrant/storage
+    networks:
+      - syncode-data
+    deploy:
+      placement:
+        constraints:
+          - node.labels.syncode.role == runtime
+
+  elasticsearch:
+    image: elasticsearch:8.5.3
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+      xpack.security.enabled: "false"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - syncode-data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    deploy:
+      placement:
+        constraints:
+          - node.labels.syncode.role == runtime
+
+  nacos:
+    image: nacos/nacos-server:v2.2.2
+    environment:
+      MODE: standalone
+      JVM_XMS: 256m
+      JVM_XMX: 256m
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN:-Y2hhbmdlLW1lLW5hY29zLXRva2VuLXNlY3JldC0xMjM0NTY3ODkw}
+      NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY:-syncode-server}
+      NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE:-syncode-server-value}
+    volumes:
+      - nacos-data:/home/nacos/data
+    ports:
+      - target: 8848
+        published: 8848
+        protocol: tcp
+        mode: host
+    networks:
+      syncode-data:
+      syncode-app:
+        aliases:
+          - syncode-nacos
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8848/nacos"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    deploy:
+      placement:
+        constraints:
+          - node.labels.syncode.role == runtime
+
+volumes:
+  mysql-data:
+  redis-data:
+  rabbitmq-data:
+  qdrant-data:
+  nacos-data:
+  elasticsearch-data:
+
+configs:
+  mysql-init-base:
+    file: ../../dev/sql/init.sql
+  mysql-init-email-login:
+    file: ../../dev/sql/2026-03-25-phase1-email-login-user-column-fix.sql
+  mysql-init-learning-platform:
+    file: ../../dev/sql/2026-03-25-phase1-learning-platform-mvp.sql
+  mysql-init-rabbitmq-reliability:
+    file: ../../dev/sql/2026-03-26-rabbitmq-user-submit-reliability.sql
+  mysql-init-notice-history:
+    file: ../../dev/sql/2026-03-30-notice-and-judge-history-enhancements.sql
+
+networks:
+  syncode-data:
+    external: true
+  syncode-app:
+    external: true

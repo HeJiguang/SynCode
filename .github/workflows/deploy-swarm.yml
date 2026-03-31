@@ -1,0 +1,215 @@
+name: deploy-swarm
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_TAG: sha-${{ github.sha }}
+  MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+  MYSQL_APP_PASSWORD: ${{ secrets.MYSQL_APP_PASSWORD }}
+  REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+  RABBITMQ_DEFAULT_USER: ${{ secrets.RABBITMQ_DEFAULT_USER }}
+  RABBITMQ_DEFAULT_PASS: ${{ secrets.RABBITMQ_DEFAULT_PASS }}
+  JWT_SECRET: ${{ secrets.JWT_SECRET }}
+  MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+  MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+  LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+  SYNCODE_RUNTIME_REPLICAS: ${{ secrets.SYNCODE_RUNTIME_REPLICAS || '1' }}
+  RUNTIME_HOST_IP: ${{ secrets.RUNTIME_HOST_IP }}
+
+jobs:
+  detect-frontend:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend_ready: ${{ steps.check.outputs.frontend_ready }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        name: Detect frontend workspace
+        shell: bash
+        run: |
+          required_files=(
+            "frontend/package.json"
+            "frontend/package-lock.json"
+            "frontend/apps/web/package.json"
+            "frontend/apps/app/package.json"
+            "frontend/apps/admin/package.json"
+          )
+
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "frontend_ready=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+
+          echo "frontend_ready=true" >> "$GITHUB_OUTPUT"
+
+  build-java:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image: syncode-gateway
+            module: oj-gateway
+          - image: syncode-friend
+            module: oj-modules/oj-friend
+          - image: syncode-system
+            module: oj-modules/oj-system
+          - image: syncode-judge
+            module: oj-modules/oj-judge
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push Java image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/java-service.Dockerfile
+          push: true
+          build-args: |
+            MODULE_PATH=${{ matrix.module }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ env.IMAGE_TAG }}
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:main
+
+  build-frontend:
+    needs: detect-frontend
+    if: needs.detect-frontend.outputs.frontend_ready == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image: syncode-web
+            app: web
+          - image: syncode-app
+            app: app
+          - image: syncode-admin
+            app: admin
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/next-app.Dockerfile
+          push: true
+          build-args: |
+            APP_NAME=${{ matrix.app }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ env.IMAGE_TAG }}
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:main
+
+  build-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push agent image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/oj-agent.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/syncode-oj-agent:${{ env.IMAGE_TAG }}
+            ghcr.io/${{ github.repository_owner }}/syncode-oj-agent:main
+
+  deploy-runtime:
+    runs-on: ubuntu-latest
+    needs:
+      - build-java
+      - build-agent
+    steps:
+      - uses: actions/checkout@v4
+      - name: Copy deployment assets to manager
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SWARM_MANAGER_HOST }}
+          username: ${{ secrets.SWARM_MANAGER_USER }}
+          password: ${{ secrets.SWARM_MANAGER_PASSWORD }}
+          source: "deploy"
+          target: "${{ secrets.SWARM_DEPLOY_PATH }}"
+      - name: Deploy stacks on manager
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ github.token }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          MYSQL_ROOT_PASSWORD: ${{ env.MYSQL_ROOT_PASSWORD }}
+          MYSQL_APP_PASSWORD: ${{ env.MYSQL_APP_PASSWORD }}
+          REDIS_PASSWORD: ${{ env.REDIS_PASSWORD }}
+          RABBITMQ_DEFAULT_USER: ${{ env.RABBITMQ_DEFAULT_USER }}
+          RABBITMQ_DEFAULT_PASS: ${{ env.RABBITMQ_DEFAULT_PASS }}
+          JWT_SECRET: ${{ env.JWT_SECRET }}
+          MAIL_USERNAME: ${{ env.MAIL_USERNAME }}
+          MAIL_PASSWORD: ${{ env.MAIL_PASSWORD }}
+          LLM_API_KEY: ${{ env.LLM_API_KEY }}
+          SYNCODE_RUNTIME_REPLICAS: ${{ env.SYNCODE_RUNTIME_REPLICAS }}
+          RUNTIME_HOST_IP: ${{ env.RUNTIME_HOST_IP }}
+        with:
+          host: ${{ secrets.SWARM_MANAGER_HOST }}
+          username: ${{ secrets.SWARM_MANAGER_USER }}
+          password: ${{ secrets.SWARM_MANAGER_PASSWORD }}
+          envs: GHCR_USERNAME,GHCR_TOKEN,IMAGE_TAG,MYSQL_ROOT_PASSWORD,MYSQL_APP_PASSWORD,REDIS_PASSWORD,RABBITMQ_DEFAULT_USER,RABBITMQ_DEFAULT_PASS,JWT_SECRET,MAIL_USERNAME,MAIL_PASSWORD,LLM_API_KEY,SYNCODE_RUNTIME_REPLICAS,RUNTIME_HOST_IP
+          script: |
+            docker login ghcr.io -u "$GHCR_USERNAME" -p "$GHCR_TOKEN"
+            docker network inspect syncode-public >/dev/null 2>&1 || docker network create --driver overlay --attachable syncode-public
+            docker network inspect syncode-app >/dev/null 2>&1 || docker network create --driver overlay --attachable syncode-app
+            docker network inspect syncode-data >/dev/null 2>&1 || docker network create --driver overlay --attachable syncode-data
+            cd "${{ secrets.SWARM_DEPLOY_PATH }}/deploy/swarm"
+            docker stack deploy -c stacks/infra.yml syncode-infra
+            docker stack deploy -c stacks/runtime.yml syncode-runtime
+
+  deploy-edge:
+    runs-on: ubuntu-latest
+    needs:
+      - detect-frontend
+      - build-frontend
+      - deploy-runtime
+    if: needs.detect-frontend.outputs.frontend_ready == 'true'
+    steps:
+      - name: Deploy edge stack on manager
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ github.token }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+        with:
+          host: ${{ secrets.SWARM_MANAGER_HOST }}
+          username: ${{ secrets.SWARM_MANAGER_USER }}
+          password: ${{ secrets.SWARM_MANAGER_PASSWORD }}
+          envs: GHCR_USERNAME,GHCR_TOKEN,IMAGE_TAG
+          script: |
+            docker login ghcr.io -u "$GHCR_USERNAME" -p "$GHCR_TOKEN"
+            cd "${{ secrets.SWARM_DEPLOY_PATH }}/deploy/swarm"
+            docker stack deploy -c stacks/edge.yml syncode-edge

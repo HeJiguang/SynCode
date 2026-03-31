@@ -1,0 +1,51 @@
+services:
+  web:
+    image: ghcr.io/hejiguang/syncode-web:${IMAGE_TAG:-main}
+    environment:
+      APP_URL: http://app:3000
+      ADMIN_URL: http://admin:3000
+    networks:
+      - syncode-public
+      - syncode-app
+    ports:
+      - target: 3000
+        published: 80
+        protocol: tcp
+        mode: ingress
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.syncode.role == edge
+
+  app:
+    image: ghcr.io/hejiguang/syncode-app:${IMAGE_TAG:-main}
+    environment:
+      NEXT_PUBLIC_BACKEND_BASE_URL: http://syncode-gateway:19090
+      SYNCODE_BACKEND_BASE_URL: http://syncode-gateway:19090
+    networks:
+      - syncode-app
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.syncode.role == edge
+
+  admin:
+    image: ghcr.io/hejiguang/syncode-admin:${IMAGE_TAG:-main}
+    environment:
+      NEXT_PUBLIC_BACKEND_BASE_URL: http://syncode-gateway:19090
+      SYNCODE_BACKEND_BASE_URL: http://syncode-gateway:19090
+    networks:
+      - syncode-app
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.syncode.role == edge
+
+networks:
+  syncode-public:
+    external: true
+  syncode-app:
+    external: true
