@@ -11,6 +11,7 @@ permissions:
   packages: write
 
 env:
+  GHCR_NAMESPACE: hejiguang
   IMAGE_TAG: sha-${{ github.sha }}
   MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
   MYSQL_APP_PASSWORD: ${{ secrets.MYSQL_APP_PASSWORD }}
@@ -84,8 +85,8 @@ jobs:
           build-args: |
             MODULE_PATH=${{ matrix.module }}
           tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ env.IMAGE_TAG }}
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:main
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/${{ matrix.image }}:${{ env.IMAGE_TAG }}
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/${{ matrix.image }}:main
 
   build-frontend:
     needs: detect-frontend
@@ -119,8 +120,8 @@ jobs:
           build-args: |
             APP_NAME=${{ matrix.app }}
           tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ env.IMAGE_TAG }}
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:main
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/${{ matrix.image }}:${{ env.IMAGE_TAG }}
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/${{ matrix.image }}:main
 
   build-agent:
     runs-on: ubuntu-latest
@@ -141,8 +142,8 @@ jobs:
           file: deploy/docker/oj-agent.Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/syncode-oj-agent:${{ env.IMAGE_TAG }}
-            ghcr.io/${{ github.repository_owner }}/syncode-oj-agent:main
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/syncode-oj-agent:${{ env.IMAGE_TAG }}
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/syncode-oj-agent:main
 
   deploy-runtime:
     runs-on: ubuntu-latest
