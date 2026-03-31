@@ -152,16 +152,46 @@ jobs:
       - build-agent
     steps:
       - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Prepare runtime image bundle
+        shell: bash
+        run: |
+          mkdir -p deploy-bundles
+
+          runtime_images=(
+            "ghcr.io/${GHCR_NAMESPACE}/syncode-gateway:${IMAGE_TAG}"
+            "ghcr.io/${GHCR_NAMESPACE}/syncode-friend:${IMAGE_TAG}"
+            "ghcr.io/${GHCR_NAMESPACE}/syncode-system:${IMAGE_TAG}"
+            "ghcr.io/${GHCR_NAMESPACE}/syncode-judge:${IMAGE_TAG}"
+            "ghcr.io/${GHCR_NAMESPACE}/syncode-oj-agent:${IMAGE_TAG}"
+          )
+
+          for image in "${runtime_images[@]}"; do
+            docker pull "$image"
+          done
+
+          docker save \
+            "ghcr.io/${GHCR_NAMESPACE}/syncode-gateway:${IMAGE_TAG}" \
+            "ghcr.io/${GHCR_NAMESPACE}/syncode-friend:${IMAGE_TAG}" \
+            "ghcr.io/${GHCR_NAMESPACE}/syncode-system:${IMAGE_TAG}" \
+            "ghcr.io/${GHCR_NAMESPACE}/syncode-judge:${IMAGE_TAG}" \
+            "ghcr.io/${GHCR_NAMESPACE}/syncode-oj-agent:${IMAGE_TAG}" \
+            -o deploy-bundles/runtime-images.tar
       - name: Copy deployment assets to manager
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SWARM_MANAGER_HOST }}
           username: ${{ secrets.SWARM_MANAGER_USER }}
           password: ${{ secrets.SWARM_MANAGER_PASSWORD }}
-          source: "deploy/swarm,deploy/docker,deploy/dev/sql/init.sql,deploy/dev/sql/2026-03-25-phase1-email-login-user-column-fix.sql,deploy/dev/sql/2026-03-25-phase1-learning-platform-mvp.sql,deploy/dev/sql/2026-03-26-rabbitmq-user-submit-reliability.sql,deploy/dev/sql/2026-03-30-notice-and-judge-history-enhancements.sql"
+          source: "deploy/swarm,deploy/docker,deploy/dev/sql/init.sql,deploy/dev/sql/2026-03-25-phase1-email-login-user-column-fix.sql,deploy/dev/sql/2026-03-25-phase1-learning-platform-mvp.sql,deploy/dev/sql/2026-03-26-rabbitmq-user-submit-reliability.sql,deploy/dev/sql/2026-03-30-notice-and-judge-history-enhancements.sql,deploy-bundles/runtime-images.tar"
           target: "${{ secrets.SWARM_DEPLOY_PATH }}"
-          timeout: "5m"
-          command_timeout: "20m"
+          timeout: "15m"
+          command_timeout: "30m"
           overwrite: true
       - name: Deploy stacks on manager
         uses: appleboy/ssh-action@v1.2.0
@@ -190,9 +220,10 @@ jobs:
             docker network inspect syncode-public >/dev/null 2>&1 || docker network create --driver overlay --attachable syncode-public
             docker network inspect syncode-app >/dev/null 2>&1 || docker network create --driver overlay --attachable syncode-app
             docker network inspect syncode-data >/dev/null 2>&1 || docker network create --driver overlay --attachable syncode-data
+            docker load -i "${{ secrets.SWARM_DEPLOY_PATH }}/deploy-bundles/runtime-images.tar"
             cd "${{ secrets.SWARM_DEPLOY_PATH }}/deploy/swarm"
             docker stack deploy --with-registry-auth -c stacks/infra.yml syncode-infra
-            docker stack deploy --with-registry-auth -c stacks/runtime.yml syncode-runtime
+            docker stack deploy --resolve-image never --with-registry-auth -c stacks/runtime.yml syncode-runtime
 
   deploy-edge:
     runs-on: ubuntu-latest
@@ -200,7 +231,7 @@ jobs:
       - detect-frontend
       - build-frontend
       - deploy-runtime
-    if: needs.detect-frontend.outputs.frontend_ready == 'true'
+    if: needs.detect-frontend.outputs.frontend_ready == 'true' && vars.ENABLE_EDGE_DEPLOY == 'true'
     steps:
       - name: Deploy edge stack on manager
         uses: appleboy/ssh-action@v1.2.0
