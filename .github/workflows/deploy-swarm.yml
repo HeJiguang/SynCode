@@ -163,8 +163,8 @@ jobs:
       - name: Deploy stacks on manager
         uses: appleboy/ssh-action@v1.2.0
         env:
-          GHCR_USERNAME: ${{ github.actor }}
-          GHCR_TOKEN: ${{ github.token }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
           MYSQL_ROOT_PASSWORD: ${{ env.MYSQL_ROOT_PASSWORD }}
           MYSQL_APP_PASSWORD: ${{ env.MYSQL_APP_PASSWORD }}
@@ -188,8 +188,8 @@ jobs:
             docker network inspect syncode-app >/dev/null 2>&1 || docker network create --driver overlay --attachable syncode-app
             docker network inspect syncode-data >/dev/null 2>&1 || docker network create --driver overlay --attachable syncode-data
             cd "${{ secrets.SWARM_DEPLOY_PATH }}/deploy/swarm"
-            docker stack deploy -c stacks/infra.yml syncode-infra
-            docker stack deploy -c stacks/runtime.yml syncode-runtime
+            docker stack deploy --with-registry-auth -c stacks/infra.yml syncode-infra
+            docker stack deploy --with-registry-auth -c stacks/runtime.yml syncode-runtime
 
   deploy-edge:
     runs-on: ubuntu-latest
@@ -202,8 +202,8 @@ jobs:
       - name: Deploy edge stack on manager
         uses: appleboy/ssh-action@v1.2.0
         env:
-          GHCR_USERNAME: ${{ github.actor }}
-          GHCR_TOKEN: ${{ github.token }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
         with:
           host: ${{ secrets.SWARM_MANAGER_HOST }}
@@ -213,4 +213,4 @@ jobs:
           script: |
             docker login ghcr.io -u "$GHCR_USERNAME" -p "$GHCR_TOKEN"
             cd "${{ secrets.SWARM_DEPLOY_PATH }}/deploy/swarm"
-            docker stack deploy -c stacks/edge.yml syncode-edge
+            docker stack deploy --with-registry-auth -c stacks/edge.yml syncode-edge
