@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sintao.friend.mapper.notice.NoticeMapper">
+
+    <select id="selectPublicNoticeList" resultType="com.sintao.friend.domain.notice.vo.PublicNoticeVO">
+        SELECT
+            notice_id,
+            title,
+            content,
+            category,
+            is_pinned,
+            publish_time
+        FROM
+            tb_notice
+        WHERE
+            is_public = 1
+            AND status = 1
+            AND (publish_time IS NULL OR publish_time &lt;= NOW())
+        ORDER BY
+            is_pinned DESC,
+            COALESCE(publish_time, create_time) DESC
+    </select>
+</mapper>

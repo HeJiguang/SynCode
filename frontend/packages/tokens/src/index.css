@@ -1,0 +1,183 @@
+/* ─────────────────────────────────────────────────────────────
+   SynCode Design Tokens  —  Emotional & Elegant Dual-Theme System
+   Dark  = :root  (prefers-color-scheme: dark default)
+   Light = :root.light
+   ───────────────────────────────────────────────────────────── */
+
+/* ── Dark Mode (Default) ── */
+:root {
+  color-scheme: dark;
+
+  /* Backgrounds — 极深的主背景 & 略亮的卡片 */
+  --bg:            #0a0a0a;   /* 纯黑灰 */
+  --bg-elevated:   #111111;   /* 极暗的深灰 */
+
+  /* Surfaces */
+  --surface-1:     #111111;   /* 卡片底色 */
+  --surface-2:     #1a1a1a;   /* 悬浮/激活色块 */
+  --surface-muted: rgba(17, 17, 17, 0.6);
+
+  /* Borders — 完全靠 1px 半透明界定，绝不发光 */
+  --border-soft:   rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  /* Typography */
+  --text-primary:   #fafafa;
+  --text-secondary: #a1a1aa;  /* 中度灰，提升呼吸感 */
+  --text-muted:     #71717a;
+
+  /* Primary CTA — 暗色：白底黑字，无渐变 */
+  --cta-bg:    #fafafa;
+  --cta-fg:    #0a0a0a;
+  --cta-hover: #e4e4e7;
+
+  /* Semantic & Emotional Accents */
+  --accent:    #a78bfa;  /* 柔和的薰衣草紫 (Violet-400) */
+  --success:   #4ade80;  /* 柔和绿 */
+  --warning:   #fb923c;
+  --danger:    #f87171;  /* 柔和红 */
+
+  --success-bg: rgba(74, 222, 128, 0.12);
+  --warning-bg: rgba(251, 146, 60, 0.14);
+  --danger-bg:  rgba(248, 113, 113, 0.14);
+  --accent-bg:  rgba(167, 139, 250, 0.12);
+
+  /* Radius — 极致网格 */
+  --radius-card: 12px;
+  --radius-sm:   6px;
+
+  /* Shadows — 暗色下所有常规面板【无投影】，只保留纯黑色的极端浮层弥散(如下拉菜单) */
+  --shadow-panel: none;
+  --shadow-float: 0 16px 48px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08);
+
+  /* Fonts — 引入 Geist */
+  --font-sans:
+    "Geist", "Inter", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono:
+    "Geist Mono", "Monaco", "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* ── Light Mode Base Variables ── */
+:root.light {
+    color-scheme: light;
+    --bg:            #faf9f6;
+    --bg-elevated:   #ffffff;
+    --surface-1:     #ffffff;
+    --surface-2:     #f4f4f5;
+    --surface-muted: rgba(255, 255, 255, 0.8);
+    --border-soft:   #e4e4e7;
+    --border-strong: #d4d4d8;
+    --text-primary:   #0a0a0a;
+    --text-secondary: #52525b;
+    --text-muted:     #a1a1aa;
+    --cta-bg:    #0a0a0a;
+    --cta-fg:    #ffffff;
+    --cta-hover: #1f1f23;
+    --accent:    #7c3aed;
+    --success:   #16a34a;
+    --warning:   #ea580c;
+    --danger:    #dc2626;
+    --success-bg: rgba(22, 163, 74, 0.08);
+    --warning-bg: rgba(234, 88, 12, 0.10);
+    --danger-bg:  rgba(220, 38, 38, 0.08);
+    --accent-bg:  rgba(124, 58, 237, 0.08);
+    --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.04), 0 0 0 1px var(--border-soft);
+    --shadow-float: 0 12px 32px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--border-soft);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not(.dark) {
+    color-scheme: light;
+    --bg:            #faf9f6;
+    --bg-elevated:   #ffffff;
+    --surface-1:     #ffffff;
+    --surface-2:     #f4f4f5;
+    --surface-muted: rgba(255, 255, 255, 0.8);
+    --border-soft:   #e4e4e7;
+    --border-strong: #d4d4d8;
+    --text-primary:   #0a0a0a;
+    --text-secondary: #52525b;
+    --text-muted:     #a1a1aa;
+    --cta-bg:    #0a0a0a;
+    --cta-fg:    #ffffff;
+    --cta-hover: #1f1f23;
+    --accent:    #7c3aed;
+    --success:   #16a34a;
+    --warning:   #ea580c;
+    --danger:    #dc2626;
+    --success-bg: rgba(22, 163, 74, 0.08);
+    --warning-bg: rgba(234, 88, 12, 0.10);
+    --danger-bg:  rgba(220, 38, 38, 0.08);
+    --accent-bg:  rgba(124, 58, 237, 0.08);
+    --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.04), 0 0 0 1px var(--border-soft);
+    --shadow-float: 0 12px 32px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--border-soft);
+  }
+}
+
+/* ── Reset & Base ── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-feature-settings: "liga" 1, "calt" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  line-height: 1.6; /* 增大正文呼吸感 */
+}
+
+::selection {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+code,
+pre {
+  font-family: var(--font-mono);
+}
+
+/* ── Typography Utilities ── */
+.kicker {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.section-title {
+  margin: 0;
+  font-size: clamp(1.75rem, 1.2rem + 1vw, 2.5rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+  color: var(--text-primary);
+}

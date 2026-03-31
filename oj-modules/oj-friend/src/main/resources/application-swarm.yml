@@ -1,0 +1,53 @@
+server:
+  port: 9202
+
+spring:
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:mysql}:3306/${MYSQL_DATABASE:bitoj_dev}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_APP_USER:ojtest}
+    password: ${MYSQL_PASSWORD:change-me-runtime}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:change-me-runtime}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_DEFAULT_USER:admin}
+    password: ${RABBITMQ_DEFAULT_PASS:change-me-runtime}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+
+mail:
+  host: smtp.qq.com
+  port: 587
+  username: ${MAIL_USERNAME:}
+  password: ${MAIL_PASSWORD:}
+  from: ${MAIL_USERNAME:}
+  subject: OnlineOJ email code
+  auth: true
+  starttls: true
+  starttls-required: true
+  ssl-protocols: TLSv1.2
+  code-expiration: 5
+  send-limit: 3
+  is-send: ${MAIL_IS_SEND:false}
+
+training:
+  agent:
+    service-id: oj-agent
+    base-url:
+    plan-path: /api/training/plan
+    candidate-limit: 40
+    client:
+      connect-timeout-ms: 1000
+      request-timeout-ms: 5000
+      max-attempts: 3
+      retry-backoff-ms: 200
+      circuit-failure-threshold: 5
+      circuit-open-ms: 30000
+      rate-limit-per-minute: 60

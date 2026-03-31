@@ -22,6 +22,10 @@ public class UserSubmissionHistoryVO {
 
     private String exeMessage;
 
+    private Long useTime;
+
+    private Long useMemory;
+
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;

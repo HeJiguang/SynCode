@@ -2,6 +2,7 @@ package com.sintao.api;
 
 
 import com.sintao.api.domain.dto.JudgeSubmitDTO;
+import com.sintao.api.domain.vo.UserCodeRunVO;
 import com.sintao.api.domain.vo.UserQuestionResultVO;
 import com.sintao.common.core.constants.Constants;
 import com.sintao.common.core.domain.R;
@@ -14,5 +15,8 @@ public interface RemoteJudgeService {
 
     @PostMapping("/judge/doJudgeJavaCode")
     R<UserQuestionResultVO> doJudgeJavaCode(@RequestBody JudgeSubmitDTO judgeSubmitDTO);
+
+    @PostMapping("/judge/runJavaCode")
+    R<UserCodeRunVO> runJavaCode(@RequestBody JudgeSubmitDTO judgeSubmitDTO);
 }
 

@@ -3,12 +3,16 @@ package com.sintao.friend.service.question.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.github.pagehelper.PageHelper;
 import com.sintao.common.core.constants.Constants;
 import com.sintao.common.core.domain.TableDataInfo;
 import com.sintao.friend.domain.question.Question;
+import com.sintao.friend.domain.question.QuestionCase;
 import com.sintao.friend.domain.question.dto.QuestionQueryDTO;
 import com.sintao.friend.domain.question.es.QuestionES;
+import com.sintao.friend.domain.question.vo.QuestionCaseVO;
 import com.sintao.friend.domain.question.vo.QuestionDetailVO;
 import com.sintao.friend.domain.question.vo.QuestionVO;
 import com.sintao.friend.elasticsearch.QuestionRepository;
@@ -16,7 +20,6 @@ import com.sintao.friend.manager.QuestionCacheManager;
 import com.sintao.friend.mapper.question.QuestionMapper;
 import com.sintao.friend.mapper.user.UserSubmitMapper;
 import com.sintao.friend.service.question.IQuestionService;
-import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -27,6 +30,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -93,6 +97,7 @@ public class QuestionServiceImpl implements IQuestionService {
         QuestionDetailVO questionDetailVO = new QuestionDetailVO();
         if (questionES != null) {
             BeanUtil.copyProperties(questionES, questionDetailVO);
+            questionDetailVO.setExampleCases(extractExampleCases(questionES.getQuestionCase()));
             return questionDetailVO;
         }
         Question question = questionMapper.selectById(questionId);
@@ -101,6 +106,7 @@ public class QuestionServiceImpl implements IQuestionService {
         }
         refreshQuestion();
         BeanUtil.copyProperties(question, questionDetailVO);
+        questionDetailVO.setExampleCases(extractExampleCases(question.getQuestionCase()));
         return questionDetailVO;
     }
 
@@ -123,7 +129,7 @@ public class QuestionServiceImpl implements IQuestionService {
     }
 
     private void refreshQuestion() {
-        List<Question> questionList = questionMapper.selectList(new LambdaQueryWrapper<Question>());
+        List<Question> questionList = questionMapper.selectList(new LambdaQueryWrapper<>());
         if (CollectionUtil.isEmpty(questionList)) {
             return;
         }
@@ -137,12 +143,37 @@ public class QuestionServiceImpl implements IQuestionService {
         }
         List<QuestionVO> resultList = new ArrayList<>();
         for (Long questionId : hotQuestionIdList) {
-            QuestionVO questionVO = new QuestionVO();
             QuestionDetailVO detail = detail(questionId);
+            if (detail == null) {
+                continue;
+            }
+            QuestionVO questionVO = new QuestionVO();
+            questionVO.setQuestionId(detail.getQuestionId());
             questionVO.setTitle(detail.getTitle());
+            questionVO.setDifficulty(detail.getDifficulty());
             resultList.add(questionVO);
         }
         return resultList;
     }
-}
 
+    private List<QuestionCaseVO> extractExampleCases(String questionCaseJson) {
+        if (StrUtil.isBlank(questionCaseJson)) {
+            return new ArrayList<>();
+        }
+        List<QuestionCase> questionCaseList = JSONUtil.toList(questionCaseJson, QuestionCase.class);
+        if (CollectionUtil.isEmpty(questionCaseList)) {
+            return new ArrayList<>();
+        }
+        return questionCaseList.stream()
+                .limit(2)
+                .map(this::toQuestionCaseVO)
+                .collect(Collectors.toList());
+    }
+
+    private QuestionCaseVO toQuestionCaseVO(QuestionCase questionCase) {
+        QuestionCaseVO caseVO = new QuestionCaseVO();
+        caseVO.setInput(questionCase.getInput());
+        caseVO.setOutput(questionCase.getOutput());
+        return caseVO;
+    }
+}

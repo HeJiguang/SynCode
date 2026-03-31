@@ -8,7 +8,9 @@
             submit_id,
             pass,
             exe_message,
-            case_judge_res
+            case_judge_res,
+            use_time,
+            use_memory
         FROM
             tb_user_submit
         <where>
@@ -48,6 +50,42 @@
             hot_count DESC
     </select>
 
+    <select id="selectSolvedQuestionCount" resultType="java.lang.Integer">
+        SELECT
+            COUNT(DISTINCT question_id)
+        FROM
+            tb_user_submit
+        WHERE
+            user_id = #{userId}
+            AND pass = 1
+    </select>
+
+    <select id="selectSubmissionCount" resultType="java.lang.Integer">
+        SELECT
+            COUNT(1)
+        FROM
+            tb_user_submit
+        WHERE
+            user_id = #{userId}
+    </select>
+
+    <select id="selectHeatmap" resultType="com.sintao.friend.domain.user.vo.UserHeatmapPointVO">
+        SELECT
+            DATE_FORMAT(create_time, '%Y-%m-%d') AS study_date,
+            COUNT(1) AS submission_count
+        FROM
+            tb_user_submit
+        WHERE
+            user_id = #{userId}
+            <if test="sinceTime != null">
+                AND create_time &gt;= #{sinceTime}
+            </if>
+        GROUP BY
+            DATE_FORMAT(create_time, '%Y-%m-%d')
+        ORDER BY
+            study_date DESC
+    </select>
+
     <select id="selectLatestExamSubmit" resultType="com.sintao.friend.domain.user.UserSubmit">
         SELECT
             submit_id,
@@ -60,6 +98,8 @@
             score,
             exe_message,
             case_judge_res,
+            use_time,
+            use_memory,
             create_by,
             create_time,
             update_by,
@@ -90,6 +130,8 @@
             score,
             exe_message,
             case_judge_res,
+            use_time,
+            use_memory,
             create_by,
             create_time,
             update_by,
@@ -98,7 +140,9 @@
             tb_user_submit
         WHERE
             user_id = #{userId}
-            AND question_id = #{questionId}
+            <if test="questionId != null">
+                AND question_id = #{questionId}
+            </if>
             <choose>
                 <when test="examId != null">
                     AND exam_id = #{examId}

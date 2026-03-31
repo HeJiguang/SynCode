@@ -15,7 +15,15 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/sysUser")
@@ -25,15 +33,7 @@ public class SysUserController extends BaseController {
     @Autowired
     private ISysUserService sysUserService;
 
-    //登录成功还是失败  bool true  false   int  code  1 成功   0 失败
-    // 如果失败需要失败的原因     String  msg
-    // 请求方法待定，URL 为 /sysUser/login
-    //接口文档    统一的响应数据的结构
-    //请求方法  post
-    //请求参数  body
-
-    // swagger 生成接口文档，第三方组件、公共组件，接口地址为 /system/sysUser/login
-    @PostMapping("/login")  //安全
+    @PostMapping("/login")
     @Operation(summary = "管理员登录", description = "根据账号密码进行管理员登录")
     @ApiResponse(responseCode = "1000", description = "操作成功")
     @ApiResponse(responseCode = "2000", description = "服务繁忙，请稍后重试")
@@ -42,22 +42,18 @@ public class SysUserController extends BaseController {
     public R<String> login(@RequestBody LoginDTO loginDTO) {
         return sysUserService.login(loginDTO.getUserAccount(), loginDTO.getPassword());
     }
-    // 成功 / 失败：用户已存在、账号或密码错误
+
     @DeleteMapping("/logout")
-    @Operation(summary = "管理员登出", description = "清除当前登录态，需在请求头携带 Authorization token")
+    @Operation(summary = "管理员登出", description = "清除当前登录态，需要在请求头携带 Authorization token")
     @Parameter(name = HttpConstants.AUTHENTICATION, in = ParameterIn.HEADER, description = "登录后返回的 token", required = true)
     @ApiResponse(responseCode = "1000", description = "登出成功")
     @ApiResponse(responseCode = "2000", description = "服务繁忙，请稍后重试")
     public R<Void> logout(@RequestHeader(HttpConstants.AUTHENTICATION) String token) {
         return toR(sysUserService.logout(token));
-//        if (logout) {
-//            return R.ok();
-//        }
-//        return R.fail();
     }
 
     @GetMapping("/info")
-    @Operation(summary = "获取当前管理员信息", description = "根据 token 获取当前登录管理员的昵称、身份等信息")
+    @Operation(summary = "获取当前管理员信息", description = "根据 token 获取当前登录管理员信息")
     @Parameter(name = HttpConstants.AUTHENTICATION, in = ParameterIn.HEADER, description = "登录后返回的 token", required = true)
     @ApiResponse(responseCode = "1000", description = "成功获取用户信息")
     @ApiResponse(responseCode = "2000", description = "服务繁忙，请稍后重试")
@@ -65,15 +61,6 @@ public class SysUserController extends BaseController {
         return sysUserService.info(token);
     }
 
-
-    //管理员的增删改查
-
-    // 接口地址为 /sysUser/add
-    //请求方法
-
-    //新增
-
-    // 开发、测试、生成
     @PostMapping("/add")
     @Operation(summary = "新增管理员", description = "根据提供的信息新增管理员")
     @ApiResponse(responseCode = "1000", description = "操作成功")
@@ -84,27 +71,27 @@ public class SysUserController extends BaseController {
     }
 
     @DeleteMapping("/{userId}")
-    @Operation(summary = "删除用户", description = "通过用户id删除用户")
-    @Parameters(value = {
+    @Operation(summary = "删除管理员", description = "通过用户ID删除管理员")
+    @Parameters({
             @Parameter(name = "userId", in = ParameterIn.PATH, description = "用户ID")
     })
     @ApiResponse(responseCode = "1000", description = "成功删除用户")
     @ApiResponse(responseCode = "2000", description = "服务繁忙，请稍后重试")
     @ApiResponse(responseCode = "3101", description = "用户不存在")
     public R<Void> delete(@PathVariable Long userId) {
-        return null;
+        return toR(sysUserService.delete(userId));
     }
 
-    @Operation(summary = "用户详情", description = "根据查询条件查询用户详情")
     @GetMapping("/detail")
-    @Parameters(value = {
+    @Operation(summary = "管理员详情", description = "根据用户ID查询管理员详情")
+    @Parameters({
             @Parameter(name = "userId", in = ParameterIn.QUERY, description = "用户ID"),
-            @Parameter(name = "sex", in = ParameterIn.QUERY, description = "用户性别")
+            @Parameter(name = "sex", in = ParameterIn.QUERY, description = "保留参数")
     })
     @ApiResponse(responseCode = "1000", description = "成功获取用户信息")
     @ApiResponse(responseCode = "2000", description = "服务繁忙，请稍后重试")
     @ApiResponse(responseCode = "3101", description = "用户不存在")
     public R<SysUserVO> detail(@RequestParam(required = true) Long userId, @RequestParam(required = false) String sex) {
-        return null;
+        return R.ok(sysUserService.detail(userId));
     }
 }

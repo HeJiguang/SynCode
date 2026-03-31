@@ -1,0 +1,11 @@
+@import "tailwindcss";
+@import "../../../../packages/tokens/src/index.css";
+@source "../../../../packages/ui/src";
+@source "../../../../packages/config/src";
+@source "../";
+
+.admin-grid {
+  background:
+    radial-gradient(circle at top right, rgba(89, 168, 255, 0.1), transparent 22%),
+    linear-gradient(180deg, rgba(8, 11, 16, 0.96), rgba(7, 10, 15, 1));
+}

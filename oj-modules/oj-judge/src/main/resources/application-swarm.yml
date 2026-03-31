@@ -1,0 +1,31 @@
+server:
+  port: 9204
+
+spring:
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_DEFAULT_USER:admin}
+    password: ${RABBITMQ_DEFAULT_PASS:change-me-runtime}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:change-me-runtime}
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:mysql}:3306/${MYSQL_DATABASE:bitoj_dev}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_APP_USER:ojtest}
+    password: ${MYSQL_PASSWORD:change-me-runtime}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+sandbox:
+  docker:
+    volume: /usr/share/java
+
+judge:
+  runtime-state:
+    ttl-minutes: 1440

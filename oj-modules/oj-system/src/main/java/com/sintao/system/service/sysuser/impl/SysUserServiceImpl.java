@@ -13,6 +13,7 @@ import com.sintao.common.security.exception.ServiceException;
 import com.sintao.common.security.service.TokenService;
 import com.sintao.system.domain.sysuser.SysUser;
 import com.sintao.system.domain.sysuser.dto.SysUserSaveDTO;
+import com.sintao.system.domain.sysuser.vo.SysUserVO;
 import com.sintao.system.mapper.sysuser.SysUserMapper;
 import com.sintao.system.service.sysuser.ISysUserService;
 import com.sintao.system.utils.BCryptUtils;
@@ -92,5 +93,26 @@ public class SysUserServiceImpl implements ISysUserService {
         sysUser.setUserAccount(sysUserSaveDTO.getUserAccount());
         sysUser.setPassword(BCryptUtils.encryptPassword(sysUserSaveDTO.getPassword()));
         return sysUserMapper.insert(sysUser);
+    }
+
+    @Override
+    public int delete(Long userId) {
+        SysUser sysUser = sysUserMapper.selectById(userId);
+        if (sysUser == null) {
+            throw new ServiceException(ResultCode.FAILED_USER_NOT_EXISTS);
+        }
+        return sysUserMapper.deleteById(userId);
+    }
+
+    @Override
+    public SysUserVO detail(Long userId) {
+        SysUser sysUser = sysUserMapper.selectById(userId);
+        if (sysUser == null) {
+            throw new ServiceException(ResultCode.FAILED_USER_NOT_EXISTS);
+        }
+        SysUserVO sysUserVO = new SysUserVO();
+        sysUserVO.setUserAccount(sysUser.getUserAccount());
+        sysUserVO.setNickName(sysUser.getNickName());
+        return sysUserVO;
     }
 }

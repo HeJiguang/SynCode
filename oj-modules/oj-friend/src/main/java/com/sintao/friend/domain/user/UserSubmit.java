@@ -42,6 +42,10 @@ public class UserSubmit extends BaseEntity {
 
 	private String caseJudgeRes;
 
+	private Long useTime;
+
+	private Long useMemory;
+
 	private String requestId;
 
 	private Integer judgeStatus;

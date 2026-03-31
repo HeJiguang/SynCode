@@ -1,0 +1,13 @@
+{
+  "name": "@aioj/ui",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "test": "tsx src/__tests__/exports.test.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
+}

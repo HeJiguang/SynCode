@@ -190,6 +190,8 @@ pass tinyint NOT NULL COMMENT '0：未通过 1：通过 2：未提交 3：判题
 exe_message  varchar(500) NOT NULL COMMENT '执行结果',
 score int NOT NULL DEFAULT '0' COMMENT '得分',
 case_judge_res text COMMENT '用例评测结果',
+use_time bigint COMMENT '运行耗时(ms)',
+use_memory bigint COMMENT '运行内存(KB)',
 judge_status tinyint NOT NULL DEFAULT '0' COMMENT '异步判题状态 0：等待 1：成功 2：死信 3：投递失败',
 retry_count int NOT NULL DEFAULT '0' COMMENT '重试次数快照',
 last_error varchar(1000) COMMENT '最终错误摘要',
@@ -249,6 +251,23 @@ update_time  datetime comment '更新时间',
 primary key (message_id)
 )
 
+create table tb_notice(
+notice_id bigint unsigned NOT NULL COMMENT '公告id',
+title varchar(100) NOT NULL COMMENT '公告标题',
+content text NOT NULL COMMENT '公告正文',
+category varchar(32) NOT NULL DEFAULT '公告' COMMENT '公告分类',
+is_public tinyint NOT NULL DEFAULT '1' COMMENT '是否公共可见 0否 1是',
+is_pinned tinyint NOT NULL DEFAULT '0' COMMENT '是否置顶 0否 1是',
+status tinyint NOT NULL DEFAULT '0' COMMENT '状态 0草稿 1已发布',
+publish_time datetime COMMENT '发布时间',
+create_by    bigint unsigned not null  comment '创建人',
+create_time  datetime not null comment '创建时间',
+update_by    bigint unsigned  comment '更新人',
+update_time  datetime comment '更新时间',
+primary key (notice_id),
+key idx_notice_public_publish (is_public, status, publish_time),
+key idx_notice_pinned_publish (is_pinned, publish_time)
+) DEFAULT CHARSET=utf8mb4 COMMENT '系统公告表'
 
 
 

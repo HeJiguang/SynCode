@@ -1,0 +1,22 @@
+{
+  "name": "@aioj/app",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "tsx src/__tests__/smoke.test.tsx && tsx src/__tests__/training-actions.test.tsx && tsx src/__tests__/ai-bootstrap.test.tsx && tsx src/__tests__/exam-judge.test.tsx && tsx src/__tests__/paths.test.ts"
+  },
+  "dependencies": {
+    "@aioj/api": "*",
+    "@aioj/config": "*",
+    "@aioj/tokens": "*",
+    "@aioj/ui": "*",
+    "@monaco-editor/react": "^4.7.0",
+    "lucide-react": "^0.511.0",
+    "monaco-editor": "^0.55.1",
+    "next": "^15.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

@@ -12,7 +12,7 @@
         FROM
             tb_message m
         JOIN
-            tb_message_text  t
+            tb_message_text t
         ON
             m.text_id = t.text_id
         WHERE

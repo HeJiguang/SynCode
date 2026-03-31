@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sintao.system.mapper.notice.NoticeMapper">
+
+    <select id="selectNoticeList" resultType="com.sintao.system.domain.notice.vo.NoticeVO">
+        SELECT
+            tn.notice_id,
+            tn.title,
+            tn.category,
+            tn.is_public,
+            tn.is_pinned,
+            tn.status,
+            tn.publish_time,
+            tn.create_time,
+            ts.nick_name AS create_name
+        FROM
+            tb_notice tn
+        LEFT JOIN
+            tb_sys_user ts
+        ON
+            tn.create_by = ts.user_id
+        <where>
+            <if test="title != null and title != ''">
+                AND tn.title LIKE CONCAT('%', #{title}, '%')
+            </if>
+            <if test="status != null">
+                AND tn.status = #{status}
+            </if>
+        </where>
+        ORDER BY
+            tn.is_pinned DESC,
+            COALESCE(tn.publish_time, tn.create_time) DESC
+    </select>
+</mapper>

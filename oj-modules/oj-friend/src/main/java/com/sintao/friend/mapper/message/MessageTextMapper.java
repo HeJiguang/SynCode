@@ -10,4 +10,3 @@ public interface MessageTextMapper extends BaseMapper<MessageText> {
 
     List<MessageTextVO> selectUserMsgList(Long userId);
 }
-

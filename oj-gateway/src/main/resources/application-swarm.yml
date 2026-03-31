@@ -1,0 +1,22 @@
+server:
+  port: 19090
+
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: oj-friend
+          uri: lb://oj-friend
+          predicates:
+            - Path=/friend/**
+        - id: oj-agent
+          uri: lb://oj-agent
+          predicates:
+            - Path=/ai/**
+
+ai:
+  gateway:
+    route-enabled: true
+    uri: ${AI_GATEWAY_URI:lb://oj-agent}
+    public-prefix: /ai
+    target-prefix: /api

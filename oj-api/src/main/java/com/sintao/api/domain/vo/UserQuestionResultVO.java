@@ -17,6 +17,10 @@ public class UserQuestionResultVO {
 
     private List<UserExeResult> userExeResultList;
 
+    private Long useTime;
+
+    private Long useMemory;
+
     @JsonIgnore
     private Integer score;
 }

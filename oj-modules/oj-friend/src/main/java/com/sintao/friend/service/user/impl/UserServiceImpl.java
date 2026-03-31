@@ -19,9 +19,12 @@ import com.sintao.common.security.service.TokenService;
 import com.sintao.friend.domain.user.User;
 import com.sintao.friend.domain.user.dto.UserDTO;
 import com.sintao.friend.domain.user.dto.UserUpdateDTO;
+import com.sintao.friend.domain.user.vo.UserDashboardSummaryVO;
+import com.sintao.friend.domain.user.vo.UserHeatmapPointVO;
 import com.sintao.friend.domain.user.vo.UserVO;
 import com.sintao.friend.manager.UserCacheManager;
 import com.sintao.friend.mapper.user.UserMapper;
+import com.sintao.friend.mapper.user.UserSubmitMapper;
 import com.sintao.friend.service.user.IUserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +32,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
 import java.time.temporal.ChronoUnit;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -55,6 +61,9 @@ public class UserServiceImpl implements IUserService {
 
     @Autowired
     private UserCacheManager userCacheManager;
+
+    @Autowired
+    private UserSubmitMapper userSubmitMapper;
 
     @Value("${mail.code-expiration:5}")
     private Long emailCodeExpiration;
@@ -170,6 +179,25 @@ public class UserServiceImpl implements IUserService {
     }
 
     @Override
+    public UserDashboardSummaryVO dashboardSummary() {
+        Long userId = ThreadLocalUtil.get(Constants.USER_ID, Long.class);
+        if (userId == null) {
+            throw new ServiceException(ResultCode.FAILED_USER_NOT_EXISTS);
+        }
+
+        LocalDateTime sinceTime = LocalDateTime.now().minusDays(180);
+        List<UserHeatmapPointVO> heatmap = userSubmitMapper.selectHeatmap(userId, sinceTime);
+        heatmap.sort(Comparator.comparing(UserHeatmapPointVO::getStudyDate).reversed());
+
+        UserDashboardSummaryVO summaryVO = new UserDashboardSummaryVO();
+        summaryVO.setSolvedCount(defaultZero(userSubmitMapper.selectSolvedQuestionCount(userId)));
+        summaryVO.setSubmissionCount(defaultZero(userSubmitMapper.selectSubmissionCount(userId)));
+        summaryVO.setHeatmap(heatmap);
+        summaryVO.setStreakDays(calculateStreakDays(heatmap));
+        return summaryVO;
+    }
+
+    @Override
     public int edit(UserUpdateDTO userUpdateDTO) {
         Long userId = ThreadLocalUtil.get(Constants.USER_ID, Long.class);
         if (userId == null) {
@@ -242,5 +270,38 @@ public class UserServiceImpl implements IUserService {
 
     private String getEmailCodeTimeKey(String email) {
         return CacheConstants.EMAIL_CODE_TIME_KEY + email;
+    }
+
+    private Integer defaultZero(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    private Integer calculateStreakDays(List<UserHeatmapPointVO> heatmap) {
+        if (heatmap == null || heatmap.isEmpty()) {
+            return 0;
+        }
+
+        int streak = 0;
+        LocalDateTime cursor = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
+        List<String> activeDays = heatmap.stream()
+                .map(UserHeatmapPointVO::getStudyDate)
+                .sorted(Comparator.reverseOrder())
+                .collect(Collectors.toList());
+
+        for (String activeDay : activeDays) {
+            String expected = cursor.toLocalDate().toString();
+            if (expected.equals(activeDay)) {
+                streak += 1;
+                cursor = cursor.minusDays(1);
+                continue;
+            }
+            if (streak == 0 && cursor.minusDays(1).toLocalDate().toString().equals(activeDay)) {
+                streak += 1;
+                cursor = cursor.minusDays(2);
+                continue;
+            }
+            break;
+        }
+        return streak;
     }
 }

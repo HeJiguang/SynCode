@@ -23,6 +23,10 @@ public class JudgeResultPushDTO {
 
     private Integer score;
 
+    private Long useTime;
+
+    private Long useMemory;
+
     private String lastError;
 
     private LocalDateTime finishTime;

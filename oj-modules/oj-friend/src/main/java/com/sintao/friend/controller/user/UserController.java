@@ -6,6 +6,7 @@ import com.sintao.common.core.domain.R;
 import com.sintao.common.core.domain.vo.LoginUserVO;
 import com.sintao.friend.domain.user.dto.UserDTO;
 import com.sintao.friend.domain.user.dto.UserUpdateDTO;
+import com.sintao.friend.domain.user.vo.UserDashboardSummaryVO;
 import com.sintao.friend.domain.user.vo.UserVO;
 import com.sintao.friend.service.user.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -70,6 +71,14 @@ public class UserController extends BaseController {
     @ApiResponse(responseCode = "2000", description = "用户不存在或未登录")
     public R<UserVO> detail() {
         return R.ok(userService.detail());
+    }
+
+    @GetMapping("/dashboard/summary")
+    @Operation(summary = "用户概览", description = "返回个人中心所需的聚合统计、热力图和连续学习天数")
+    @ApiResponse(responseCode = "200", description = "成功返回用户概览")
+    @ApiResponse(responseCode = "2000", description = "用户不存在或未登录")
+    public R<UserDashboardSummaryVO> dashboardSummary() {
+        return R.ok(userService.dashboardSummary());
     }
 
     @PutMapping("/edit")

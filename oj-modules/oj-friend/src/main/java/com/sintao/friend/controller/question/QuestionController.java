@@ -28,14 +28,14 @@ public class QuestionController extends BaseController {
     private IQuestionService questionService;
 
     @GetMapping("/semiLogin/list")
-    @Operation(summary = "题目列表", description = "分页查询题目列表，支持关键词搜索和难度筛选，使用 ES 检索")
+    @Operation(summary = "题目列表", description = "分页查询题目列表，支持关键词搜索和难度筛选")
     @ApiResponse(responseCode = "200", description = "成功返回分页数据")
     public TableDataInfo list(QuestionQueryDTO questionQueryDTO) {
         return questionService.list(questionQueryDTO);
     }
 
     @GetMapping("/semiLogin/dbList")
-    @Operation(summary = "题目列表（数据库版）", description = "从数据库分页查询题目列表，暂未实现")
+    @Operation(summary = "题目列表（数据库版）", description = "从数据库分页查询题目列表，当前暂未实现")
     @ApiResponse(responseCode = "200", description = "成功返回分页数据")
     public TableDataInfo dbList(QuestionQueryDTO questionQueryDTO) {
         return null;
@@ -48,6 +48,14 @@ public class QuestionController extends BaseController {
         return R.ok(questionService.hotList());
     }
 
+    @GetMapping("/semiLogin/detail")
+    @Operation(summary = "题目详情（公开）", description = "未登录也可访问的题目详情接口，返回题面、默认代码和示例用例")
+    @Parameter(name = "questionId", in = ParameterIn.QUERY, description = "题目ID", required = true)
+    @ApiResponse(responseCode = "200", description = "成功返回题目详情")
+    public R<QuestionDetailVO> semiLoginDetail(@Parameter(description = "题目ID") Long questionId) {
+        return R.ok(questionService.detail(questionId));
+    }
+
     @GetMapping("/detail")
     @Operation(summary = "题目详情", description = "根据题目ID获取题目完整信息")
     @Parameter(name = "questionId", in = ParameterIn.QUERY, description = "题目ID", required = true)
@@ -58,21 +66,20 @@ public class QuestionController extends BaseController {
     }
 
     @GetMapping("/preQuestion")
-    @Operation(summary = "上一题", description = "获取题目列表中当前题目的上一题 ID，按创建时间排序")
+    @Operation(summary = "上一题", description = "获取题目列表中当前题目的上一题ID，按创建时间排序")
     @Parameter(name = "questionId", in = ParameterIn.QUERY, description = "当前题目ID", required = true)
     @ApiResponse(responseCode = "200", description = "成功返回上一题ID")
-    @ApiResponse(responseCode = "2000", description = "已是第一题")
+    @ApiResponse(responseCode = "2000", description = "已经是第一题")
     public R<String> preQuestion(@Parameter(description = "当前题目ID") Long questionId) {
         return R.ok(questionService.preQuestion(questionId));
     }
 
     @GetMapping("/nextQuestion")
-    @Operation(summary = "下一题", description = "获取题目列表中当前题目的下一题 ID，按创建时间排序")
+    @Operation(summary = "下一题", description = "获取题目列表中当前题目的下一题ID，按创建时间排序")
     @Parameter(name = "questionId", in = ParameterIn.QUERY, description = "当前题目ID", required = true)
     @ApiResponse(responseCode = "200", description = "成功返回下一题ID")
-    @ApiResponse(responseCode = "2000", description = "已是最后一题")
+    @ApiResponse(responseCode = "2000", description = "已经是最后一题")
     public R<String> nextQuestion(@Parameter(description = "当前题目ID") Long questionId) {
         return R.ok(questionService.nextQuestion(questionId));
     }
 }
-

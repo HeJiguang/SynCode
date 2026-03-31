@@ -1,0 +1,30 @@
+{
+  "name": "syncode-frontend",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev -w @aioj/web -- --port 4000",
+    "build:web": "npm run build -w @aioj/web",
+    "test:web": "npm run test -w @aioj/web",
+    "dev:app": "npm run dev -w @aioj/app -- --port 4001",
+    "build:app": "npm run build -w @aioj/app",
+    "test:app": "npm run test -w @aioj/app",
+    "dev:admin": "npm run dev -w @aioj/admin -- --port 4002",
+    "build:admin": "npm run build -w @aioj/admin",
+    "test:admin": "npm run test -w @aioj/admin",
+    "test:api": "npm run test -w @aioj/api",
+    "test:ui": "npm run test -w @aioj/ui"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.4",
+    "@types/node": "^22.13.14",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "tailwindcss": "^4.1.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
+  }
+}

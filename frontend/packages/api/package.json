@@ -1,0 +1,10 @@
+{
+  "name": "@aioj/api",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "test": "tsx src/__tests__/contracts.test.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts"
+}

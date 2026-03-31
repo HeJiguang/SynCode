@@ -1,0 +1,4 @@
+node_modules
+apps.zip
+apps/*/.next
+apps/*/next-env.d.ts
