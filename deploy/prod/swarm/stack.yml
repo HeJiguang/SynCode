@@ -1,0 +1,138 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: ingress
+    configs:
+      - source: prod_nginx_conf
+        target: /etc/nginx/nginx.conf
+      - source: prod_nginx_default_conf
+        target: /etc/nginx/conf.d/default.conf
+    networks:
+      - edge
+    deploy:
+      placement:
+        constraints:
+          - ${MANAGER_CONSTRAINT}
+
+  web:
+    image: ${WEB_IMAGE}
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    networks:
+      - edge
+    deploy:
+      placement:
+        constraints:
+          - ${MANAGER_CONSTRAINT}
+
+  app:
+    image: ${APP_IMAGE}
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    networks:
+      - edge
+      - backend
+    deploy:
+      placement:
+        constraints:
+          - ${MANAGER_CONSTRAINT}
+
+  admin:
+    image: ${ADMIN_IMAGE}
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    networks:
+      - edge
+      - backend
+    deploy:
+      placement:
+        constraints:
+          - ${MANAGER_CONSTRAINT}
+
+  oj-gateway:
+    image: ${GATEWAY_IMAGE}
+    env_file:
+      - ../env/runtime.env
+    networks:
+      - backend
+    deploy:
+      placement:
+        constraints:
+          - ${MANAGER_CONSTRAINT}
+
+  oj-system:
+    image: ${SYSTEM_IMAGE}
+    env_file:
+      - ../env/runtime.env
+    networks:
+      - backend
+    deploy:
+      placement:
+        constraints:
+          - ${MANAGER_CONSTRAINT}
+
+  oj-friend:
+    image: ${FRIEND_IMAGE}
+    env_file:
+      - ../env/runtime.env
+    networks:
+      - backend
+    deploy:
+      placement:
+        constraints:
+          - ${MANAGER_CONSTRAINT}
+
+  oj-job:
+    image: ${JOB_IMAGE}
+    env_file:
+      - ../env/runtime.env
+    networks:
+      - backend
+    deploy:
+      placement:
+        constraints:
+          - ${MANAGER_CONSTRAINT}
+
+  oj-agent:
+    image: ${AGENT_IMAGE}
+    env_file:
+      - ../env/runtime.env
+    networks:
+      - backend
+    deploy:
+      placement:
+        constraints:
+          - ${WORKER_CONSTRAINT}
+
+  oj-judge:
+    image: ${JUDGE_IMAGE}
+    env_file:
+      - ../env/runtime.env
+    networks:
+      - backend
+    deploy:
+      placement:
+        constraints:
+          - ${WORKER_CONSTRAINT}
+
+configs:
+  prod_nginx_conf:
+    file: ../nginx/nginx.conf
+  prod_nginx_default_conf:
+    file: ../nginx/conf.d/default.conf
+
+networks:
+  edge:
+    driver: overlay
+  backend:
+    driver: overlay

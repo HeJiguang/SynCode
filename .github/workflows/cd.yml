@@ -1,0 +1,197 @@
+name: cd
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Optional image tag override
+        required: false
+        type: string
+
+concurrency:
+  group: cd-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  DEPLOY_BASE_DIR: ~/onlineoj
+
+jobs:
+  release:
+    name: Build Push And Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          owner_lower="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          if [[ -n "${{ github.event.inputs.image_tag }}" ]]; then
+            image_tag="${{ github.event.inputs.image_tag }}"
+          else
+            image_tag="sha-${GITHUB_SHA::12}"
+          fi
+          echo "registry_namespace=ghcr.io/${owner_lower}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${image_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Package Java services
+        run: mvn -q -DskipTests package
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/prod/docker/next-app.Dockerfile
+          push: true
+          build-args: |
+            APP_NAME=web
+          tags: ${{ steps.meta.outputs.registry_namespace }}/syncode-web:${{ steps.meta.outputs.image_tag }}
+
+      - name: Build and push app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/prod/docker/next-app.Dockerfile
+          push: true
+          build-args: |
+            APP_NAME=app
+          tags: ${{ steps.meta.outputs.registry_namespace }}/syncode-app:${{ steps.meta.outputs.image_tag }}
+
+      - name: Build and push admin image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/prod/docker/next-app.Dockerfile
+          push: true
+          build-args: |
+            APP_NAME=admin
+          tags: ${{ steps.meta.outputs.registry_namespace }}/syncode-admin:${{ steps.meta.outputs.image_tag }}
+
+      - name: Build and push gateway image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/prod/docker/java-service.Dockerfile
+          push: true
+          build-args: |
+            JAR_FILE=oj-gateway/target/oj-gateway-1.0-SNAPSHOT.jar
+          tags: ${{ steps.meta.outputs.registry_namespace }}/oj-gateway:${{ steps.meta.outputs.image_tag }}
+
+      - name: Build and push system image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/prod/docker/java-service.Dockerfile
+          push: true
+          build-args: |
+            JAR_FILE=oj-modules/oj-system/target/oj-system-1.0-SNAPSHOT.jar
+          tags: ${{ steps.meta.outputs.registry_namespace }}/oj-system:${{ steps.meta.outputs.image_tag }}
+
+      - name: Build and push friend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/prod/docker/java-service.Dockerfile
+          push: true
+          build-args: |
+            JAR_FILE=oj-modules/oj-friend/target/oj-friend-1.0-SNAPSHOT.jar
+          tags: ${{ steps.meta.outputs.registry_namespace }}/oj-friend:${{ steps.meta.outputs.image_tag }}
+
+      - name: Build and push job image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/prod/docker/java-service.Dockerfile
+          push: true
+          build-args: |
+            JAR_FILE=oj-modules/oj-job/target/oj-job-1.0-SNAPSHOT.jar
+          tags: ${{ steps.meta.outputs.registry_namespace }}/oj-job:${{ steps.meta.outputs.image_tag }}
+
+      - name: Build and push judge image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/prod/docker/java-service.Dockerfile
+          push: true
+          build-args: |
+            JAR_FILE=oj-modules/oj-judge/target/oj-judge-1.0-SNAPSHOT.jar
+          tags: ${{ steps.meta.outputs.registry_namespace }}/oj-judge:${{ steps.meta.outputs.image_tag }}
+
+      - name: Build and push oj-agent image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/prod/docker/oj-agent.Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.registry_namespace }}/oj-agent:${{ steps.meta.outputs.image_tag }}
+
+      - name: Prepare SSH key
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.DEPLOY_SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Render remote env files
+        shell: bash
+        run: |
+          mkdir -p .cd-tmp
+          printf '%s\n' "${{ secrets.STACK_ENV_PROD }}" > .cd-tmp/stack.env
+          printf '%s\n' "${{ secrets.RUNTIME_ENV_PROD }}" > .cd-tmp/runtime.env
+          python - <<'PY'
+          from pathlib import Path
+          stack = Path(".cd-tmp/stack.env")
+          text = stack.read_text(encoding="utf-8")
+          replacements = {
+              "sha-REPLACE_ME": "${{ steps.meta.outputs.image_tag }}",
+              "ghcr.io/your-org-or-user": "${{ steps.meta.outputs.registry_namespace }}",
+          }
+          for src, dst in replacements.items():
+              text = text.replace(src, dst)
+          stack.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Sync deploy assets to manager
+        shell: bash
+        run: |
+          ssh "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}" "mkdir -p ${DEPLOY_BASE_DIR}/deploy/prod/env"
+          rsync -az --delete deploy/prod/ "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}:${DEPLOY_BASE_DIR}/deploy/prod/"
+          rsync -az .cd-tmp/stack.env "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}:${DEPLOY_BASE_DIR}/deploy/prod/env/stack.env"
+          rsync -az .cd-tmp/runtime.env "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}:${DEPLOY_BASE_DIR}/deploy/prod/env/runtime.env"
+
+      - name: Deploy on manager
+        shell: bash
+        run: |
+          ssh "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}" "\
+            cd ${DEPLOY_BASE_DIR} && \
+            chmod +x deploy/prod/scripts/deploy.sh && \
+            STACK_ENV_FILE=deploy/prod/env/stack.env \
+            RUNTIME_ENV_FILE=deploy/prod/env/runtime.env \
+            deploy/prod/scripts/deploy.sh"

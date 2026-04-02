@@ -3,8 +3,6 @@
 .idea
 .m2-repo
 .pytest_cache
-.tmp_pytest_config
-.tmp_pytest_dense
 .vscode
 .worktrees
 frontend/node_modules
@@ -14,6 +12,9 @@ frontend/apps/*/out
 **/target
 **/__pycache__
 **/.pytest_cache
+**/.venv
+oj-agent/tmp_pytest_config
+oj-agent/tmp_pytest_dense
 logs
 temp
 user-code-pool
