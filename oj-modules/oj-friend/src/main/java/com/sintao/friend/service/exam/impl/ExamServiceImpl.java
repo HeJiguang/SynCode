@@ -1,15 +1,20 @@
 package com.sintao.friend.service.exam.impl;
 
 import cn.hutool.core.collection.CollectionUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import com.sintao.common.core.constants.Constants;
 import com.sintao.common.core.domain.TableDataInfo;
+import com.sintao.common.core.enums.ResultCode;
 import com.sintao.common.core.utils.ThreadLocalUtil;
+import com.sintao.common.security.exception.ServiceException;
+import com.sintao.friend.domain.exam.Exam;
 import com.sintao.friend.domain.exam.dto.ExamQueryDTO;
 import com.sintao.friend.domain.exam.dto.ExamRankDTO;
 import com.sintao.friend.domain.exam.vo.ExamRankVO;
 import com.sintao.friend.domain.exam.vo.ExamVO;
+import com.sintao.friend.domain.user.UserExam;
 import com.sintao.friend.domain.user.vo.UserVO;
 import com.sintao.friend.manager.ExamCacheManager;
 import com.sintao.friend.manager.UserCacheManager;
@@ -20,6 +25,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -84,18 +90,21 @@ public class ExamServiceImpl implements IExamService {
 
     @Override
     public String getFirstQuestion(Long examId) {
+        validateExamAccess(examId);
         checkAndRefresh(examId);
         return examCacheManager.getFirstQuestion(examId).toString();
     }
 
     @Override
     public String preQuestion(Long examId, Long questionId) {
+        validateExamAccess(examId);
         checkAndRefresh(examId);
         return examCacheManager.preQuestion(examId, questionId).toString();
     }
 
     @Override
     public String nextQuestion(Long examId, Long questionId) {
+        validateExamAccess(examId);
         checkAndRefresh(examId);
         return examCacheManager.nextQuestion(examId, questionId).toString();
     }
@@ -128,6 +137,33 @@ public class ExamServiceImpl implements IExamService {
         Long listSize = examCacheManager.getExamQuestionListSize(examId);
         if (listSize == null || listSize <= 0) {
             examCacheManager.refreshExamQuestionCache(examId);
+        }
+    }
+
+    private void validateExamAccess(Long examId) {
+        Exam exam = examMapper.selectById(examId);
+        if (exam == null) {
+            throw new ServiceException(ResultCode.EXAM_NOT_EXISTS);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        if (exam.getStartTime() != null && now.isBefore(exam.getStartTime())) {
+            throw new ServiceException(ResultCode.EXAM_NOT_STARTED);
+        }
+        if (exam.getEndTime() != null && now.isAfter(exam.getEndTime())) {
+            throw new ServiceException(ResultCode.EXAM_IS_FINISH);
+        }
+
+        Long userId = ThreadLocalUtil.get(Constants.USER_ID, Long.class);
+        if (userId == null) {
+            throw new ServiceException(ResultCode.FAILED_UNAUTHORIZED);
+        }
+
+        UserExam userExam = userExamMapper.selectOne(new LambdaQueryWrapper<UserExam>()
+                .eq(UserExam::getExamId, examId)
+                .eq(UserExam::getUserId, userId));
+        if (userExam == null) {
+            throw new ServiceException(ResultCode.USER_EXAM_NOT_ENTERED);
         }
     }
 }

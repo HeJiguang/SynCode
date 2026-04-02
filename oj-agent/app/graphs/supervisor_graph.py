@@ -18,7 +18,6 @@ class SupervisorState(TypedDict):
     request: RequestContext
     execution: NotRequired[ExecutionState]
     training_request: NotRequired[TrainingPlanRequest]
-    stream_mode: NotRequired[bool]
     unified_state: NotRequired[UnifiedAgentState]
 
 
@@ -92,7 +91,6 @@ def chat_capability_node(state: SupervisorState) -> SupervisorState:
         {
             "request": state["request"],
             "execution": state["execution"],
-            "stream_mode": bool(state.get("stream_mode")),
         }
     )
     return {

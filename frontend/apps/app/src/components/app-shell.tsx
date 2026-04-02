@@ -67,8 +67,7 @@ export function AppShell({ children, rail, immersive, demoMode = false }: AppShe
         <div className="border-b border-[var(--border-soft)] bg-[var(--surface-2)]/80 backdrop-blur-md">
           <div className={`mx-auto flex items-center justify-between gap-4 px-6 py-3 ${immersive ? "w-full" : "max-w-[1720px]"}`}>
             <p className="text-sm leading-6 text-[var(--text-secondary)]">
-              当前未登录，正在展示公开内容与演示数据。登录后可使用真实题目详情、系统公告、训练计划、判题提交、WebSocket
-              实时结果和 AI 流式能力。
+              当前浏览的是公开内容。登录后可继续查看个人训练计划、提交记录、实时判题结果和 AI 辅助能力。
             </p>
             <a href={appPublicPath("/login")} className="shrink-0">
               <Button size="sm">立即登录</Button>

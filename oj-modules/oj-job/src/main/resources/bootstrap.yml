@@ -6,14 +6,14 @@ spring:
   cloud:
     nacos:
       discovery:
-        namespace: c30aa94a-3644-48d8-9beb-20978bdd133b
-        server-addr: ${NACOS_SERVER_ADDR:http://localhost:8848}
-        # username: nacos
-        # password: your_nacos_password
-        ip: ${HOST_IP:127.0.0.1}
+        namespace: 706a61a6-f9ad-49f5-856c-6350f77450bc
+        server-addr: ${NACOS_SERVER_ADDR:101.96.200.76:8848}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:Nacos8@sin}
+        # ip: ${HOST_IP:127.0.0.1}
       config:
-        namespace: c30aa94a-3644-48d8-9beb-20978bdd133b
-        server-addr: ${NACOS_SERVER_ADDR:http://localhost:8848}
+        namespace: 706a61a6-f9ad-49f5-856c-6350f77450bc
+        server-addr: ${NACOS_SERVER_ADDR:101.96.200.76:8848}
         file-extension: yaml
-        # username: nacos
-        # password: your_nacos_password
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:Nacos8@sin}

@@ -31,11 +31,17 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 
 @Slf4j
 @Component
 public class AuthFilter implements GlobalFilter, Ordered {
+
+    private static final List<String> BUILT_IN_PUBLIC_PATHS = Arrays.asList(
+            "/system/sysUser/login",
+            "/friend/message/semiLogin/**"
+    );
 
     @Autowired
     private IgnoreWhiteProperties ignoreWhite;
@@ -51,7 +57,7 @@ public class AuthFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
         String url = request.getURI().getPath();
 
-        if (matches(url, ignoreWhite.getWhites())) {
+        if (matches(url, ignoreWhite.getWhites()) || matches(url, BUILT_IN_PUBLIC_PATHS)) {
             return chain.filter(exchange);
         }
 

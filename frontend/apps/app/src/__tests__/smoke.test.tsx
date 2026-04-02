@@ -16,7 +16,7 @@ async function main() {
   assert.match(dashboardHtml, /href="\/app\/login"/);
 
   assert.match(workspaceHtml, /SynCode/);
-  assert.match(workspaceHtml, /AI Assistant/);
+  assert.match(workspaceHtml, /Agent Runtime/);
   assert.match(workspaceHtml, /Heat 98/);
 }
 

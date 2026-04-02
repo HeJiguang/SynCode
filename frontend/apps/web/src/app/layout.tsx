@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "SynCode | AI 辅助编程训练平台",
-  description: "面向训练、考试与解题辅助的现代化 SynCode 产品前端演示。"
+  description: "面向训练、考试与解题辅助的 SynCode 产品前端。"
 };
 
 const themeScript = `

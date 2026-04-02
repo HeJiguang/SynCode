@@ -10,9 +10,9 @@ type PanelProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 const toneClasses = {
-  default: "bg-[var(--surface-1)]",
-  strong:  "bg-[var(--surface-2)]",
-  accent:  "bg-[var(--surface-2)]"
+  default: "bg-[var(--surface-1)]/90",
+  strong:  "bg-[var(--surface-2)]/92",
+  accent:  "bg-[var(--surface-2)]/94"
 };
 
 /**
@@ -23,9 +23,11 @@ export function Panel({ children, className, hoverable = false, tone = "default"
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-soft)]",
+        "relative overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-soft)] backdrop-blur-xl",
+        "before:pointer-events-none before:absolute before:inset-0 before:bg-[linear-gradient(180deg,rgba(255,255,255,0.06),transparent_28%)] before:opacity-70",
         toneClasses[tone],
-        hoverable && "transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) hover:-translate-y-0.5 hover:shadow-[var(--shadow-float)] hover:border-[var(--border-strong)]",
+        "shadow-[var(--shadow-panel)]",
+        hoverable && "transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) hover:-translate-y-1 hover:shadow-[var(--shadow-float)] hover:border-[var(--border-strong)]",
         className
       )}
       {...props}

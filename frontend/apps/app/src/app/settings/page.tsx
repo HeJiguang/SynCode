@@ -23,11 +23,11 @@ export default async function SettingsPage() {
 
       <Panel className="p-5">
         <p className="kicker">Account</p>
-        <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">生产环境接入说明</h2>
+        <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">资料与账号</h2>
         <div className="mt-4 space-y-3 text-sm leading-7 text-[var(--text-secondary)]">
-          <p>头像通过现有 `/friend/file/upload` 上传到 OSS，再回写到用户资料。</p>
-          <p>昵称、邮箱、学校、专业和个人简介会直接写入真实用户信息，不再使用演示态资料。</p>
-          <p>如果后端接口异常，设置页不会再静默回退 demo 数据，而是直接显示保存失败。</p>
+          <p>在这里更新头像、昵称、学校、专业和个人简介，系统会直接同步到你的账号资料。</p>
+          <p>头像沿用现有文件上传链路保存，其余字段会在提交后立即写回个人信息。</p>
+          <p>如果保存没有成功，页面会直接提示失败原因，方便你及时重试。</p>
         </div>
       </Panel>
     </AppShell>

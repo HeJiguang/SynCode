@@ -1,4 +1,5 @@
 import * as React from "react";
+import { ArrowRight, Clock3, Layers3, Sparkles } from "lucide-react";
 import { getHotProblemList, getProblemDetail } from "@aioj/api";
 
 import { AppShell } from "../../../components/app-shell";
@@ -17,30 +18,47 @@ export default async function ProblemDetailPage({ params }: PageProps) {
 
   return (
     <AppShell demoMode={!token} rail={<HotProblemsPanel problems={hotProblems.slice(0, 3)} />}>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-1">
-          <p className="kicker">Question Detail</p>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">{detail.title}</h1>
-          <p className="max-w-xl text-sm leading-7 text-[var(--text-secondary)]">{detail.summary}</p>
+      <Panel className="hero-grid mb-6 overflow-hidden p-6 md:p-7" tone="strong">
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="kicker">题目详情</p>
+            <h1 className="mt-2 text-3xl font-bold tracking-[-0.04em] text-[var(--text-primary)] md:text-4xl">{detail.title}</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-secondary)] md:text-[15px]">{detail.summary}</p>
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <Tag tone={detail.difficulty === "Easy" ? "success" : detail.difficulty === "Medium" ? "warning" : "danger"}>
+                {detail.difficulty}
+              </Tag>
+              <Tag tone="accent">
+                <Layers3 size={12} className="mr-1" />
+                {detail.algorithmTag}
+              </Tag>
+              <Tag>
+                <Clock3 size={12} className="mr-1" />
+                预计 {detail.estimatedMinutes} 分钟
+              </Tag>
+            </div>
+          </div>
+          <div className="shrink-0">
+            <a href={`/app/workspace/${detail.questionId}`}>
+              <Button className="h-11 px-6 font-semibold" id="btn-enter-workspace">
+                进入工作区开始训练
+                <ArrowRight size={15} className="ml-1" />
+              </Button>
+            </a>
+          </div>
         </div>
-        <div className="shrink-0">
-          <a href={`/app/workspace/${detail.questionId}`}>
-            <Button className="h-10 px-6 font-semibold shadow-sm" id="btn-enter-workspace">
-              进入工作区开始训练
-            </Button>
-          </a>
-        </div>
-      </div>
+      </Panel>
 
       <div className="grid gap-4 xl:grid-cols-[1.04fr_0.96fr]">
         <Panel className="p-6" tone="strong">
           <div className="flex flex-wrap items-center gap-3">
-            <Tag tone={detail.difficulty === "Easy" ? "success" : detail.difficulty === "Medium" ? "warning" : "danger"}>
-              {detail.difficulty}
-            </Tag>
             {detail.tags.map((item) => (
               <Tag key={item}>{item}</Tag>
             ))}
+            <Tag tone="accent">
+              <Sparkles size={12} className="mr-1" />
+              热度 {detail.heat}
+            </Tag>
           </div>
           <div className="mt-5 space-y-4">
             {detail.content.map((item) => (

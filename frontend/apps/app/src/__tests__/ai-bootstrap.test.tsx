@@ -1,40 +1,41 @@
 import assert from "node:assert/strict";
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { AiMessage } from "@aioj/api";
-import { getAiMessages } from "@aioj/api";
+import type { AiArtifact } from "@aioj/api";
 
 import { AiPanel } from "../components/ai-panel";
 
 async function main() {
-  const emptyMessages = await getAiMessages("two-sum");
-  assert.equal(emptyMessages.length, 0);
-
   const emptyHtml = renderToStaticMarkup(
-    <AiPanel messages={emptyMessages} questionId="two-sum" questionTitle="Two Sum" questionContent="Find two numbers." />
+    <AiPanel initialArtifacts={[]} questionId="two-sum" questionTitle="Two Sum" questionContent="Find two numbers." />
   );
-  assert.match(emptyHtml, /No conversation history yet/);
+  assert.match(emptyHtml, /No agent activity yet/);
 
-  const seededMessages: AiMessage[] = [
+  const seededArtifacts: AiArtifact[] = [
     {
-      id: "user-1",
-      role: "user",
-      content: "Why does this fail on duplicate values?"
-    },
-    {
-      id: "assistant-1",
-      role: "assistant",
+      artifactId: "art-1",
+      runId: "run-1",
+      artifactType: "diagnosis_report",
       title: "Duplicate case",
-      content: "Check the lookup order before writing into the hash map."
+      summary: "The lookup order is inverted when duplicate values appear.",
+      body: {
+        answer: "Check the lookup order before writing into the hash map.",
+        nextAction: "Trace the [3,3] sample before updating the map."
+      },
+      renderHint: "diagnosis",
+      version: 1,
+      createdAt: "2026-04-01T00:00:00Z"
     }
   ];
 
-  const historyHtml = renderToStaticMarkup(
-    <AiPanel messages={seededMessages} questionId="two-sum" questionTitle="Two Sum" questionContent="Find two numbers." />
+  const artifactHtml = renderToStaticMarkup(
+    <AiPanel initialArtifacts={seededArtifacts} questionId="two-sum" questionTitle="Two Sum" questionContent="Find two numbers." />
   );
-  assert.match(historyHtml, /Duplicate case/);
-  assert.match(historyHtml, /Check the lookup order before writing into the hash map\./);
-  assert.doesNotMatch(historyHtml, /No conversation history yet/);
+  assert.match(artifactHtml, /Duplicate case/);
+  assert.match(artifactHtml, /Check the lookup order before writing into the hash map\./);
+  assert.match(artifactHtml, /Next step/);
+  assert.match(artifactHtml, /Trace the \[3,3\] sample before updating the map\./);
+  assert.doesNotMatch(artifactHtml, /No agent activity yet/);
 }
 
 void main();

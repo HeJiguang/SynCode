@@ -4,38 +4,60 @@
 @source "../../../../packages/config/src";
 @source "../";
 
-/* ── 微型噪点纹理 (Noise Texture) ── */
-/* 极微弱的黑白底噪点，仅在背景层呈现，增加物理材质感 */
+/* Atmosphere */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
-  opacity: 1; /* Dark Mode 下默认透明度 */
+  background:
+    radial-gradient(circle at 12% 18%, rgba(94, 234, 212, 0.12), transparent 28%),
+    radial-gradient(circle at 84% 10%, rgba(245, 158, 11, 0.1), transparent 24%),
+    radial-gradient(circle at 50% 100%, rgba(96, 165, 250, 0.08), transparent 35%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity: 1;
 }
 
-:root.light body::before,
+:root.light body::before {
+  opacity: 0.42;
+}
+
 @media (prefers-color-scheme: light) {
   :root:not(.dark) body::before {
-    opacity: 0.025; /* Light Mode 使用更轻的噪点 */
+    opacity: 0.42;
   }
 }
 
-/* ── App 专属样式覆盖 ── */
+.hero-grid {
+  position: relative;
+}
+
+.hero-grid::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent 100%);
+  pointer-events: none;
+  opacity: 0.16;
+}
+
+/* App-specific surfaces */
 .code-editor-frame {
-  background-color: #0d0d0f;
+  background-color: #0d0f12;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-card);
   overflow: hidden;
 }
 
 :root.light .code-editor-frame {
-  background-color: #1a1a1a;
+  background-color: #1a1f24;
 }
 
-/* 语言切换 Tab — 下划线现代风格 (加宽留白间距) */
 .lang-tab {
   position: relative;
   padding: 0.625rem 0.25rem;
@@ -69,19 +91,18 @@ body::before {
 }
 
 .lang-tab[data-active="true"]::after {
-  background: var(--text-primary);
+  background: var(--accent);
 }
 
 .lang-tabs-bar {
   display: flex;
-  gap: 1.5rem; /* 增加选项卡间距 */
+  gap: 1.5rem;
   border-bottom: 1px solid var(--border-soft);
 }
 
-/* ── 呼吸灯动效 (Breathing Status Dot) ── */
 @keyframes soft-pulse {
-  0%   { opacity: 1; transform: scale(1); }
-  50%  { opacity: 0.5; transform: scale(0.9); }
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.9); }
   100% { opacity: 1; transform: scale(1); }
 }
 
@@ -89,10 +110,9 @@ body::before {
   animation: soft-pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* AI 打字机动效 (Fade-in cascade) */
 @keyframes fadeInSlideUp {
   from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .ai-typewriter-enter {

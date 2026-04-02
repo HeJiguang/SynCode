@@ -9,6 +9,7 @@ from app.core.config import AgentSettings
 
 
 LOGGER = logging.getLogger(__name__)
+NACOS_HTTP_TIMEOUT_SECONDS = 10.0
 
 
 @dataclass
@@ -20,7 +21,7 @@ class NacosRegistry:
     def register(self) -> None:
         if not self.settings.nacos_enabled or not self.settings.nacos_server_addr:
             return
-        with httpx.Client(timeout=5.0) as client:
+        with httpx.Client(timeout=NACOS_HTTP_TIMEOUT_SECONDS, trust_env=False) as client:
             access_token = self._login(client)
             client.post(
                 self._instance_url(),
@@ -33,7 +34,7 @@ class NacosRegistry:
         if not self.settings.nacos_enabled or not self.settings.nacos_server_addr:
             return
         self._stop_heartbeat_loop()
-        with httpx.Client(timeout=5.0) as client:
+        with httpx.Client(timeout=NACOS_HTTP_TIMEOUT_SECONDS, trust_env=False) as client:
             access_token = self._login(client)
             client.delete(
                 self._instance_url(),
@@ -101,7 +102,7 @@ class NacosRegistry:
         self._heartbeat_thread = None
 
     def _heartbeat_loop(self) -> None:
-        with httpx.Client(timeout=5.0) as client:
+        with httpx.Client(timeout=NACOS_HTTP_TIMEOUT_SECONDS, trust_env=False) as client:
             while not self._heartbeat_stop.wait(5.0):
                 try:
                     access_token = self._login(client)

@@ -78,16 +78,20 @@ export function WorkspaceLayout({ aiPanel, questionPanel, editorPanel }: Workspa
   const currentWidth = aiExpanded ? aiWidth : AI_COLLAPSED_WIDTH;
 
   return (
-    <div ref={containerRef} className="flex h-full w-full gap-3 p-3 bg-[var(--bg)]">
+    <div ref={containerRef} className="flex h-full w-full gap-3 bg-[var(--bg)] p-3">
       {/* ── Main Workspace ── */}
-      <div className="flex flex-1 gap-3 min-w-0">
+      <div className="flex min-w-0 flex-1 gap-3">
         {/* Question & Result (Left) */}
-        <div className="w-[45%] lg:w-1/2 min-w-0 h-full">
-          {questionPanel}
+        <div className="h-full min-w-0 w-[43%] xl:w-[41%]">
+          <div className="h-full rounded-[26px] border border-[var(--border-soft)] bg-[var(--surface-1)]/72 p-1 shadow-[var(--shadow-panel)]">
+            {questionPanel}
+          </div>
         </div>
         {/* Editor (Center) */}
-        <div className="flex-1 min-w-0 h-full">
-          {editorPanel}
+        <div className="h-full min-w-0 flex-1">
+          <div className="h-full rounded-[26px] border border-[var(--border-soft)] bg-[var(--surface-1)]/58 p-1 shadow-[var(--shadow-panel)]">
+            {editorPanel}
+          </div>
         </div>
       </div>
 
@@ -103,32 +107,33 @@ export function WorkspaceLayout({ aiPanel, questionPanel, editorPanel }: Workspa
         {aiExpanded && (
           <div
             onMouseDown={handleDragStart}
-            className="absolute left-0 top-0 h-full w-[6px] z-20 cursor-col-resize group flex items-center justify-center"
+            className="group absolute left-0 top-0 z-20 flex h-full w-[8px] cursor-col-resize items-center justify-center"
             title="拖动以调整 AI 面板宽度"
           >
-            {/* Visual indicator strip */}
-            <div className="h-12 w-[3px] rounded-full bg-[var(--border-soft)] group-hover:bg-[var(--accent)] transition-colors duration-150" />
+            <div className="h-14 w-[3px] rounded-full bg-[var(--border-soft)] transition-colors duration-150 group-hover:bg-[var(--accent)]" />
           </div>
         )}
 
         {/* Panel content */}
         <div
-          className={`w-full h-full transform origin-right transition-all duration-300 ${
+          className={`h-full w-full origin-right transform transition-all duration-300 ${
             aiExpanded ? "opacity-100 scale-100 pl-[6px]" : "opacity-0 scale-95 pointer-events-none"
-          } ${!aiExpanded ? "" : ""}`}
+          }`}
         >
-          {aiPanel}
+          <div className="h-full rounded-[26px] border border-[var(--border-soft)] bg-[var(--surface-1)]/72 p-1 shadow-[var(--shadow-panel)]">
+            {aiPanel}
+          </div>
         </div>
 
         {/* Collapsed state background */}
         {!aiExpanded && (
-          <div className="absolute inset-0 bg-[var(--surface-1)] rounded-[var(--radius-card)] border border-[var(--border-soft)]" />
+          <div className="absolute inset-0 rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-1)]/80 shadow-[var(--shadow-panel)]" />
         )}
 
         {/* Toggle Button */}
         <button
           onClick={() => setAiExpanded(!aiExpanded)}
-          className="absolute -left-3 top-1/2 -translate-y-1/2 z-10 flex h-16 w-4 items-center justify-center rounded-full border border-[var(--border-strong)] bg-[var(--surface-1)] text-[var(--text-muted)] shadow-sm hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors"
+          className="absolute -left-3 top-1/2 z-10 flex h-16 w-5 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--border-strong)] bg-[var(--surface-1)] text-[var(--text-muted)] shadow-sm transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text-primary)]"
         >
           {aiExpanded ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
         </button>
@@ -140,8 +145,8 @@ export function WorkspaceLayout({ aiPanel, questionPanel, editorPanel }: Workspa
             onClick={() => setAiExpanded(true)}
           >
             <Bot size={18} className="text-[var(--accent)] mb-14" />
-            <div className="-rotate-90 text-[11px] font-bold tracking-[0.2em] text-[var(--text-muted)] uppercase whitespace-nowrap">
-              AI Assistant
+            <div className="-rotate-90 text-[11px] font-bold tracking-[0.2em] text-[var(--text-muted)] whitespace-nowrap">
+              AI 辅助
             </div>
           </div>
         )}

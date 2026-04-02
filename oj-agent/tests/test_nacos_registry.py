@@ -12,6 +12,8 @@ class _DummyResponse:
 class _DummyClient:
     def __init__(self) -> None:
         self.post_calls: list[tuple[str, dict]] = []
+        self.timeout: float | None = None
+        self.trust_env: bool | None = None
 
     def __enter__(self):
         return self
@@ -70,12 +72,19 @@ def test_register_posts_instance_and_starts_heartbeat(monkeypatch):
     registry = NacosRegistry(_settings())
     started: list[bool] = []
 
-    monkeypatch.setattr("app.core.nacos_registry.httpx.Client", lambda timeout: client)
+    def _build_client(*, timeout, trust_env):
+        client.timeout = timeout
+        client.trust_env = trust_env
+        return client
+
+    monkeypatch.setattr("app.core.nacos_registry.httpx.Client", _build_client)
     monkeypatch.setattr(registry, "_start_heartbeat_loop", lambda: started.append(True))
 
     registry.register()
 
     assert started == [True]
+    assert client.timeout is not None
+    assert client.trust_env is False
     assert client.post_calls
     url, params = client.post_calls[0]
     assert url.endswith("/nacos/v1/ns/instance")

@@ -28,6 +28,9 @@ class NacosBootstrap:
     password: str | None         # Nacos 控制台密码
 
 
+NACOS_HTTP_TIMEOUT_SECONDS = 10.0
+
+
 def _to_bool(raw: str | None, default: bool) -> bool:
     """内部辅助函数：安全地将环境变量字符串解析为布尔值"""
     if raw is None:
@@ -109,7 +112,7 @@ def load_nacos_config() -> dict[str, Any]:
     try:
         # 使用 httpx 作为 HTTP 客户端（比 requests 更现代，性能更好）。
         # 设置 timeout=5.0 极其重要：防止 Nacos 服务器无响应时，导致整个应用在启动时无限期挂死 (Hang)。
-        with httpx.Client(timeout=5.0) as client:
+        with httpx.Client(timeout=NACOS_HTTP_TIMEOUT_SECONDS, trust_env=False) as client:
             # 1. 尝试登录获取 Token
             access_token = _login(client, bootstrap)
             

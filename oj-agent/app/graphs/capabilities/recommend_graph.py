@@ -2,11 +2,14 @@ from typing import TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from app.guardrails.runtime import GuardrailInput, GuardrailRuntime
-from app.retrieval.models import RetrievalQuery
-from app.retrieval.runtime import RetrievalRuntime
-from app.runtime.enums import RiskLevel, RunStatus
-from app.runtime.models import EvidenceItem, EvidenceState, GuardrailState, OutcomeState, UnifiedAgentState
+from app.runtime.enums import RiskLevel
+from app.runtime.models import OutcomeState, UnifiedAgentState
+from app.graphs.capabilities.shared import (
+    build_evidence_state,
+    build_guardrail_state,
+    collect_capability_support,
+    update_execution,
+)
 
 
 class RecommendGraphState(TypedDict):
@@ -18,36 +21,13 @@ class RecommendGraphState(TypedDict):
 def recommend_node(state: RecommendGraphState) -> RecommendGraphState:
     request = state["request"]
     execution = state["execution"]
-    retrieval = RetrievalRuntime().retrieve(
-        RetrievalQuery(
-            query_text=" ".join(
-                value
-                for value in [
-                    request.question_title,
-                    request.question_content,
-                    request.user_message,
-                ]
-                if value
-            ),
-            task_type=request.task_type.value,
-            user_id=request.user_id,
-            conversation_id=request.conversation_id,
-        )
-    )
-    guard = GuardrailRuntime().evaluate(
-        GuardrailInput(
-            task_type=request.task_type.value,
-            user_message=request.user_message,
-            question_title=request.question_title,
-            question_content=request.question_content,
-            user_code=request.user_code,
-            judge_result=request.judge_result,
-        )
-    )
-    evidence_guard = GuardrailRuntime().evaluate_evidence(
-        task_type=request.task_type.value,
-        evidence_count=len(retrieval.items),
-        route_names=retrieval.route_names,
+    support = collect_capability_support(
+        request,
+        query_fields=(
+            "question_title",
+            "question_content",
+            "user_message",
+        ),
     )
 
     recommendation_lines = [
@@ -61,34 +41,16 @@ def recommend_node(state: RecommendGraphState) -> RecommendGraphState:
 
     unified_state = UnifiedAgentState(
         request=request,
-        execution=execution.model_copy(
+        execution=update_execution(execution, active_node="recommend_graph"),
+        evidence=build_evidence_state(support.retrieval),
+        guardrail=build_guardrail_state(support.request_guard, support.evidence_guard).model_copy(
             update={
-                "status": RunStatus.SUCCEEDED,
-                "active_node": "recommend_graph",
-            }
-        ),
-        evidence=EvidenceState(
-            items=[
-                EvidenceItem(
-                    evidence_id=item.evidence_id,
-                    source_type=item.source_type,
-                    source_id=item.source_id,
-                    title=item.title,
-                    snippet=item.snippet,
-                    recall_score=item.score,
-                    metadata={"route_name": item.route_name, **item.metadata},
+                "risk_level": (
+                    support.request_guard.risk_level
+                    if support.request_guard.risk_level is not RiskLevel.LOW
+                    else support.evidence_guard.risk_level
                 )
-                for item in retrieval.items
-            ],
-            route_names=retrieval.route_names,
-            coverage_score=1.0 if retrieval.items else 0.0,
-        ),
-        guardrail=GuardrailState(
-            risk_level=guard.risk_level if guard.risk_level is not RiskLevel.LOW else evidence_guard.risk_level,
-            completeness_ok=guard.completeness_ok and evidence_guard.completeness_ok,
-            policy_ok=guard.policy_ok,
-            dirty_data_flags=guard.missing_fields,
-            risk_reasons=guard.risk_reasons + evidence_guard.risk_reasons,
+            }
         ),
         outcome=OutcomeState(
             intent="recommend_question",

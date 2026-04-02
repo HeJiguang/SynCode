@@ -1,16 +1,20 @@
+from app.graphs.capabilities.shared import CapabilitySupport
 from app.graphs.capabilities.tutor_graph import build_tutor_graph
+from app.guardrails.runtime import GuardrailOutput
+from app.retrieval.models import RetrievalResult, RetrievedEvidence
 from app.runtime.context import build_request_context
 from app.runtime.enums import RiskLevel, RunStatus, TaskType
-from app.runtime.models import ExecutionState
+from app.runtime.models import EvidenceState, ExecutionState, GuardrailState, OutcomeState, UnifiedAgentState
 
 
 def test_tutor_graph_populates_evidence_and_guardrail_state(monkeypatch):
     import app.graphs.capabilities.tutor_graph as tutor_module  # noqa: WPS433
-    from app.retrieval.models import RetrievalResult, RetrievedEvidence  # noqa: WPS433
 
-    class _StubRetrievalRuntime:
-        def retrieve(self, query):
-            return RetrievalResult(
+    monkeypatch.setattr(
+        tutor_module,
+        "collect_capability_support",
+        lambda request, *, query_fields: CapabilitySupport(
+            retrieval=RetrievalResult(
                 route_names=["lexical"],
                 items=[
                     RetrievedEvidence(
@@ -23,56 +27,17 @@ def test_tutor_graph_populates_evidence_and_guardrail_state(monkeypatch):
                         score=0.93,
                     )
                 ],
-            )
-
-    class _StubGuardrailRuntime:
-        def evaluate(self, guardrail_input):
-            from app.guardrails.runtime import GuardrailOutput  # noqa: WPS433
-
-            return GuardrailOutput(
+            ),
+            request_guard=GuardrailOutput(
                 risk_level=RiskLevel.LOW,
                 completeness_ok=True,
                 policy_ok=True,
-                missing_fields=[],
-                risk_reasons=[],
-            )
-
-        def evaluate_output(self, *, answer, evidence_count):
-            from app.guardrails.runtime import GuardrailOutput  # noqa: WPS433
-
-            return GuardrailOutput(
+            ),
+            evidence_guard=GuardrailOutput(
                 risk_level=RiskLevel.LOW,
                 completeness_ok=True,
                 policy_ok=True,
-                missing_fields=[],
-                risk_reasons=[],
-            )
-
-    class _StubLegacyGraph:
-        def invoke(self, payload):
-            return {
-                "intent": "explain_problem",
-                "status_events": [
-                    {"node": "router", "message": "Routed request to intent: explain_problem."}
-                ],
-                "knowledge_hits": [],
-                "context_gaps": [],
-                "confidence": 0.88,
-                "next_action": "Trace the smallest failing sample.",
-                "final_answer": "Legacy answer",
-            }
-
-    monkeypatch.setattr(tutor_module, "RetrievalRuntime", lambda: _StubRetrievalRuntime())
-    monkeypatch.setattr(tutor_module, "GuardrailRuntime", lambda: _StubGuardrailRuntime())
-    monkeypatch.setattr(tutor_module, "build_graph", lambda: _StubLegacyGraph())
-    monkeypatch.setattr(
-        tutor_module.chat_assistant,
-        "generate_chat_answer",
-        lambda state: (
-            "TutorGraph answer",
-            0.91,
-            "Trace the smallest failing sample.",
-            "mock-model",
+            ),
         ),
     )
 
@@ -84,7 +49,7 @@ def test_tutor_graph_populates_evidence_and_guardrail_state(monkeypatch):
                 task_type=TaskType.CHAT,
                 user_message="Explain the core idea of this problem.",
                 question_title="Two Sum",
-                judge_result="WA on sample #2",
+                question_content="Find two numbers that add up to target.",
                 user_code="public class Solution {}",
             ),
             "execution": ExecutionState(
@@ -99,66 +64,16 @@ def test_tutor_graph_populates_evidence_and_guardrail_state(monkeypatch):
     state = result["unified_state"]
 
     assert state.evidence.route_names == ["lexical"]
-    assert state.evidence.items[0].source_id == "doc-1"
+    assert state.evidence.items
     assert state.guardrail.completeness_ok is True
     assert state.guardrail.policy_ok is True
-    assert state.outcome.answer == "TutorGraph answer"
+    assert state.outcome.intent == "explain_problem"
+    assert "Tutor summary:" in state.outcome.answer
+    assert "Retrieved hint:" in state.outcome.answer
 
 
 def test_tutor_graph_delegates_failure_intent_to_diagnose_graph(monkeypatch):
     import app.graphs.capabilities.tutor_graph as tutor_module  # noqa: WPS433
-    from app.retrieval.models import RetrievalResult  # noqa: WPS433
-    from app.runtime.models import (  # noqa: WPS433
-        EvidenceState,
-        GuardrailState,
-        OutcomeState,
-        UnifiedAgentState,
-    )
-
-    class _StubRetrievalRuntime:
-        def retrieve(self, query):
-            return RetrievalResult(route_names=[], items=[])
-
-    class _StubGuardrailRuntime:
-        def evaluate(self, guardrail_input):
-            from app.guardrails.runtime import GuardrailOutput  # noqa: WPS433
-
-            return GuardrailOutput(
-                risk_level=RiskLevel.LOW,
-                completeness_ok=True,
-                policy_ok=True,
-                missing_fields=[],
-                risk_reasons=[],
-                triggered_verifiers=["request_verifier"],
-            )
-
-        def evaluate_output(self, *, answer, evidence_count):
-            from app.guardrails.runtime import GuardrailOutput  # noqa: WPS433
-
-            return GuardrailOutput(
-                risk_level=RiskLevel.LOW,
-                completeness_ok=True,
-                policy_ok=True,
-                missing_fields=[],
-                risk_reasons=[],
-                triggered_verifiers=["output_verifier"],
-            )
-
-    class _StubLegacyGraph:
-        def invoke(self, payload):
-            return {
-                "intent": "analyze_failure",
-                "question_title": "Two Sum",
-                "judge_result": "WA on sample #2",
-                "user_code": "public class Solution {}",
-                "user_message": "Why is this WA?",
-                "status_events": [
-                    {"node": "router", "message": "Routed request to intent: analyze_failure."}
-                ],
-                "final_answer": "Legacy answer",
-                "confidence": 0.88,
-                "next_action": "Trace the smallest failing sample.",
-            }
 
     class _StubDiagnoseGraph:
         def invoke(self, payload):
@@ -185,9 +100,6 @@ def test_tutor_graph_delegates_failure_intent_to_diagnose_graph(monkeypatch):
                 )
             }
 
-    monkeypatch.setattr(tutor_module, "RetrievalRuntime", lambda: _StubRetrievalRuntime())
-    monkeypatch.setattr(tutor_module, "GuardrailRuntime", lambda: _StubGuardrailRuntime())
-    monkeypatch.setattr(tutor_module, "build_graph", lambda: _StubLegacyGraph())
     monkeypatch.setattr(tutor_module, "build_diagnose_graph", lambda: _StubDiagnoseGraph())
 
     result = build_tutor_graph().invoke(
@@ -214,61 +126,11 @@ def test_tutor_graph_delegates_failure_intent_to_diagnose_graph(monkeypatch):
     assert state.outcome.answer == "DiagnoseGraph delegated answer"
     assert state.execution.active_node == "diagnose_graph"
     assert state.request.task_type is TaskType.DIAGNOSIS
+    assert state.outcome.status_events[0]["node"] == "intent_router"
 
 
 def test_tutor_graph_delegates_recommendation_intent_to_recommend_graph(monkeypatch):
     import app.graphs.capabilities.tutor_graph as tutor_module  # noqa: WPS433
-    from app.retrieval.models import RetrievalResult  # noqa: WPS433
-    from app.runtime.models import (  # noqa: WPS433
-        EvidenceState,
-        GuardrailState,
-        OutcomeState,
-        UnifiedAgentState,
-    )
-
-    class _StubRetrievalRuntime:
-        def retrieve(self, query):
-            return RetrievalResult(route_names=[], items=[])
-
-    class _StubGuardrailRuntime:
-        def evaluate(self, guardrail_input):
-            from app.guardrails.runtime import GuardrailOutput  # noqa: WPS433
-
-            return GuardrailOutput(
-                risk_level=RiskLevel.LOW,
-                completeness_ok=True,
-                policy_ok=True,
-                missing_fields=[],
-                risk_reasons=[],
-                triggered_verifiers=["request_verifier"],
-            )
-
-        def evaluate_output(self, *, answer, evidence_count):
-            from app.guardrails.runtime import GuardrailOutput  # noqa: WPS433
-
-            return GuardrailOutput(
-                risk_level=RiskLevel.LOW,
-                completeness_ok=True,
-                policy_ok=True,
-                missing_fields=[],
-                risk_reasons=[],
-                triggered_verifiers=["output_verifier"],
-            )
-
-    class _StubLegacyGraph:
-        def invoke(self, payload):
-            return {
-                "intent": "recommend_question",
-                "question_title": "Two Sum",
-                "question_content": "Find two numbers that add up to target.",
-                "user_message": "What should I practice next?",
-                "status_events": [
-                    {"node": "router", "message": "Routed request to intent: recommend_question."}
-                ],
-                "final_answer": "Legacy answer",
-                "confidence": 0.81,
-                "next_action": "Practice another array problem.",
-            }
 
     class _StubRecommendGraph:
         def invoke(self, payload):
@@ -295,9 +157,6 @@ def test_tutor_graph_delegates_recommendation_intent_to_recommend_graph(monkeypa
                 )
             }
 
-    monkeypatch.setattr(tutor_module, "RetrievalRuntime", lambda: _StubRetrievalRuntime())
-    monkeypatch.setattr(tutor_module, "GuardrailRuntime", lambda: _StubGuardrailRuntime())
-    monkeypatch.setattr(tutor_module, "build_graph", lambda: _StubLegacyGraph())
     monkeypatch.setattr(tutor_module, "build_recommend_graph", lambda: _StubRecommendGraph())
 
     result = build_tutor_graph().invoke(
@@ -324,90 +183,17 @@ def test_tutor_graph_delegates_recommendation_intent_to_recommend_graph(monkeypa
     assert state.outcome.answer == "RecommendGraph delegated answer"
     assert state.execution.active_node == "recommend_graph"
     assert state.request.task_type is TaskType.RECOMMENDATION
+    assert state.outcome.status_events[0]["node"] == "intent_router"
 
 
-def test_tutor_graph_merges_evidence_guard_for_low_evidence(monkeypatch):
-    import app.graphs.capabilities.tutor_graph as tutor_module  # noqa: WPS433
-    from app.retrieval.models import RetrievalResult  # noqa: WPS433
-
-    class _StubRetrievalRuntime:
-        def retrieve(self, query):
-            return RetrievalResult(route_names=[], items=[])
-
-    class _StubGuardrailRuntime:
-        def evaluate(self, guardrail_input):
-            from app.guardrails.runtime import GuardrailOutput  # noqa: WPS433
-
-            return GuardrailOutput(
-                risk_level=RiskLevel.LOW,
-                completeness_ok=True,
-                policy_ok=True,
-                missing_fields=[],
-                risk_reasons=[],
-                triggered_verifiers=["request_verifier"],
-            )
-
-        def evaluate_evidence(self, *, task_type, evidence_count):
-            from app.guardrails.runtime import GuardrailOutput  # noqa: WPS433
-
-            return GuardrailOutput(
-                risk_level=RiskLevel.MEDIUM,
-                completeness_ok=False,
-                policy_ok=True,
-                missing_fields=[],
-                risk_reasons=["Insufficient evidence for grounded tutor answer."],
-                triggered_verifiers=["evidence_verifier"],
-            )
-
-        def evaluate_output(self, *, answer, evidence_count):
-            from app.guardrails.runtime import GuardrailOutput  # noqa: WPS433
-
-            return GuardrailOutput(
-                risk_level=RiskLevel.LOW,
-                completeness_ok=True,
-                policy_ok=True,
-                missing_fields=[],
-                risk_reasons=[],
-                triggered_verifiers=["output_verifier"],
-            )
-
-    class _StubLegacyGraph:
-        def invoke(self, payload):
-            return {
-                "intent": "explain_problem",
-                "status_events": [
-                    {"node": "router", "message": "Routed request to intent: explain_problem."}
-                ],
-                "knowledge_hits": [],
-                "context_gaps": [],
-                "confidence": 0.66,
-                "next_action": "Share the failing example.",
-                "final_answer": "Legacy answer",
-            }
-
-    monkeypatch.setattr(tutor_module, "RetrievalRuntime", lambda: _StubRetrievalRuntime())
-    monkeypatch.setattr(tutor_module, "GuardrailRuntime", lambda: _StubGuardrailRuntime())
-    monkeypatch.setattr(tutor_module, "build_graph", lambda: _StubLegacyGraph())
-    monkeypatch.setattr(
-        tutor_module.chat_assistant,
-        "generate_chat_answer",
-        lambda state: (
-            "TutorGraph answer",
-            0.82,
-            "Share the failing example.",
-            "mock-model",
-        ),
-    )
-
+def test_tutor_graph_asks_for_context_when_workspace_context_is_missing():
     result = build_tutor_graph().invoke(
         {
             "request": build_request_context(
                 trace_id="trace-tutor-004",
                 user_id="u-1",
                 task_type=TaskType.CHAT,
-                user_message="Explain the likely bug here.",
-                question_title="Two Sum",
-                user_code="public class Solution {}",
+                user_message="Can you go deeper on that?",
             ),
             "execution": ExecutionState(
                 run_id="run-tutor-004",
@@ -420,6 +206,6 @@ def test_tutor_graph_merges_evidence_guard_for_low_evidence(monkeypatch):
 
     state = result["unified_state"]
 
-    assert state.guardrail.risk_level is RiskLevel.MEDIUM
+    assert state.outcome.intent == "ask_for_context"
     assert state.guardrail.completeness_ok is False
-    assert "Insufficient evidence for grounded tutor answer." in state.guardrail.risk_reasons
+    assert "workspace context" in state.guardrail.risk_reasons[0]

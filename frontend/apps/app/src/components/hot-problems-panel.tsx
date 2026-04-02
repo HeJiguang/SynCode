@@ -14,7 +14,7 @@ export function HotProblemsPanel({ problems }: HotProblemsPanelProps) {
     <Panel hoverable className="flex flex-col p-0">
       <div className="flex items-center justify-between border-b border-[var(--border-soft)] p-6 pb-5">
         <div>
-          <p className="kicker">Hot Problems</p>
+          <p className="kicker">热门题目</p>
           <h3 className="mt-1 text-lg font-bold text-[var(--text-primary)]">热题榜</h3>
         </div>
         <div className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--text-muted)]">

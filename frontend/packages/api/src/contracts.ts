@@ -46,11 +46,48 @@ export type SubmissionRecord = {
   notes?: string;
 };
 
-export type AiMessage = {
-  id: string;
-  role: "user" | "assistant";
-  title?: string;
-  content: string;
+export type AiArtifactType =
+  | "answer_card"
+  | "diagnosis_report"
+  | "recommendation_pack"
+  | "training_plan"
+  | "review_summary"
+  | "profile_delta"
+  | "weakness_snapshot"
+  | "message_pack"
+  | "run_summary";
+
+export type AiRenderHint = "markdown" | "diagnosis" | "plan" | "profile_delta" | "recommendation" | "timeline_card";
+
+export type AiArtifact = {
+  artifactId: string;
+  runId: string;
+  artifactType: AiArtifactType;
+  title: string;
+  summary?: string;
+  body: Record<string, unknown>;
+  renderHint: AiRenderHint;
+  version: number;
+  createdAt: string;
+};
+
+export type AiRunEvent = {
+  eventId: string;
+  runId: string;
+  seq: number;
+  eventType: string;
+  level: "INFO" | "WARN" | "ERROR";
+  timestamp: string;
+  payload: Record<string, unknown>;
+};
+
+export type AiRunCreateResponse = {
+  runId: string;
+  status: string;
+  entryGraph: string;
+  eventsUrl: string;
+  artifactsUrl: string;
+  bootstrapArtifactId?: string;
 };
 
 export type TrainingTask = {

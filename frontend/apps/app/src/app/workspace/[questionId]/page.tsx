@@ -1,5 +1,5 @@
 import * as React from "react";
-import { getAiMessages, getProblemDetail, getSubmissionHistory } from "@aioj/api";
+import { getProblemDetail, getSubmissionHistory } from "@aioj/api";
 import { Clock, HardDrive, Hash } from "lucide-react";
 
 import { Panel, Tabs, Tag } from "@aioj/ui";
@@ -18,9 +18,8 @@ export default async function WorkspacePage({ params }: PageProps) {
   const { questionId } = await params;
   const token = await getServerAccessToken();
 
-  const [detail, messages, submissions] = await Promise.all([
+  const [detail, submissions] = await Promise.all([
     getProblemDetail(questionId, token),
-    getAiMessages(questionId, token),
     getSubmissionHistory(questionId, token)
   ]);
 
@@ -28,7 +27,7 @@ export default async function WorkspacePage({ params }: PageProps) {
 
   const questionDescription = (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="shrink-0 p-6 pb-4">
+      <div className="hero-grid shrink-0 border-b border-[var(--border-soft)] p-6 pb-5">
         <div className="flex flex-wrap items-center gap-3">
           <Tag tone={detail.difficulty === "Easy" ? "success" : detail.difficulty === "Medium" ? "warning" : "danger"}>
             {detail.difficulty}
@@ -36,10 +35,20 @@ export default async function WorkspacePage({ params }: PageProps) {
           {detail.tags.map((item) => (
             <Tag key={item}>{item}</Tag>
           ))}
-          <Tag tone="accent">Heat {detail.heat}</Tag>
+          <Tag tone="accent">热度 {detail.heat}</Tag>
         </div>
 
-        <p className="mt-4 text-[13px] leading-relaxed text-[var(--text-secondary)]">{detail.summary}</p>
+        <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl">
+            <p className="kicker">当前题目</p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{detail.title}</h2>
+            <p className="mt-3 text-[13px] leading-relaxed text-[var(--text-secondary)]">{detail.summary}</p>
+          </div>
+          <div className="rounded-[18px] border border-[var(--border-soft)] bg-black/10 px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.16em] text-[var(--text-muted)]">建议节奏</p>
+            <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">先读题，再跑样例，最后提交评测</p>
+          </div>
+        </div>
 
         <div className="mt-6 grid grid-cols-3 gap-3">
           <div className="flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 py-2">
@@ -57,9 +66,9 @@ export default async function WorkspacePage({ params }: PageProps) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-6 pt-2">
+      <div className="flex-1 overflow-auto p-6 pt-4">
         <div className="space-y-5">
-          <h3 className="text-lg font-bold text-[var(--text-primary)]">{detail.title} 题目说明</h3>
+          <h3 className="text-lg font-bold text-[var(--text-primary)]">题目说明</h3>
           {detail.content.map((item, index) => (
             <p key={index} className="text-[14px] leading-relaxed text-[var(--text-secondary)]">
               {item}
@@ -114,7 +123,7 @@ export default async function WorkspacePage({ params }: PageProps) {
       <WorkspaceLayout
         aiPanel={
           <AiPanel
-            messages={messages}
+            initialArtifacts={[]}
             questionId={questionId}
             questionTitle={detail.title}
             questionContent={questionContent}

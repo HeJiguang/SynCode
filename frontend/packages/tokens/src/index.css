@@ -9,46 +9,46 @@
   color-scheme: dark;
 
   /* Backgrounds — 极深的主背景 & 略亮的卡片 */
-  --bg:            #0a0a0a;   /* 纯黑灰 */
-  --bg-elevated:   #111111;   /* 极暗的深灰 */
+  --bg:            #071018;
+  --bg-elevated:   #0d1821;
 
   /* Surfaces */
-  --surface-1:     #111111;   /* 卡片底色 */
-  --surface-2:     #1a1a1a;   /* 悬浮/激活色块 */
-  --surface-muted: rgba(17, 17, 17, 0.6);
+  --surface-1:     rgba(13, 24, 33, 0.88);
+  --surface-2:     rgba(20, 34, 45, 0.94);
+  --surface-muted: rgba(11, 20, 28, 0.7);
 
   /* Borders — 完全靠 1px 半透明界定，绝不发光 */
-  --border-soft:   rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.16);
+  --border-soft:   rgba(148, 163, 184, 0.14);
+  --border-strong: rgba(148, 163, 184, 0.28);
 
   /* Typography */
-  --text-primary:   #fafafa;
-  --text-secondary: #a1a1aa;  /* 中度灰，提升呼吸感 */
-  --text-muted:     #71717a;
+  --text-primary:   #edf5fb;
+  --text-secondary: #a0b1bf;
+  --text-muted:     #6d8293;
 
   /* Primary CTA — 暗色：白底黑字，无渐变 */
-  --cta-bg:    #fafafa;
-  --cta-fg:    #0a0a0a;
-  --cta-hover: #e4e4e7;
+  --cta-bg:    #d7f4ee;
+  --cta-fg:    #08211b;
+  --cta-hover: #bfece2;
 
   /* Semantic & Emotional Accents */
-  --accent:    #a78bfa;  /* 柔和的薰衣草紫 (Violet-400) */
+  --accent:    #5eead4;
   --success:   #4ade80;  /* 柔和绿 */
   --warning:   #fb923c;
   --danger:    #f87171;  /* 柔和红 */
 
   --success-bg: rgba(74, 222, 128, 0.12);
-  --warning-bg: rgba(251, 146, 60, 0.14);
+  --warning-bg: rgba(245, 158, 11, 0.14);
   --danger-bg:  rgba(248, 113, 113, 0.14);
-  --accent-bg:  rgba(167, 139, 250, 0.12);
+  --accent-bg:  rgba(94, 234, 212, 0.14);
 
   /* Radius — 极致网格 */
-  --radius-card: 12px;
-  --radius-sm:   6px;
+  --radius-card: 22px;
+  --radius-sm:   12px;
 
   /* Shadows — 暗色下所有常规面板【无投影】，只保留纯黑色的极端浮层弥散(如下拉菜单) */
-  --shadow-panel: none;
-  --shadow-float: 0 16px 48px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --shadow-panel: 0 24px 70px rgba(2, 8, 15, 0.36);
+  --shadow-float: 0 28px 90px rgba(2, 8, 15, 0.5);
 
   /* Fonts — 引入 Geist */
   --font-sans:
@@ -60,57 +60,57 @@
 /* ── Light Mode Base Variables ── */
 :root.light {
     color-scheme: light;
-    --bg:            #faf9f6;
+    --bg:            #f4efe7;
     --bg-elevated:   #ffffff;
     --surface-1:     #ffffff;
-    --surface-2:     #f4f4f5;
-    --surface-muted: rgba(255, 255, 255, 0.8);
-    --border-soft:   #e4e4e7;
-    --border-strong: #d4d4d8;
-    --text-primary:   #0a0a0a;
-    --text-secondary: #52525b;
-    --text-muted:     #a1a1aa;
-    --cta-bg:    #0a0a0a;
-    --cta-fg:    #ffffff;
-    --cta-hover: #1f1f23;
-    --accent:    #7c3aed;
+    --surface-2:     #eef2f3;
+    --surface-muted: rgba(255, 255, 255, 0.78);
+    --border-soft:   rgba(15, 23, 42, 0.10);
+    --border-strong: rgba(15, 23, 42, 0.18);
+    --text-primary:   #14212b;
+    --text-secondary: #4d6372;
+    --text-muted:     #8493a1;
+    --cta-bg:    #143c36;
+    --cta-fg:    #f4fbf9;
+    --cta-hover: #0f312c;
+    --accent:    #0f8f7c;
     --success:   #16a34a;
     --warning:   #ea580c;
     --danger:    #dc2626;
     --success-bg: rgba(22, 163, 74, 0.08);
     --warning-bg: rgba(234, 88, 12, 0.10);
     --danger-bg:  rgba(220, 38, 38, 0.08);
-    --accent-bg:  rgba(124, 58, 237, 0.08);
-    --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.04), 0 0 0 1px var(--border-soft);
-    --shadow-float: 0 12px 32px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--border-soft);
+    --accent-bg:  rgba(15, 143, 124, 0.10);
+    --shadow-panel: 0 18px 42px rgba(15, 23, 42, 0.08);
+    --shadow-float: 0 24px 56px rgba(15, 23, 42, 0.12);
 }
 
 @media (prefers-color-scheme: light) {
   :root:not(.dark) {
     color-scheme: light;
-    --bg:            #faf9f6;
+    --bg:            #f4efe7;
     --bg-elevated:   #ffffff;
     --surface-1:     #ffffff;
-    --surface-2:     #f4f4f5;
-    --surface-muted: rgba(255, 255, 255, 0.8);
-    --border-soft:   #e4e4e7;
-    --border-strong: #d4d4d8;
-    --text-primary:   #0a0a0a;
-    --text-secondary: #52525b;
-    --text-muted:     #a1a1aa;
-    --cta-bg:    #0a0a0a;
-    --cta-fg:    #ffffff;
-    --cta-hover: #1f1f23;
-    --accent:    #7c3aed;
+    --surface-2:     #eef2f3;
+    --surface-muted: rgba(255, 255, 255, 0.78);
+    --border-soft:   rgba(15, 23, 42, 0.10);
+    --border-strong: rgba(15, 23, 42, 0.18);
+    --text-primary:   #14212b;
+    --text-secondary: #4d6372;
+    --text-muted:     #8493a1;
+    --cta-bg:    #143c36;
+    --cta-fg:    #f4fbf9;
+    --cta-hover: #0f312c;
+    --accent:    #0f8f7c;
     --success:   #16a34a;
     --warning:   #ea580c;
     --danger:    #dc2626;
     --success-bg: rgba(22, 163, 74, 0.08);
     --warning-bg: rgba(234, 88, 12, 0.10);
     --danger-bg:  rgba(220, 38, 38, 0.08);
-    --accent-bg:  rgba(124, 58, 237, 0.08);
-    --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.04), 0 0 0 1px var(--border-soft);
-    --shadow-float: 0 12px 32px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--border-soft);
+    --accent-bg:  rgba(15, 143, 124, 0.10);
+    --shadow-panel: 0 18px 42px rgba(15, 23, 42, 0.08);
+    --shadow-float: 0 24px 56px rgba(15, 23, 42, 0.12);
   }
 }
 

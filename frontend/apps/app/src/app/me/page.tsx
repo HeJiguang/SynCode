@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ArrowRight, BookOpen, Clock3, Flame, Settings } from "lucide-react";
+import { ArrowRight, BookOpen, Clock3, Flame, Settings, Sparkles, Target } from "lucide-react";
 import { getPublicMessages, getSubmissionHistory, getTrainingSnapshot, getUserProfile } from "@aioj/api";
 import { redirect } from "next/navigation";
 
@@ -38,7 +38,7 @@ export default async function ProfilePage() {
         <>
           <AnnouncementCenter messages={messages.slice(0, 3)} />
           <Panel className="p-4">
-            <p className="kicker">Quick Access</p>
+            <p className="kicker">快捷入口</p>
             <div className="mt-3 space-y-2">
               {[
                 { label: "进入设置", href: "/app/settings", icon: <Settings size={14} /> },
@@ -61,7 +61,7 @@ export default async function ProfilePage() {
         </>
       }
     >
-      <Panel className="p-6" tone="strong">
+      <Panel className="hero-grid overflow-hidden p-6 md:p-7" tone="strong">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
             <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-2)] text-2xl font-semibold text-[var(--text-primary)]">
@@ -85,7 +85,7 @@ export default async function ProfilePage() {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[420px]">
             <div className="rounded-[20px] border border-[var(--border-soft)] bg-[var(--surface-2)] px-4 py-3">
               <p className="text-xs text-[var(--text-muted)]">已解题数</p>
               <p className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">{profile.solvedCount}</p>
@@ -103,12 +103,29 @@ export default async function ProfilePage() {
             </div>
           </div>
         </div>
+        <div className="mt-6 grid gap-3 md:grid-cols-3">
+          <div className="rounded-[18px] border border-[var(--border-soft)] bg-black/10 px-4 py-4">
+            <p className="text-xs text-[var(--text-muted)]">当前焦点</p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-primary)]">{focusLabel}</p>
+          </div>
+          <div className="rounded-[18px] border border-[var(--border-soft)] bg-black/10 px-4 py-4">
+            <p className="text-xs text-[var(--text-muted)]">本周目标</p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-primary)]">{training.weeklyGoal}</p>
+          </div>
+          <div className="rounded-[18px] border border-[var(--border-soft)] bg-black/10 px-4 py-4">
+            <p className="text-xs text-[var(--text-muted)]">建议动作</p>
+            <a href={appPublicPath("/training")} className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-[var(--accent)] transition-opacity hover:opacity-80">
+              <Sparkles size={14} />
+              查看训练计划
+            </a>
+          </div>
+        </div>
       </Panel>
 
       <Panel className="p-6">
         <div className="mb-5 flex items-center justify-between">
           <div>
-            <p className="kicker">Activity</p>
+            <p className="kicker">学习活跃度</p>
             <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">提交热力图</h2>
           </div>
           <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
@@ -122,7 +139,7 @@ export default async function ProfilePage() {
       <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <Panel className="overflow-hidden p-0">
           <div className="border-b border-[var(--border-soft)] px-6 py-5">
-            <p className="kicker">Recent</p>
+            <p className="kicker">最近动态</p>
             <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">最近提交</h2>
           </div>
           <div className="divide-y divide-[var(--border-soft)]">
@@ -151,7 +168,7 @@ export default async function ProfilePage() {
 
         <div className="space-y-6">
           <Panel className="p-6">
-            <p className="kicker">Training</p>
+            <p className="kicker">训练进展</p>
             <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">{training.title}</h2>
             <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
               {training.direction} · {training.level}
@@ -173,7 +190,7 @@ export default async function ProfilePage() {
           </Panel>
 
           <Panel className="p-6">
-            <p className="kicker">Account</p>
+            <p className="kicker">账号信息</p>
             <div className="mt-3 space-y-3 text-sm text-[var(--text-secondary)]">
               <p>邮箱：{profile.email || "未设置"}</p>
               <p>学校：{profile.schoolName || "未设置"}</p>

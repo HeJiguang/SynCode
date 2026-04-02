@@ -3,7 +3,6 @@ import type {
   AdminMetric,
   AdminQuestionRow,
   AdminUserRow,
-  AiMessage,
   ExamDetail,
   ExamSummary,
   PublicMessage,
@@ -16,7 +15,6 @@ import type {
 import { adminExams, adminMetrics, adminQuestions, adminUsers } from "./mock/admin";
 import { hotQuestions, questionDetails, questions } from "./mock/problems";
 import { exams } from "./mock/training";
-import { fetchLiveAiHistory } from "./live/ai";
 import { fetchLiveExamDetail, fetchLiveExamList, getExamMockFallback } from "./live/exams";
 import { fetchLiveMessages, getMessageMockFallback } from "./live/messages";
 import { fetchLiveHotProblemList, fetchLiveProblemDetail, fetchLiveProblemList } from "./live/questions";
@@ -28,7 +26,6 @@ export * from "./contracts";
 export * from "./auth";
 export * from "./client";
 export * from "./runtime";
-export * from "./live/ai";
 
 export async function getProblemList(): Promise<QuestionListItem[]> {
   try {
@@ -87,15 +84,6 @@ export async function getExamDetail(examId: string, token?: string | null): Prom
 export async function getUserProfile(token?: string | null): Promise<UserProfile> {
   if (!token) return getUserMockFallback();
   return fetchLiveUserProfile(token);
-}
-
-export async function getAiMessages(questionId?: string, token?: string | null): Promise<AiMessage[]> {
-  if (!questionId || !token) return [];
-  try {
-    return await fetchLiveAiHistory(questionId, token);
-  } catch {
-    return [];
-  }
 }
 
 export async function getPublicMessages(token?: string | null): Promise<PublicMessage[]> {

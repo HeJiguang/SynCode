@@ -11,7 +11,7 @@ export function AnnouncementCenter({ messages }: AnnouncementCenterProps) {
     <Panel hoverable className="flex flex-col p-0">
       <div className="flex items-center justify-between border-b border-[var(--border-soft)] p-6">
         <div>
-          <p className="kicker">Public Information</p>
+          <p className="kicker">公告中心</p>
           <h3 className="mt-1 text-lg font-bold text-[var(--text-primary)]">系统公告</h3>
         </div>
         <Tag tone="accent">精选公告</Tag>

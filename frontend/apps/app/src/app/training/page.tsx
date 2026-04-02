@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Sparkles, Target, TrendingUp } from "lucide-react";
 import { getPublicMessages, getTrainingSnapshot, getUserProfile } from "@aioj/api";
 import { redirect } from "next/navigation";
 
@@ -30,10 +31,50 @@ export default async function TrainingPage() {
 
   return (
     <AppShell rail={<AnnouncementCenter messages={messages.slice(0, 2)} />}>
+      <Panel className="hero-grid overflow-hidden p-6 md:p-7" tone="accent">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="kicker">训练总览</p>
+            <h1 className="mt-2 text-3xl font-bold tracking-[-0.04em] text-[var(--text-primary)] md:text-4xl">{training.title}</h1>
+            <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)] md:text-[15px]">
+              {training.direction} · {training.level}
+            </p>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-secondary)]">本周目标：{training.weeklyGoal}</p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Tag tone="accent">连续学习 {profile.streakDays} 天</Tag>
+              <Tag>{profile.solvedCount} 题已解决</Tag>
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3 lg:min-w-[460px]">
+            <div className="rounded-[18px] border border-[var(--border-soft)] bg-black/10 px-4 py-4">
+              <p className="text-xs text-[var(--text-muted)]">完成度</p>
+              <p className="mt-2 inline-flex items-center gap-2 text-lg font-semibold text-[var(--text-primary)]">
+                <TrendingUp size={16} className="text-[var(--accent)]" />
+                {training.completionRate}%
+              </p>
+            </div>
+            <div className="rounded-[18px] border border-[var(--border-soft)] bg-black/10 px-4 py-4">
+              <p className="text-xs text-[var(--text-muted)]">任务数</p>
+              <p className="mt-2 inline-flex items-center gap-2 text-lg font-semibold text-[var(--text-primary)]">
+                <Target size={16} className="text-[var(--accent)]" />
+                {training.tasks.length} 项
+              </p>
+            </div>
+            <div className="rounded-[18px] border border-[var(--border-soft)] bg-black/10 px-4 py-4">
+              <p className="text-xs text-[var(--text-muted)]">下一步</p>
+              <p className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+                <Sparkles size={16} className="text-[var(--accent)]" />
+                继续推进当前计划
+              </p>
+            </div>
+          </div>
+        </div>
+      </Panel>
+
       <div className="grid gap-4 xl:grid-cols-[0.96fr_1.04fr]">
         <Panel className="p-5" tone="accent">
-          <p className="kicker">Profile</p>
-          <h2 className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">{training.title}</h2>
+          <p className="kicker">训练总览</p>
+          <h2 className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">当前节奏</h2>
           <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
             {training.direction} · {training.level}
           </p>
@@ -48,7 +89,7 @@ export default async function TrainingPage() {
         </Panel>
 
         <Panel className="p-5">
-          <p className="kicker">Progress</p>
+          <p className="kicker">任务进度</p>
           <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">当前任务</h2>
           <p className="mt-2 text-sm text-[var(--text-muted)]">完成度 {training.completionRate}%</p>
           <div className="mt-5 space-y-3">
@@ -77,13 +118,13 @@ export default async function TrainingPage() {
 
       <div className="grid gap-4 md:grid-cols-2">
         <Panel className="p-5">
-          <p className="kicker">Strengths</p>
+          <p className="kicker">优势方向</p>
           <div className="mt-4 space-y-2 text-sm leading-7 text-[var(--text-secondary)]">
             {training.strengths.length > 0 ? training.strengths.map((item) => <p key={item}>{item}</p>) : <p>暂无总结数据。</p>}
           </div>
         </Panel>
         <Panel className="p-5">
-          <p className="kicker">Weaknesses</p>
+          <p className="kicker">待补强项</p>
           <div className="mt-4 space-y-2 text-sm leading-7 text-[var(--text-secondary)]">
             {training.weaknesses.length > 0 ? training.weaknesses.map((item) => <p key={item}>{item}</p>) : <p>暂无弱项分析数据。</p>}
           </div>

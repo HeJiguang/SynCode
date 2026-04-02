@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "SynCode App",
-  description: "SynCode 用户端演示，聚焦刷题、训练、考试和 AI 辅助工作流。"
+  description: "SynCode 用户端，聚焦刷题、训练、考试和 AI 辅助工作流。"
 };
 
 /**

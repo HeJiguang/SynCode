@@ -20,8 +20,8 @@ public class AiRouteConfig {
         String targetPrefix = normalizePrefix(properties.getTargetPrefix(), "/api");
 
         return builder.routes()
-                .route("oj-agent-chat-route", route -> route
-                        .path(publicPrefix + "/chat", publicPrefix + "/chat/**")
+                .route("oj-agent-route", route -> route
+                        .path(publicPrefix, publicPrefix + "/**")
                         .filters(filter -> filter.rewritePath(
                                 publicPrefix + "/(?<segment>.*)",
                                 targetPrefix + "/${segment}"

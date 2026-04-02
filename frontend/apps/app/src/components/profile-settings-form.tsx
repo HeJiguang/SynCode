@@ -160,7 +160,7 @@ export function ProfileSettingsForm({ profile }: ProfileSettingsFormProps) {
             {isSaving ? <LoaderCircle size={14} className="animate-spin" /> : null}
             保存资料
           </Button>
-          <p className="text-sm text-[var(--text-muted)]">头像会通过现有 OSS 上传接口保存，昵称与简介直接写回用户资料。</p>
+          <p className="text-sm text-[var(--text-muted)]">建议补充完整头像与简介，方便训练计划和个人主页展示更准确。</p>
         </div>
       </form>
     </Panel>

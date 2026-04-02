@@ -2,285 +2,241 @@ from typing import NotRequired, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from app.graph.edges import ANALYZE_FAILURE, RECOMMEND_QUESTION
-from app.graph.builder import build_graph
 from app.graphs.capabilities.diagnose_graph import build_diagnose_graph
 from app.graphs.capabilities.recommend_graph import build_recommend_graph
-from app.guardrails.runtime import GuardrailInput, GuardrailRuntime
-from app.retrieval.runtime import RetrievalRuntime
-from app.retrieval.models import RetrievalQuery
+from app.graphs.capabilities.shared import (
+    CapabilitySupport,
+    build_evidence_state,
+    build_guardrail_state,
+    collect_capability_support,
+    update_execution,
+)
 from app.runtime.enums import RiskLevel, RunStatus, TaskType
-from app.runtime.models import EvidenceItem, EvidenceState, GuardrailState, UnifiedAgentState
-from app.services import chat_assistant
+from app.runtime.models import EvidenceState, GuardrailState, OutcomeState, UnifiedAgentState
+
+
+ASK_FOR_CONTEXT = "ask_for_context"
+EXPLAIN_PROBLEM = "explain_problem"
+ANALYZE_FAILURE = "analyze_failure"
+RECOMMEND_QUESTION = "recommend_question"
 
 
 class TutorGraphState(TypedDict):
     request: object
     execution: object
-    stream_mode: NotRequired[bool]
+    intent: NotRequired[str]
+    support: NotRequired[CapabilitySupport]
     unified_state: UnifiedAgentState
 
 
-def _safe_evidence_guard(
-    guardrail_runtime,
-    *,
-    task_type: str,
-    evidence_count: int,
-    route_names: list[str] | None = None,
-):
-    if not hasattr(guardrail_runtime, "evaluate_evidence"):
-        from app.guardrails.runtime import GuardrailOutput  # noqa: WPS433
-
-        return GuardrailOutput(
-            risk_level=RiskLevel.LOW,
-            completeness_ok=True,
-            policy_ok=True,
-        )
-    try:
-        return guardrail_runtime.evaluate_evidence(
-            task_type=task_type,
-            evidence_count=evidence_count,
-            route_names=route_names,
-        )
-    except TypeError:
-        return guardrail_runtime.evaluate_evidence(
-            task_type=task_type,
-            evidence_count=evidence_count,
-        )
-
-
-def _higher_risk(left: RiskLevel, right: RiskLevel) -> RiskLevel:
-    order = {
-        RiskLevel.LOW: 1,
-        RiskLevel.MEDIUM: 2,
-        RiskLevel.HIGH: 3,
-    }
-    return left if order[left] >= order[right] else right
-
-
-def _hydrate_request_from_legacy_result(request, result: dict):
-    return request.model_copy(
-        update={
-            "conversation_id": result.get("conversation_id") or request.conversation_id,
-            "question_id": result.get("question_id") or request.question_id,
-            "question_title": result.get("question_title") or request.question_title,
-            "question_content": result.get("question_content") or request.question_content,
-            "user_code": result.get("user_code") or request.user_code,
-            "judge_result": result.get("judge_result") or request.judge_result,
-            "user_message": result.get("user_message") or request.user_message,
-        }
-    )
-
-
-def _merge_status_events(result: dict, delegated_state: UnifiedAgentState):
-    merged = [
-        {"node": "retrieval_runtime", "message": "Built retrieval evidence set."},
-        {"node": "guardrail_runtime", "message": "Evaluated request and output guardrails."},
-    ]
-    merged.extend(
-        {"node": str(item["node"]), "message": str(item["message"])}
-        for item in result.get("status_events") or []
-    )
-    merged.extend(delegated_state.outcome.status_events)
-    return delegated_state.outcome.model_copy(update={"status_events": merged})
-
-
-def _delegate_intent(
-    request,
-    execution,
-    result: dict,
-) -> UnifiedAgentState | None:
-    hydrated_request = _hydrate_request_from_legacy_result(request, result)
-    intent = str(result.get("intent") or "")
-    if intent == ANALYZE_FAILURE:
-        payload = {
-            "request": hydrated_request.model_copy(update={"task_type": TaskType.DIAGNOSIS}),
-            "execution": execution,
-        }
-        delegated = build_diagnose_graph().invoke(payload)["unified_state"]
-        return delegated.model_copy(update={"outcome": _merge_status_events(result, delegated)})
-    if intent == RECOMMEND_QUESTION:
-        payload = {
-            "request": hydrated_request.model_copy(update={"task_type": TaskType.RECOMMENDATION}),
-            "execution": execution,
-        }
-        delegated = build_recommend_graph().invoke(payload)["unified_state"]
-        return delegated.model_copy(update={"outcome": _merge_status_events(result, delegated)})
-    return None
-
-
-def tutor_node(state: TutorGraphState) -> TutorGraphState:
+def route_intent_node(state: TutorGraphState) -> TutorGraphState:
     request = state["request"]
-    execution = state["execution"]
-    stream_mode = bool(state.get("stream_mode"))
+    return {
+        **state,
+        "intent": _interactive_intent(request),
+    }
 
-    retrieval_runtime = RetrievalRuntime()
-    retrieval_result = retrieval_runtime.retrieve(
-        RetrievalQuery(
-            query_text=" ".join(
-                value
-                for value in [
-                    request.question_title,
-                    request.question_content,
-                    request.judge_result,
-                    request.user_message,
-                ]
-                if value
+
+def route_after_intent(state: TutorGraphState) -> str:
+    return state["intent"]
+
+
+def collect_support_node(state: TutorGraphState) -> TutorGraphState:
+    return {
+        **state,
+        "support": collect_capability_support(
+            state["request"],
+            query_fields=(
+                "question_title",
+                "question_content",
+                "judge_result",
+                "user_message",
             ),
-            task_type=request.task_type.value,
-            user_id=request.user_id,
-            conversation_id=request.conversation_id,
-        )
+        ),
+    }
+
+
+def ask_for_context_node(state: TutorGraphState) -> TutorGraphState:
+    request = state["request"]
+    unified_state = UnifiedAgentState(
+        request=request,
+        execution=update_execution(state["execution"], active_node="tutor_context_gate"),
+        evidence=EvidenceState(),
+        guardrail=GuardrailState(
+            risk_level=RiskLevel.MEDIUM,
+            completeness_ok=False,
+            policy_ok=True,
+            risk_reasons=["missing workspace context for tutor answer"],
+        ),
+        outcome=OutcomeState(
+            intent=ASK_FOR_CONTEXT,
+            answer="I need the problem statement, your current code, or the latest judge result before I can give a grounded answer.",
+            confidence=0.25,
+            next_action="Send the current question context and the latest failing submission details.",
+            status_events=[
+                {"node": "intent_router", "message": "The request needs more workspace context before tutoring can continue."}
+            ],
+        ),
     )
+    return {**state, "unified_state": unified_state}
 
-    guardrail_runtime = GuardrailRuntime()
-    input_guard = guardrail_runtime.evaluate(
-        GuardrailInput(
-            task_type=request.task_type.value,
-            user_message=request.user_message,
-            question_title=request.question_title,
-            question_content=request.question_content,
-            user_code=request.user_code,
-            judge_result=request.judge_result,
-        )
-    )
-    evidence_guard = _safe_evidence_guard(
-        guardrail_runtime,
-        task_type=request.task_type.value,
-        evidence_count=len(retrieval_result.items),
-        route_names=retrieval_result.route_names,
-    )
 
-    result = build_graph().invoke(
-        {
-            "trace_id": request.trace_id,
-            "user_id": request.user_id,
-            "conversation_id": request.conversation_id,
-            "question_id": request.question_id,
-            "question_title": request.question_title,
-            "question_content": request.question_content,
-            "user_code": request.user_code,
-            "judge_result": request.judge_result,
-            "user_message": request.user_message,
-        }
-    )
-    if not stream_mode:
-        delegated_state = _delegate_intent(request, execution, result)
-        if delegated_state is not None:
-            return {
-                **state,
-                "unified_state": delegated_state,
-            }
+def tutor_reasoning_node(state: TutorGraphState) -> TutorGraphState:
+    request = state["request"]
+    support = state["support"]
+    retrieval = support.retrieval
+    strongest_evidence = retrieval.items[0] if retrieval.items else None
 
-    answer = str(result.get("final_answer") or "I need more context before I can help precisely.")
-    confidence = float(result.get("confidence") or 0.2)
-    next_action = str(result.get("next_action") or "Send one more concrete failing example.")
-    model_name = None
-    output_guard = None
+    answer_lines = ["Tutor summary:"]
+    if request.question_title:
+        answer_lines.append(f"Anchor the reasoning around {request.question_title}.")
+    if request.question_content:
+        answer_lines.append("Restate the input/output contract and identify the invariant that must remain true after each step.")
+    else:
+        answer_lines.append("Start by restating the invariant you expect to maintain through the solution.")
+    if request.user_code:
+        answer_lines.append("Compare your current code against that invariant before changing syntax or data structures.")
+    if request.judge_result:
+        answer_lines.append(f"Use the latest judge signal as a filter: {request.judge_result}.")
+    if strongest_evidence is not None:
+        answer_lines.append(f"Retrieved hint: {strongest_evidence.snippet}")
+    answer_lines.append("Do not jump to a rewrite until you can explain where the current state first diverges from the expected state.")
 
-    if not stream_mode:
-        answer, confidence, next_action, model_name = chat_assistant.generate_chat_answer(result)
-        output_guard = guardrail_runtime.evaluate_output(
-            answer=answer,
-            evidence_count=len(retrieval_result.items),
-        )
-
-    combined_risk = input_guard.risk_level
-    combined_risk = _higher_risk(combined_risk, evidence_guard.risk_level)
-    if output_guard is not None:
-        combined_risk = _higher_risk(input_guard.risk_level, output_guard.risk_level)
-        combined_risk = _higher_risk(combined_risk, evidence_guard.risk_level)
-
-    execution = execution.model_copy(
-        update={
-            "status": RunStatus.SUCCEEDED,
-            "active_node": "tutor_graph",
-            "model_name": model_name,
-        }
+    next_action = (
+        "Dry-run the smallest non-trivial sample and write down the expected state after each update."
+        if request.user_code or request.judge_result
+        else "Write the invariant in one sentence before coding the next attempt."
     )
 
     unified_state = UnifiedAgentState(
         request=request,
-        execution=execution,
-        evidence=EvidenceState(
-            items=[
-                EvidenceItem(
-                    evidence_id=item.evidence_id,
-                    source_type=item.source_type,
-                    source_id=item.source_id,
-                    title=item.title,
-                    snippet=item.snippet,
-                    recall_score=item.score,
-                    metadata={"route_name": item.route_name, **item.metadata},
-                )
-                for item in retrieval_result.items
+        execution=update_execution(state["execution"], active_node="interactive_learning_graph"),
+        evidence=build_evidence_state(retrieval),
+        guardrail=build_guardrail_state(support.request_guard, support.evidence_guard),
+        outcome=OutcomeState(
+            intent=EXPLAIN_PROBLEM,
+            answer="\n".join(answer_lines),
+            confidence=0.82 if retrieval.items else 0.7,
+            next_action=next_action,
+            status_events=[
+                {"node": "intent_router", "message": "Routed request to the tutor reasoning path."},
+                {"node": "retrieval_runtime", "message": "Collected learning evidence for the workspace prompt."},
+                {"node": "reasoner_node", "message": "Built a tutor explanation from workspace context and retrieved evidence."},
+                {"node": "composer_node", "message": "Composed the final tutor answer and next step."},
             ],
-            route_names=retrieval_result.route_names,
-            coverage_score=1.0 if retrieval_result.items else 0.0,
-        ),
-        guardrail=GuardrailState(
-            risk_level=combined_risk,
-            completeness_ok=input_guard.completeness_ok and evidence_guard.completeness_ok,
-            policy_ok=(
-                input_guard.policy_ok
-                and evidence_guard.policy_ok
-                and (output_guard.policy_ok if output_guard is not None else True)
-            ),
-            dirty_data_flags=input_guard.missing_fields + evidence_guard.missing_fields,
-            risk_reasons=(
-                input_guard.risk_reasons
-                + evidence_guard.risk_reasons
-                + (output_guard.risk_reasons if output_guard is not None else [])
-            ),
-        ),
-        outcome=chat_assistant_safe_outcome(
-            result,
-            answer,
-            confidence,
-            next_action,
-            response_payload={
-                "assistant_state": result,
-                "stream_mode": stream_mode,
-            },
         ),
     )
+    return {**state, "unified_state": unified_state}
+
+
+def delegate_diagnosis_node(state: TutorGraphState) -> TutorGraphState:
+    request = state["request"].model_copy(update={"task_type": TaskType.DIAGNOSIS})
+    delegated = build_diagnose_graph().invoke(
+        {
+            "request": request,
+            "execution": state["execution"],
+        }
+    )["unified_state"]
     return {
         **state,
-        "unified_state": unified_state,
+        "unified_state": _prepend_status_event(
+            delegated,
+            {"node": "intent_router", "message": "Routed chat request to the diagnosis capability."},
+        ),
     }
 
 
-def chat_assistant_safe_outcome(
-    result: dict,
-    answer: str,
-    confidence: float,
-    next_action: str,
-    *,
-    response_payload: dict | None = None,
-):
-    from app.runtime.models import OutcomeState
+def delegate_recommendation_node(state: TutorGraphState) -> TutorGraphState:
+    request = state["request"].model_copy(update={"task_type": TaskType.RECOMMENDATION})
+    delegated = build_recommend_graph().invoke(
+        {
+            "request": request,
+            "execution": state["execution"],
+        }
+    )["unified_state"]
+    return {
+        **state,
+        "unified_state": _prepend_status_event(
+            delegated,
+            {"node": "intent_router", "message": "Routed chat request to the recommendation capability."},
+        ),
+    }
 
-    status_events = [
-        {"node": "retrieval_runtime", "message": "Built retrieval evidence set."},
-        {"node": "guardrail_runtime", "message": "Evaluated request and output guardrails."},
-    ]
-    status_events.extend(
-        {"node": str(item["node"]), "message": str(item["message"])}
-        for item in result.get("status_events") or []
+
+def _interactive_intent(request) -> str:
+    message = (request.user_message or "").casefold()
+    has_workspace_context = any(
+        [
+            request.question_title,
+            request.question_content,
+            request.user_code,
+            request.judge_result,
+        ]
     )
-    return OutcomeState(
-        intent=str(result.get("intent") or "ask_for_context"),
-        answer=answer,
-        next_action=next_action,
-        confidence=confidence,
-        status_events=status_events,
-        response_payload=response_payload or {},
+
+    recommendation_keywords = [
+        "practice next",
+        "next practice",
+        "recommend",
+        "next step",
+        "what should i practice",
+    ]
+    diagnosis_keywords = [
+        "wa",
+        "tle",
+        "wrong answer",
+        "still wrong",
+        "why is this",
+        "why does this fail",
+        "diagnose",
+        "latest submission",
+    ]
+
+    if any(keyword in message for keyword in recommendation_keywords):
+        return RECOMMEND_QUESTION
+    judge_signal = (request.judge_result or "").casefold()
+    if request.judge_result or any(keyword in message for keyword in diagnosis_keywords) or any(
+        signal in judge_signal for signal in (" re ", " ce ", "runtime error", "compile error")
+    ):
+        return ANALYZE_FAILURE
+    if not has_workspace_context:
+        return ASK_FOR_CONTEXT
+    return EXPLAIN_PROBLEM
+
+
+def _prepend_status_event(state: UnifiedAgentState, event: dict[str, str]) -> UnifiedAgentState:
+    return state.model_copy(
+        update={
+            "outcome": state.outcome.model_copy(
+                update={"status_events": [event, *state.outcome.status_events]}
+            )
+        }
     )
 
 
 def build_tutor_graph():
     graph = StateGraph(TutorGraphState)
-    graph.add_node("tutor", tutor_node)
-    graph.add_edge(START, "tutor")
-    graph.add_edge("tutor", END)
+    graph.add_node("route_intent", route_intent_node)
+    graph.add_node("collect_support", collect_support_node)
+    graph.add_node("tutor_reasoning", tutor_reasoning_node)
+    graph.add_node("ask_for_context", ask_for_context_node)
+    graph.add_node("delegate_diagnosis", delegate_diagnosis_node)
+    graph.add_node("delegate_recommendation", delegate_recommendation_node)
+
+    graph.add_edge(START, "route_intent")
+    graph.add_conditional_edges(
+        "route_intent",
+        route_after_intent,
+        {
+            ASK_FOR_CONTEXT: "ask_for_context",
+            EXPLAIN_PROBLEM: "collect_support",
+            ANALYZE_FAILURE: "delegate_diagnosis",
+            RECOMMEND_QUESTION: "delegate_recommendation",
+        },
+    )
+    graph.add_edge("collect_support", "tutor_reasoning")
+    graph.add_edge("tutor_reasoning", END)
+    graph.add_edge("ask_for_context", END)
+    graph.add_edge("delegate_diagnosis", END)
+    graph.add_edge("delegate_recommendation", END)
     return graph.compile()

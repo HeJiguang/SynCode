@@ -31,6 +31,8 @@ public enum ResultCode {
     EXAM_NOT_HAS_QUESTION(3206, "竞赛中不包含题目"),
     EXAM_IS_FINISH(3207, "竞赛已经结束，不能进行当前操作"),
     EXAM_IS_PUBLISH(3208, "竞赛已经发布，不能进行编辑或删除操作"),
+    EXAM_NOT_STARTED(3209, "考试尚未开始"),
+    USER_EXAM_NOT_ENTERED(3210, "未报名，无法进入考试"),
 
     USER_EXAM_HAS_ENTER(3301, "用户已经报名，无需重复报名"),
 

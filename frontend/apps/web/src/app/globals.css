@@ -4,43 +4,49 @@
 @source "../../../../packages/config/src";
 @source "../";
 
-/* ── 噪点纹理 ── */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
+  background:
+    radial-gradient(circle at 15% 15%, rgba(94, 234, 212, 0.12), transparent 24%),
+    radial-gradient(circle at 84% 12%, rgba(245, 158, 11, 0.1), transparent 22%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
   opacity: 1;
 }
 
-:root.light body::before,
+:root.light body::before {
+  opacity: 0.42;
+}
+
 @media (prefers-color-scheme: light) {
   :root:not(.dark) body::before {
-    opacity: 0.025;
+    opacity: 0.42;
   }
 }
 
-/* Hero 代码块 */
 .hero-code-block {
-  background-color: #0b0b0c;
+  background-color: #0b0f12;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-card);
   overflow: hidden;
 }
 
-/* 带有极精细模糊深度的毛玻璃导航栏 */
 .nav-bar {
-  background: rgba(10, 10, 10, 0.68);
+  background: rgba(11, 20, 28, 0.68);
   border: 1px solid var(--border-soft);
   backdrop-filter: blur(24px) saturate(1.2);
   -webkit-backdrop-filter: blur(24px) saturate(1.2);
 }
 
-:root.light .nav-bar,
+:root.light .nav-bar {
+  background: rgba(255, 255, 255, 0.72);
+}
+
 @media (prefers-color-scheme: light) {
   :root:not(.dark) .nav-bar {
-    background: rgba(250, 249, 246, 0.76); /* 匹配奶油色背景 */
+    background: rgba(255, 255, 255, 0.72);
   }
 }
