@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   bootstrap:
@@ -34,20 +33,18 @@ jobs:
           echo "image_tag=${image_tag}" >> "$GITHUB_OUTPUT"
           echo "runner_name=${runner_name}" >> "$GITHUB_OUTPUT"
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
+      - name: Build runner image
+        shell: bash
+        run: |
+          docker build \
+            -t "syncode-self-hosted-runner:${{ steps.meta.outputs.image_tag }}" \
+            -f deploy/runner/Dockerfile .
 
-      - name: Build and push runner image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: deploy/runner/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.registry_namespace }}/syncode-self-hosted-runner:${{ steps.meta.outputs.image_tag }}
+      - name: Pack runner image
+        shell: bash
+        run: |
+          mkdir -p .cd-tmp
+          docker save "syncode-self-hosted-runner:${{ steps.meta.outputs.image_tag }}" | gzip > .cd-tmp/syncode-self-hosted-runner.tar.gz
 
       - name: Prepare SSH key
         shell: bash
@@ -60,13 +57,15 @@ jobs:
       - name: Install runner on manager
         shell: bash
         run: |
-          runner_image="${{ steps.meta.outputs.registry_namespace }}/syncode-self-hosted-runner:${{ steps.meta.outputs.image_tag }}"
+          runner_image="syncode-self-hosted-runner:${{ steps.meta.outputs.image_tag }}"
           runner_name="${{ steps.meta.outputs.runner_name }}"
+
+          ssh "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}" "mkdir -p ~/onlineoj-runner"
+          scp .cd-tmp/syncode-self-hosted-runner.tar.gz "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}:~/onlineoj-runner/syncode-self-hosted-runner.tar.gz"
 
           ssh "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}" "\
             set -euo pipefail && \
-            printf '%s\n' '${{ secrets.REGISTRY_PASSWORD }}' | docker login ghcr.io -u '${{ secrets.REGISTRY_USERNAME }}' --password-stdin && \
-            docker pull '${runner_image}' && \
+            gunzip -c ~/onlineoj-runner/syncode-self-hosted-runner.tar.gz | docker load >/dev/null && \
             docker volume create syncode_runner_data >/dev/null && \
             docker rm -f syncode-runner-bootstrap syncode-runner >/dev/null 2>&1 || true && \
             docker run -d --name syncode-runner-bootstrap \
@@ -94,4 +93,5 @@ jobs:
               -v syncode_runner_data:/runner \
               -v /var/run/docker.sock:/var/run/docker.sock \
               '${runner_image}' >/dev/null && \
+            rm -f ~/onlineoj-runner/syncode-self-hosted-runner.tar.gz && \
             docker ps --filter name=syncode-runner"
