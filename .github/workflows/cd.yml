@@ -22,7 +22,11 @@ env:
 jobs:
   release:
     name: Build Push And Deploy
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - syncode-prod
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -159,12 +163,12 @@ jobs:
       - name: Render remote env files
         shell: bash
         run: |
-          mkdir -p .cd-tmp
-          printf '%s\n' "${{ secrets.STACK_ENV_PROD }}" > .cd-tmp/stack.env
-          printf '%s\n' "${{ secrets.RUNTIME_ENV_PROD }}" > .cd-tmp/runtime.env
+          mkdir -p deploy/prod/env
+          printf '%s\n' "${{ secrets.STACK_ENV_PROD }}" > deploy/prod/env/stack.env
+          printf '%s\n' "${{ secrets.RUNTIME_ENV_PROD }}" > deploy/prod/env/runtime.env
           python - <<'PY'
           from pathlib import Path
-          stack = Path(".cd-tmp/stack.env")
+          stack = Path("deploy/prod/env/stack.env")
           text = stack.read_text(encoding="utf-8")
           replacements = {
               "sha-REPLACE_ME": "${{ steps.meta.outputs.image_tag }}",
@@ -176,27 +180,17 @@ jobs:
           PY
 
       - name: Sync deploy assets to manager
-        shell: bash
-        run: |
-          ssh "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}" "mkdir -p ${DEPLOY_BASE_DIR}/deploy/prod/env"
-          rsync -az --delete deploy/prod/ "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}:${DEPLOY_BASE_DIR}/deploy/prod/"
-          rsync -az .cd-tmp/stack.env "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}:${DEPLOY_BASE_DIR}/deploy/prod/env/stack.env"
-          rsync -az .cd-tmp/runtime.env "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}:${DEPLOY_BASE_DIR}/deploy/prod/env/runtime.env"
+        run: echo "Running directly on the manager self-hosted runner; no remote sync is required."
 
       - name: Log manager in to GHCR
         shell: bash
         run: |
-          printf '%s\n' "${{ secrets.REGISTRY_PASSWORD }}" | ssh "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}" "\
-            docker login ghcr.io \
-              -u '${{ secrets.REGISTRY_USERNAME }}' \
-              --password-stdin"
+          printf '%s\n' "${{ secrets.REGISTRY_PASSWORD }}" | docker login ghcr.io -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin
 
       - name: Deploy on manager
         shell: bash
         run: |
-          ssh "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}" "\
-            cd ${DEPLOY_BASE_DIR} && \
-            chmod +x deploy/prod/scripts/deploy.sh && \
-            STACK_ENV_FILE=deploy/prod/env/stack.env \
-            RUNTIME_ENV_FILE=deploy/prod/env/runtime.env \
-            deploy/prod/scripts/deploy.sh"
+          chmod +x deploy/prod/scripts/deploy.sh
+          STACK_ENV_FILE=deploy/prod/env/stack.env \
+          RUNTIME_ENV_FILE=deploy/prod/env/runtime.env \
+          deploy/prod/scripts/deploy.sh
