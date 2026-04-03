@@ -20,7 +20,7 @@ function AuthSignal({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="rounded-[20px] border border-white/10 bg-white/[0.03] p-5 backdrop-blur-md transition-all duration-300 ease-out hover:border-white/20 hover:bg-white/[0.05]">
+    <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-5 backdrop-blur-md transition-all duration-300 ease-out hover:border-white/20 hover:bg-white/[0.05]">
       <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-zinc-100">
         {icon}
       </div>
@@ -98,9 +98,9 @@ export default function LoginPage() {
             <div>
               <p className="kicker">SynCode Access</p>
               <div className="mt-4 flex flex-wrap gap-3">
-                <Tag tone="accent">Precision Console</Tag>
+                <Tag tone="accent">Voyager Console</Tag>
                 <Tag>Developer Workflow</Tag>
-                <Tag>Premium Dark Mode</Tag>
+                <Tag>Secure Sign-in</Tag>
               </div>
             </div>
 
@@ -108,30 +108,30 @@ export default function LoginPage() {
               <h1 className="text-5xl font-semibold leading-[1.02] tracking-[-0.06em] text-zinc-50">
                 登录后继续你的
                 <br />
-                训练、考试与 AI 辅助编程工作流
+                训练、考试与 AI 工作流
               </h1>
               <p className="mt-6 max-w-2xl text-base leading-8 text-[var(--text-secondary)]">
-                SynCode 把题目、训练计划、考试工作区和提交反馈聚合到同一条学习主线里。登录后可以继续当前节奏，而不是重新寻找上下文。
+                SynCode 会把当前训练计划、考试工作区、提交记录和 AI 上下文收束到同一个控制台里。你登录后看到的不是零散页面，而是一条连续的工作主线。
               </p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
               <AuthSignal
                 label="Training"
-                title="连续训练主线"
-                description="把当前方向、任务进度和薄弱项放在同一视图里，减少频繁切换。"
+                title="持续训练主线"
+                description="把当前方向、任务进度和待补强项稳定地放在同一张面板里。"
                 icon={<Sparkles size={18} />}
               />
               <AuthSignal
                 label="Exam"
                 title="进入考试工作区"
-                description="考试状态、题面、编辑器和判题反馈在一个稳定布局里协同呈现。"
+                description="考试状态、题面、编辑器和判题反馈保持在同一个上下文中。"
                 icon={<ShieldCheck size={18} />}
               />
               <AuthSignal
                 label="Access"
                 title="邮箱验证码登录"
-                description="使用一次性验证码完成登录，不需要额外维护密码体系。"
+                description="用一次性验证码完成登录，不需要额外维护复杂密码体系。"
                 icon={<Mail size={18} />}
               />
             </div>
@@ -140,7 +140,7 @@ export default function LoginPage() {
           <div className="flex items-center justify-between rounded-[22px] border border-white/10 bg-white/[0.03] px-5 py-4 backdrop-blur-md">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-faint)]">Next Step</p>
-              <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">获取验证码并进入控制台，继续你上一次中断的学习上下文。</p>
+              <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">获取验证码并进入控制台，继续你上一次中断的训练上下文。</p>
             </div>
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-zinc-100">
               <ArrowRight size={16} />
@@ -203,7 +203,7 @@ export default function LoginPage() {
             </div>
 
             <p className="mt-4 text-xs leading-6 text-[var(--text-muted)]">
-              验证码会发送到你的邮箱。若未收到，请先确认邮箱地址是否可用，再重新发送。
+              验证码会发送到你的邮箱。若暂未收到，请先确认邮箱地址可用，再重新发送。
             </p>
           </div>
         </Panel>

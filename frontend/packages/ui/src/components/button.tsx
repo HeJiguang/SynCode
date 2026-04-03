@@ -17,9 +17,9 @@ const sizeClasses = {
 
 const variantClasses = {
   primary:
-    "bg-[var(--cta-bg)] text-[var(--cta-fg)] hover:bg-[var(--cta-hover)]",
+    "bg-[var(--cta-bg)] text-[var(--cta-fg)] shadow-[0_10px_28px_rgba(32,192,138,0.24)] hover:bg-[var(--cta-hover)] hover:shadow-[0_14px_36px_rgba(32,192,138,0.28)]",
   secondary:
-    "border border-[var(--border-soft)] bg-[var(--cta-secondary-bg)] text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--cta-secondary-hover)]",
+    "border border-[var(--border-soft)] bg-[var(--cta-secondary-bg)] text-[var(--text-primary)] backdrop-blur-md hover:border-[var(--border-strong)] hover:bg-[var(--cta-secondary-hover)]",
   ghost:
     "text-[var(--text-secondary)] hover:bg-[var(--cta-secondary-bg)] hover:text-[var(--text-primary)]"
 };

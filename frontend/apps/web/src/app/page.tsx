@@ -1,205 +1,224 @@
 import * as React from "react";
-import { ArrowUpRight, BrainCircuit, ChartColumnIncreasing, LaptopMinimalCheck } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Bot, BrainCircuit, PanelsTopLeft, Sparkles } from "lucide-react";
 
 import { githubUrl } from "@aioj/config";
 import { Button, Panel, Tag } from "@aioj/ui";
 
-const featureCards = [
-  {
-    icon: <BrainCircuit size={20} />,
-    title: "结构化 AI 辅助",
-    description: "在题目上下文中直接给出思路引导、错误定位和代码改写建议。"
-  },
-  {
-    icon: <LaptopMinimalCheck size={20} />,
-    title: "实时评测闭环",
-    description: "写代码、运行、提交、接收结果和复盘都在同一工作区内完成。"
-  },
-  {
-    icon: <ChartColumnIncreasing size={20} />,
-    title: "面向成长的训练",
-    description: "把热题、阶段目标和训练节奏收拢成一条持续推进的工作流。"
-  }
+const heroStats = [
+  { value: "1", label: "统一工作流" },
+  { value: "3x", label: "更快定位问题" },
+  { value: "24/7", label: "随时进入训练" }
+];
+
+const timelineItems = [
+  { title: "系统提示", body: "题面、训练目标和上下文会先收束到一个稳定工作区。", tone: "dim" },
+  { title: "用户操作", body: "在编辑器、训练面板和考试工作区之间保持同一条链路。", tone: "neutral" },
+  { title: "AI 响应", body: "建议、定位与反馈只在关键节点出现，不制造视觉噪音。", tone: "accent" }
 ];
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-[var(--bg)]">
-      <section className="sticky top-0 z-50 px-4 py-3 md:px-8">
-        <div className="mx-auto flex max-w-7xl items-center justify-between rounded-[var(--radius-card)] nav-bar px-4 py-2.5">
-          <a className="flex items-center gap-2.5 transition-opacity hover:opacity-80" href="/">
-            <div className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--text-primary)] text-[var(--bg)] text-xs font-bold shadow-sm">
+    <main className="min-h-screen bg-[var(--bg)] text-[var(--text-primary)]">
+      <section className="px-4 py-4 md:px-8">
+        <div className="mx-auto flex max-w-7xl items-center justify-between rounded-[22px] border border-[var(--border-soft)] bg-[var(--surface-overlay)] px-4 py-3 backdrop-blur-xl">
+          <a className="flex items-center gap-3 transition-opacity hover:opacity-85" href="/">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[12px] bg-white text-[12px] font-bold tracking-[0.12em] text-[#09111a]">
               SC
             </div>
             <div>
-              <p className="text-sm font-semibold tracking-[0.1em] text-[var(--text-primary)]">SynCode</p>
-              <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">AI 原生编程训练平台</p>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">SynCode</p>
+              <p className="text-[11px] text-[var(--text-faint)]">AI 辅助编程训练平台</p>
             </div>
           </a>
-          <nav className="hidden items-center gap-1.5 md:flex">
+
+          <div className="flex items-center gap-2">
             <a href="/app">
               <Button size="sm">开始体验</Button>
             </a>
             <a href={githubUrl} rel="noreferrer" target="_blank">
-              <Button size="sm" variant="ghost">
+              <Button size="sm" variant="secondary">
                 GitHub
               </Button>
             </a>
-          </nav>
+          </div>
         </div>
       </section>
 
-      <section className="px-4 pb-12 pt-16 md:px-8 md:pt-24 lg:pt-32">
-        <div className="mx-auto grid max-w-7xl items-start gap-16 lg:grid-cols-[1fr_1fr]">
-          <div className="space-y-8">
-            <Tag tone="accent" className="bg-[var(--accent-bg)] px-3 py-1 text-[var(--accent)]">
-              AI-Native Workflow
-            </Tag>
+      <section className="px-4 pb-10 pt-10 md:px-8 md:pt-16">
+        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.95fr_1.05fr]">
+          <div className="flex flex-col justify-between gap-8">
             <div className="space-y-6">
-              <h1 className="max-w-xl text-5xl font-extrabold leading-[1.05] tracking-[-0.03em] text-[var(--text-primary)] md:text-[64px]">
-                让 AI 成为你的编程训练搭档。
-              </h1>
-              <p className="max-w-lg text-[17px] leading-relaxed text-[var(--text-secondary)]">
-                SynCode 把题库、编辑器、实时判题、训练计划与 AI 辅助收束进同一条工作流，减少切换成本，让练习过程更稳定、更专注。
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-4 pt-2">
-              <a href="/app">
-                <Button size="lg" className="h-12 px-8 text-[15px] font-semibold" id="hero-cta-primary">
-                  进入系统
-                </Button>
-              </a>
-              <a href={githubUrl} rel="noreferrer" target="_blank">
-                <Button size="lg" variant="secondary" className="h-12 px-8 text-[15px] font-medium" id="hero-cta-github">
-                  GitHub <ArrowUpRight size={16} className="ml-1 opacity-70" />
-                </Button>
-              </a>
+              <Tag tone="accent" className="px-3 py-1 text-[10px]">
+                AI-native workflow
+              </Tag>
+              <div className="space-y-5">
+                <h1 className="max-w-[560px] text-[clamp(3rem,5vw,5.5rem)] font-semibold leading-[0.96] tracking-[-0.07em] text-white">
+                  让 AI 成为你的
+                  <br />
+                  编程训练搭档
+                </h1>
+                <p className="max-w-[560px] text-[17px] leading-8 text-[var(--text-secondary)]">
+                  SynCode 把题库、训练、考试、代码编辑与 AI 辅助串成一条稳定的练习链路。你不需要在多个页面之间来回切换，重点始终留在当前问题本身。
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3 pt-2">
+                <a href="/app">
+                  <Button className="h-12 px-7 text-[15px]" size="lg">
+                    进入系统
+                  </Button>
+                </a>
+                <a href={githubUrl} rel="noreferrer" target="_blank">
+                  <Button className="h-12 px-7 text-[15px]" size="lg" variant="secondary">
+                    GitHub
+                    <ArrowUpRight size={16} />
+                  </Button>
+                </a>
+              </div>
             </div>
 
-            <div className="grid gap-6 border-t border-[var(--border-soft)] pt-8 text-sm sm:grid-cols-3">
-              {[
-                { num: "1", label: "统一工作区" },
-                { num: "3x", label: "更快定位问题" },
-                { num: "24/7", label: "随时进入训练" }
-              ].map((item) => (
-                <div key={item.num} className="group">
-                  <p className="font-mono text-3xl font-extrabold tabular-nums text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent)]">
-                    {item.num}
-                  </p>
-                  <p className="mt-1.5 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">{item.label}</p>
+            <div className="grid gap-6 border-t border-[var(--border-soft)] pt-8 sm:grid-cols-3">
+              {heroStats.map((item) => (
+                <div key={item.label}>
+                  <p className="font-mono text-4xl font-semibold tracking-[-0.04em] text-white">{item.value}</p>
+                  <p className="mt-2 text-xs uppercase tracking-[0.14em] text-[var(--text-faint)]">{item.label}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="grid gap-4">
-            <Panel hoverable className="p-6">
+          <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+            <Panel className="p-6 xl:col-span-2" tone="accent">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="kicker">Problem Setup</p>
-                  <h2 className="mt-2 text-xl font-bold text-[var(--text-primary)]">两数之和</h2>
-                  <p className="mt-1 text-sm text-[var(--text-secondary)]">数组 / 哈希表 / 预计 15 分钟</p>
+                  <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white">两数之和</h2>
+                  <p className="mt-2 text-sm text-[var(--text-secondary)]">数组 / 哈希表 / 预计 15 分钟</p>
                 </div>
                 <Tag tone="success">Easy</Tag>
               </div>
-              <div className="mt-5 rounded-[var(--radius-sm)] border border-[var(--border-soft)] bg-[var(--surface-2)] p-4 text-[13px] leading-6 text-[var(--text-secondary)]">
-                题面、代码编辑、运行结果和 AI 分析都保持在一个视口内，避免在多个页面之间来回跳转。
+              <div className="mt-6 rounded-[20px] border border-[var(--border-soft)] bg-black/20 p-4 text-sm leading-7 text-[var(--text-secondary)]">
+                题面、代码编辑器、运行结果和 AI 分析会停留在同一视图里，减少上下文切换。训练系统只在真正需要时给出建议，而不是持续打断你。
               </div>
             </Panel>
 
-            <div className="grid gap-4 md:grid-cols-[1.02fr_0.98fr]">
-              <Panel hoverable className="p-6">
-                <p className="kicker">Editor Focus</p>
-                <div className="hero-code-block mt-4 p-5 font-mono text-[13px] leading-relaxed text-zinc-300">
-                  <p className="text-zinc-500">{"// Find complement"}</p>
-                  <p>Map&lt;Integer, Integer&gt; seen = new HashMap&lt;&gt;();</p>
-                  <p className="mt-2">for (int i = 0; i &lt; nums.length; i++) {"{"}</p>
-                  <p className="pl-4">int rem = target - nums[i];</p>
-                  <p className="pl-4 text-cyan-300">if (seen.containsKey(rem)) return ...;</p>
-                  <p>{"}"}</p>
-                </div>
-              </Panel>
+            <Panel className="p-5" hoverable>
+              <p className="kicker">Editor Focus</p>
+              <div className="mt-4 rounded-[20px] border border-[var(--border-soft)] bg-[#0b0d15] p-5 font-mono text-[13px] leading-7 text-[#d9e6ff]">
+                <p className="text-[#64708f]">// Find complement</p>
+                <p>Map&lt;Integer, Integer&gt; seen = new HashMap&lt;&gt;();</p>
+                <p className="mt-2">for (int i = 0; i &lt; nums.length; i++) {"{"}</p>
+                <p className="pl-4">int rem = target - nums[i];</p>
+                <p className="pl-4 text-[#45d8a3]">if (seen.containsKey(rem)) return ...;</p>
+                <p>{"}"}</p>
+              </div>
+            </Panel>
 
-              <Panel hoverable className="p-6">
-                <p className="kicker">Training Pulse</p>
-                <h3 className="mt-2 text-base font-bold text-[var(--text-primary)]">系统联动提示</h3>
-                <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
-                  热题、公告、最近提交和训练目标会自然汇入同一个工作台，而不是分散在多个孤立页面里。
+            <Panel className="p-5" hoverable>
+              <p className="kicker">Training Pulse</p>
+              <h3 className="mt-3 text-lg font-semibold text-white">系统联动提示</h3>
+              <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
+                热题、公告、训练目标和最近提交会在一个控制台里自然汇合，而不是散落在多个孤立页面里。
+              </p>
+              <div className="mt-5 rounded-[18px] border border-[rgba(130,233,194,0.24)] bg-[rgba(70,216,162,0.08)] p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">AI Suggestion</p>
+                <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">
+                  当前题目更适合先查后存的写法，这样能避免索引覆盖带来的边界错误。
                 </p>
-                <div className="relative mt-4 overflow-hidden rounded-[var(--radius-sm)] bg-[var(--surface-2)] p-4">
-                  <div className="absolute left-0 top-0 h-full w-1 bg-[var(--accent)]" />
-                  <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--accent)]">AI Suggestion</p>
-                  <p className="text-[13px] leading-relaxed text-[var(--text-secondary)]">
-                    当前题目更适合“先查后存”的写法，能够避免索引覆盖带来的边界错误。
-                  </p>
-                </div>
-              </Panel>
+              </div>
+            </Panel>
+          </div>
+        </div>
+      </section>
+
+      <section className="px-4 pb-20 pt-8 md:px-8">
+        <div className="mx-auto grid max-w-7xl gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+          <Panel className="p-7 md:p-8">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-[16px] border border-[var(--border-soft)] bg-white/[0.04] text-white">
+                <Sparkles size={18} />
+              </div>
+              <div>
+                <p className="kicker text-[var(--accent)]">Workflow Console</p>
+                <h2 className="mt-1 text-[32px] font-semibold leading-none tracking-[-0.05em] text-white">一条更稳的学习主线</h2>
+              </div>
             </div>
-          </div>
-        </div>
-      </section>
 
-      <section className="mt-12 border-t border-[var(--border-soft)]/50 px-4 py-16 md:px-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="mb-12 text-center">
-            <p className="kicker text-[var(--accent)]">Core Experience</p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--text-primary)]">所有关键动作，都在同一条链路里完成</h2>
-          </div>
-          <div className="grid gap-6 md:grid-cols-3">
-            {featureCards.map((item) => (
-              <Panel key={item.title} hoverable className="group relative overflow-hidden p-8">
-                <div className="absolute right-0 top-0 p-8 opacity-0 transition-opacity duration-300 group-hover:opacity-[0.03]">
-                  {React.cloneElement(item.icon as React.ReactElement<{ size?: number }>, { size: 120 })}
-                </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--surface-2)] text-[var(--text-primary)] transition-transform duration-300 group-hover:scale-110">
-                  {item.icon}
-                </div>
-                <h3 className="mt-6 text-lg font-bold text-[var(--text-primary)]">{item.title}</h3>
-                <p className="mt-3 text-[15px] leading-relaxed text-[var(--text-secondary)]">{item.description}</p>
-              </Panel>
-            ))}
-          </div>
-        </div>
-      </section>
+            <div className="mt-8 space-y-4 text-[15px] leading-8 text-[var(--text-secondary)]">
+              <p>不是把很多卡片堆在一起，而是把你下一步真正要做的动作放到最前面。</p>
+              <p>从进入题目，到执行代码、查看结果，再到训练反馈，SynCode 保持同一个上下文和同一套视觉语言。</p>
+            </div>
 
-      <section className="px-4 pb-20 pt-10 md:px-8">
-        <div className="mx-auto max-w-7xl">
-          <Panel hoverable className="relative overflow-hidden border-[var(--border-soft)] p-10 md:p-14">
-            <div className="pointer-events-none absolute left-1/2 top-1/2 h-full w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--accent)] opacity-[0.03] blur-[100px]" />
-            <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-              <div className="space-y-4">
-                <Tag tone="accent">Launch Ready</Tag>
-                <h2 className="text-3xl font-extrabold tracking-tight text-[var(--text-primary)]">开始下一次更高效的训练。</h2>
-                <p className="max-w-xl text-[15px] leading-relaxed text-[var(--text-secondary)]">
-                  从公开浏览进入系统，登录后解锁真实判题、AI 对话、训练计划和完整个人工作台。
-                </p>
-              </div>
-              <div className="flex shrink-0 flex-wrap gap-4">
-                <a href="/app">
-                  <Button size="lg" className="h-14 px-8 text-base shadow-sm" id="cta-banner-primary">
-                    进入 SynCode
-                  </Button>
-                </a>
-              </div>
+            <div className="mt-8 space-y-4">
+              {[
+                { icon: <BrainCircuit size={16} />, text: "Prompt 与题目上下文自动收束，不需要重复描述背景。" },
+                { icon: <PanelsTopLeft size={16} />, text: "题库、训练、考试和个人进度都用统一的控制台语义组织。" },
+                { icon: <Bot size={16} />, text: "AI 只在关键节点出现，避免廉价感很重的全屏装饰和泛滥提示。" }
+              ].map((item) => (
+                <div key={item.text} className="flex items-start gap-3 rounded-[18px] border border-[var(--border-soft)] bg-white/[0.02] px-4 py-4">
+                  <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-[12px] bg-white/[0.04] text-[var(--accent)]">
+                    {item.icon}
+                  </div>
+                  <p className="text-sm leading-7 text-[var(--text-secondary)]">{item.text}</p>
+                </div>
+              ))}
             </div>
           </Panel>
 
-          <div className="mt-12 flex flex-wrap items-center justify-between gap-4 text-[13px] font-medium text-[var(--text-muted)]">
-            <p>SynCode · AI Native Coding Trainer</p>
-            <div className="flex flex-wrap items-center gap-6">
-              <a href="/app" className="transition-colors hover:text-[var(--text-primary)]">
-                App
-              </a>
-              <a
-                href={githubUrl}
-                rel="noreferrer"
-                target="_blank"
-                className="transition-colors hover:text-[var(--text-primary)]"
-              >
-                GitHub
-              </a>
+          <Panel className="overflow-hidden p-0" tone="accent">
+            <div className="grid gap-0 xl:grid-cols-[1.1fr_0.9fr]">
+              <div className="border-b border-[var(--border-soft)] p-7 xl:border-b-0 xl:border-r">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="kicker">Session Preview</p>
+                    <h3 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">工作流预览</h3>
+                  </div>
+                  <Tag tone="accent">Live</Tag>
+                </div>
+
+                <div className="mt-6 rounded-[22px] border border-[var(--border-soft)] bg-[#111427] p-5">
+                  <div className="mb-5 flex items-center gap-2">
+                    <span className="h-3 w-3 rounded-full bg-[#ff5f57]" />
+                    <span className="h-3 w-3 rounded-full bg-[#febc2e]" />
+                    <span className="h-3 w-3 rounded-full bg-[#28c840]" />
+                  </div>
+                  <div className="space-y-4">
+                    <div className="rounded-[18px] bg-[#171b31] p-4">
+                      <p className="text-sm text-[#dce5ff]">请解释 E = mc² 的含义，并给出编程竞赛中常见的推导误区。</p>
+                    </div>
+                    <div className="rounded-[18px] bg-[#0d1021] p-4 text-sm leading-7 text-[#9aa5c7]">
+                      这里保留一个清晰的对话区，但不会让整个页面退化成聊天模板。训练信息、题目状态和操作入口仍然是主角。
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-7">
+                <p className="kicker">Timeline</p>
+                <div className="mt-5 space-y-5">
+                  {timelineItems.map((item) => (
+                    <div key={item.title} className="relative rounded-[18px] border border-[var(--border-soft)] bg-white/[0.03] px-4 py-4">
+                      <span
+                        className={`absolute left-0 top-4 h-8 w-[3px] rounded-r-full ${
+                          item.tone === "accent" ? "bg-[var(--accent)]" : item.tone === "neutral" ? "bg-[#7d8bb4]" : "bg-white/12"
+                        }`}
+                      />
+                      <p className="pl-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)]">{item.title}</p>
+                      <p className="mt-2 pl-3 text-sm leading-7 text-[var(--text-secondary)]">{item.body}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-8">
+                  <a href="/app">
+                    <Button className="h-12 w-full text-[15px]" size="lg">
+                      进入 SynCode
+                      <ArrowRight size={16} />
+                    </Button>
+                  </a>
+                </div>
+              </div>
             </div>
-          </div>
+          </Panel>
         </div>
       </section>
     </main>

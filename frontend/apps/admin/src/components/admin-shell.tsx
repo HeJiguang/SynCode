@@ -16,13 +16,13 @@ type AdminShellProps = {
 export function AdminShell({ children, description, title, adminName }: AdminShellProps) {
   return (
     <div className="min-h-screen px-4 py-4 md:px-6">
-      <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[1600px] gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
+      <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[1600px] gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
         <div className="space-y-4">
-          <Panel className="p-5" tone="strong">
-            <p className="kicker">Admin</p>
-            <h1 className="mt-2 text-2xl font-semibold">SynCode Admin</h1>
+          <Panel className="p-5" tone="accent">
+            <p className="kicker">Admin Console</p>
+            <h1 className="mt-2 text-2xl font-semibold text-white">SynCode Admin</h1>
             <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
-              当前登录管理员：{adminName}。管理端只从 `/admin` 独立进入，不从官网和用户端暴露入口。
+              当前登录管理员：{adminName}。管理端保持为独立后台站点，只承担系统配置、内容维护与运营操作。
             </p>
             <form action={adminApiPath("/auth/logout")} method="post" className="mt-4">
               <Button size="sm" variant="secondary">

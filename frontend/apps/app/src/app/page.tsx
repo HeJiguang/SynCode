@@ -46,7 +46,7 @@ export default async function DashboardPage() {
         direction: "待设置训练方向",
         level: "待评估",
         streakDays: 0,
-        weeklyGoal: "用户侧真实训练数据加载中",
+        weeklyGoal: "登录后生成个性化训练计划",
         completionRate: 0,
         strengths: [],
         weaknesses: [],
@@ -90,7 +90,7 @@ export default async function DashboardPage() {
     }
   }
 
-  const nextWorkspaceQuestionId = hotProblems[0]?.questionId ?? problems[0]?.questionId ?? "two-sum";
+  const nextWorkspaceQuestionId = hotProblems[0]?.questionId ?? problems[0]?.questionId ?? "1000";
   const latestSubmission = submissions[0];
   const currentFocus = training.tasks[0]?.focus || training.direction || "待设置训练方向";
   const currentTask = training.tasks[0];
@@ -122,13 +122,13 @@ export default async function DashboardPage() {
         </>
       }
     >
-      <Panel tone="strong" className="hero-grid overflow-hidden p-7 md:p-8">
+      <Panel tone="accent" className="hero-grid overflow-hidden p-7 md:p-8">
         <div className="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <p className="kicker">Today</p>
             <h1 className="section-title mt-3">{getGreeting(profile.nickName || "开发者")}</h1>
             <p className="mt-4 max-w-2xl text-[15px] leading-8 text-[var(--text-secondary)]">
-              这里聚合了训练计划、近期提交、题目热度和系统动态。首页的目标不是展示所有信息，而是把你下一步最值得做的动作放到最前面。
+              这里聚合了训练计划、最近提交、热门题目和系统公告。首页的目标不是堆满信息，而是把你下一步最值得做的动作放在最前面。
             </p>
             <div className="mt-6 flex flex-wrap gap-2.5">
               <Tag tone="accent">当前焦点 {currentFocus}</Tag>
@@ -137,7 +137,7 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3 lg:w-[540px]">
+          <div className="grid gap-3 sm:grid-cols-3 lg:w-[560px]">
             <div className="rounded-[var(--radius-card)] border border-[var(--border-soft)] bg-[var(--surface-1)] p-4">
               <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--text-faint)]">本周目标</p>
               <p className="mt-2 text-sm leading-6 text-[var(--text-primary)]">{training.weeklyGoal}</p>
@@ -166,7 +166,7 @@ export default async function DashboardPage() {
         <DashboardKpiCard
           label="连续学习"
           value={`${profile.streakDays} 天`}
-          detail="保持节奏比堆积任务更重要。"
+          detail="保持节奏比一次刷很多题更重要。"
           icon={<Flame size={16} />}
         />
         <DashboardKpiCard
@@ -178,7 +178,7 @@ export default async function DashboardPage() {
         <DashboardKpiCard
           label="最近提交"
           value={latestSubmission?.status ?? "暂无"}
-          detail={latestSubmission ? `${latestSubmission.language} · ${latestSubmission.submittedAt}` : "登录后查看个人提交记录"}
+          detail={latestSubmission ? `${latestSubmission.language} · ${latestSubmission.submittedAt}` : "登录后查看个人提交记录。"}
           icon={<Activity size={16} />}
         />
       </div>
@@ -204,21 +204,21 @@ export default async function DashboardPage() {
           </DashboardModule>
 
           <DashboardModule
-            eyebrow="Strengths"
+            eyebrow="Summary"
             title="训练总结"
-            description="保留少量但关键的自我反馈，让首页承担“方向确认”而不是“信息堆砌”。"
+            description="保留少量但关键的自我反馈，让首页承担方向确认，而不是信息堆叠。"
           >
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-[var(--radius-card)] border border-[var(--border-soft)] bg-[var(--surface-muted)] p-5">
                 <p className="kicker">优势方向</p>
                 <div className="mt-4 space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
-                  {training.strengths.length > 0 ? training.strengths.map((item) => <p key={item}>{item}</p>) : <p>暂无总结数据。</p>}
+                  {training.strengths.length > 0 ? training.strengths.map((item) => <p key={item}>{item}</p>) : <p>暂时还没有总结数据。</p>}
                 </div>
               </div>
               <div className="rounded-[var(--radius-card)] border border-[var(--border-soft)] bg-[var(--surface-muted)] p-5">
                 <p className="kicker">待补强项</p>
                 <div className="mt-4 space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
-                  {training.weaknesses.length > 0 ? training.weaknesses.map((item) => <p key={item}>{item}</p>) : <p>暂无弱项分析数据。</p>}
+                  {training.weaknesses.length > 0 ? training.weaknesses.map((item) => <p key={item}>{item}</p>) : <p>暂时还没有补强建议。</p>}
                 </div>
               </div>
             </div>
@@ -229,7 +229,7 @@ export default async function DashboardPage() {
           <DashboardModule
             eyebrow="Problem Flow"
             title="热门题入口"
-            description="保留高频动作，但降低视觉权重，让它成为辅助区而不是主角。"
+            description="保留高频动作，但降低视觉权重，让它成为辅区而不是主角。"
           >
             <HotProblemsPanel problems={hotProblems} />
           </DashboardModule>
