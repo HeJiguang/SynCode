@@ -7,15 +7,9 @@ import { AnnouncementCenter } from "../../components/announcement-center";
 import { AppShell } from "../../components/app-shell";
 import { TrainingActions } from "../../components/training-actions";
 import { appInternalPath } from "../../lib/paths";
+import { getTrainingStatusLabel, getTrainingStatusTone, withFallback } from "../../lib/presentation";
 import { getServerAccessToken } from "../../lib/server-auth";
 import { Panel, Tag } from "@aioj/ui";
-
-function toneForTrainingStatus(status: string) {
-  const normalized = String(status);
-  if (normalized.includes("已完成")) return "success" as const;
-  if (normalized.includes("进行") || normalized.includes("执行")) return "accent" as const;
-  return "default" as const;
-}
 
 export default async function TrainingPage() {
   const token = await getServerAccessToken();
@@ -29,17 +23,21 @@ export default async function TrainingPage() {
     getPublicMessages(token)
   ]);
 
+  const trainingDirection = withFallback(training.direction, "待设置训练方向");
+  const trainingLevel = withFallback(training.level, "待评估");
+  const weeklyGoal = withFallback(training.weeklyGoal, "登录后生成个性化训练计划");
+
   return (
     <AppShell rail={<AnnouncementCenter messages={messages.slice(0, 2)} />}>
       <Panel className="hero-grid overflow-hidden border border-white/10 bg-white/[0.03] p-6 backdrop-blur-md md:p-7" tone="accent">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <p className="kicker">训练总览</p>
-            <h1 className="mt-2 text-3xl font-bold tracking-[-0.04em] text-[var(--text-primary)] md:text-4xl">{training.title}</h1>
-            <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)] md:text-[15px]">
-              {training.direction} · {training.level}
+            <p className="kicker">Training Overview</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-[var(--text-primary)] md:text-5xl">{training.title}</h1>
+            <p className="mt-4 text-sm leading-7 text-[var(--text-secondary)] md:text-[15px]">
+              {trainingDirection} · {trainingLevel}
             </p>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-secondary)]">本周目标：{training.weeklyGoal}</p>
+            <p className="mt-4 max-w-2xl text-sm leading-8 text-[var(--text-secondary)]">本周目标：{weeklyGoal}</p>
             <div className="mt-5 flex flex-wrap gap-2">
               <Tag tone="accent">连续学习 {profile.streakDays} 天</Tag>
               <Tag>{profile.solvedCount} 题已解决</Tag>
@@ -73,12 +71,12 @@ export default async function TrainingPage() {
 
       <div className="grid gap-4 xl:grid-cols-[0.96fr_1.04fr]">
         <Panel className="border border-white/10 bg-white/[0.03] p-5 backdrop-blur-md" tone="accent">
-          <p className="kicker">训练总览</p>
-          <h2 className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">当前节奏</h2>
+          <p className="kicker">Plan Context</p>
+          <h2 className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">当前训练主线</h2>
           <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
-            {training.direction} · {training.level}
+            {trainingDirection} · {trainingLevel}
           </p>
-          <p className="mt-4 text-sm text-[var(--text-secondary)]">本周目标：{training.weeklyGoal}</p>
+          <p className="mt-4 text-sm text-[var(--text-secondary)]">本周目标：{weeklyGoal}</p>
           <div className="mt-5 flex flex-wrap gap-2">
             <Tag tone="accent">连续学习 {profile.streakDays} 天</Tag>
             <Tag>{profile.solvedCount} 题已解决</Tag>
@@ -89,7 +87,7 @@ export default async function TrainingPage() {
         </Panel>
 
         <Panel className="border border-white/10 bg-white/[0.03] p-5 backdrop-blur-md">
-          <p className="kicker">任务进度</p>
+          <p className="kicker">Task Progress</p>
           <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">当前任务</h2>
           <p className="mt-2 text-sm text-[var(--text-muted)]">完成度 {training.completionRate}%</p>
           <div className="mt-5 space-y-3">
@@ -98,7 +96,7 @@ export default async function TrainingPage() {
                 <div key={task.taskId} className="rounded-[18px] border border-white/10 bg-white/[0.02] p-4 transition-all duration-300 ease-out hover:border-white/20 hover:bg-white/[0.04]">
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-semibold text-[var(--text-primary)]">{task.title}</p>
-                    <Tag tone={toneForTrainingStatus(task.status)}>{task.status}</Tag>
+                    <Tag tone={getTrainingStatusTone(task)}>{getTrainingStatusLabel(task)}</Tag>
                   </div>
                   <p className="mt-2 text-sm text-[var(--text-secondary)]">
                     聚焦 {task.focus} · 难度 {task.difficulty}
@@ -116,15 +114,17 @@ export default async function TrainingPage() {
 
       <div className="grid gap-4 md:grid-cols-2">
         <Panel className="border border-white/10 bg-white/[0.03] p-5 backdrop-blur-md">
-          <p className="kicker">优势方向</p>
+          <p className="kicker">Strengths</p>
+          <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">优势方向</h2>
           <div className="mt-4 space-y-2 text-sm leading-7 text-[var(--text-secondary)]">
-            {training.strengths.length > 0 ? training.strengths.map((item) => <p key={item}>{item}</p>) : <p>暂无总结数据。</p>}
+            {training.strengths.length > 0 ? training.strengths.map((item) => <p key={item}>{item}</p>) : <p>训练总结会在生成计划后逐步出现。</p>}
           </div>
         </Panel>
         <Panel className="border border-white/10 bg-white/[0.03] p-5 backdrop-blur-md">
-          <p className="kicker">待补强项</p>
+          <p className="kicker">Weak Points</p>
+          <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">待补强项</h2>
           <div className="mt-4 space-y-2 text-sm leading-7 text-[var(--text-secondary)]">
-            {training.weaknesses.length > 0 ? training.weaknesses.map((item) => <p key={item}>{item}</p>) : <p>暂无弱项分析数据。</p>}
+            {training.weaknesses.length > 0 ? training.weaknesses.map((item) => <p key={item}>{item}</p>) : <p>生成你的第一份计划后，这里会开始聚焦需要加强的方向。</p>}
           </div>
         </Panel>
       </div>

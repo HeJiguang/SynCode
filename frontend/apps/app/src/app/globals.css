@@ -4,7 +4,6 @@
 @source "../../../../packages/config/src";
 @source "../";
 
-/* Atmosphere */
 body::before {
   content: "";
   position: fixed;
@@ -12,20 +11,21 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(circle at 12% 18%, rgba(94, 234, 212, 0.12), transparent 28%),
-    radial-gradient(circle at 84% 10%, rgba(245, 158, 11, 0.1), transparent 24%),
-    radial-gradient(circle at 50% 100%, rgba(96, 165, 250, 0.08), transparent 35%),
-    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
-  opacity: 1;
+    radial-gradient(circle at top left, rgba(74, 147, 133, 0.08), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(255, 255, 255, 0.03), transparent 24%);
 }
 
 :root.light body::before {
-  opacity: 0.42;
+  background:
+    radial-gradient(circle at top left, rgba(61, 122, 110, 0.08), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), transparent);
 }
 
 @media (prefers-color-scheme: light) {
   :root:not(.dark) body::before {
-    opacity: 0.42;
+    background:
+      radial-gradient(circle at top left, rgba(61, 122, 110, 0.08), transparent 24%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.3), transparent);
   }
 }
 
@@ -37,49 +37,54 @@ body::before {
   content: "";
   position: absolute;
   inset: 0;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-  background-size: 28px 28px;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent 100%);
   pointer-events: none;
-  opacity: 0.16;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.35), transparent 100%);
+  opacity: 0.12;
 }
 
-/* App-specific surfaces */
 .code-editor-frame {
-  background-color: #0d0f12;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-card);
   overflow: hidden;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: #0d1116;
 }
 
 :root.light .code-editor-frame {
-  background-color: #1a1f24;
+  background: #1f2328;
+}
+
+.lang-tabs-bar {
+  display: flex;
+  gap: 1.25rem;
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .lang-tab {
   position: relative;
+  border: none;
+  background: transparent;
   padding: 0.625rem 0.25rem;
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--text-muted);
-  border: none;
-  background: transparent;
   cursor: pointer;
-  transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color 180ms ease-out;
 }
 
 .lang-tab::after {
   content: "";
   position: absolute;
+  right: 0;
   bottom: -1px;
   left: 0;
-  right: 0;
   height: 2px;
-  background: transparent;
   border-radius: 2px 2px 0 0;
-  transition: background 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  background: transparent;
+  transition: background-color 180ms ease-out;
 }
 
 .lang-tab:hover {
@@ -94,27 +99,21 @@ body::before {
   background: var(--accent);
 }
 
-.lang-tabs-bar {
-  display: flex;
-  gap: 1.5rem;
-  border-bottom: 1px solid var(--border-soft);
-}
-
 @keyframes soft-pulse {
   0% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(0.9); }
+  50% { opacity: 0.55; transform: scale(0.96); }
   100% { opacity: 1; transform: scale(1); }
 }
 
 .animate-soft-pulse {
-  animation: soft-pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: soft-pulse 2.8s ease-in-out infinite;
 }
 
-@keyframes fadeInSlideUp {
+@keyframes fade-in-up {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .ai-typewriter-enter {
-  animation: fadeInSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fade-in-up 0.45s ease-out forwards;
 }

@@ -3,8 +3,9 @@
 import * as React from "react";
 
 import type { TrainingTask } from "@aioj/api";
-import { Button, Panel } from "@aioj/ui";
+import { Button, Panel, Tag } from "@aioj/ui";
 import { appApiPath, appPublicPath } from "../lib/paths";
+import { getTrainingStatusLabel, getTrainingStatusTone } from "../lib/presentation";
 
 type TrainingActionsProps = {
   direction: string;
@@ -87,11 +88,14 @@ export function TrainingActions({ direction, tasks }: TrainingActionsProps) {
         {tasks.map((task) => {
           const href = resolveTaskHref(task);
           return (
-            <div key={task.taskId} className="rounded-[18px] border border-white/10 bg-white/[0.02] px-4 py-3 transition-all duration-300 ease-out hover:border-white/20 hover:bg-white/[0.04]">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div key={task.taskId} className="rounded-[18px] border border-white/10 bg-white/[0.02] px-4 py-4 transition-all duration-300 ease-out hover:border-white/20 hover:bg-white/[0.04]">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">{task.title}</p>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">{task.focus}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{task.title}</p>
+                    <Tag tone={getTrainingStatusTone(task)}>{getTrainingStatusLabel(task)}</Tag>
+                  </div>
+                  <p className="mt-2 text-xs leading-6 text-[var(--text-muted)]">{task.focus}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {href ? (

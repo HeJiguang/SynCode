@@ -15,9 +15,9 @@ function getIntensity(count: number): 0 | 1 | 2 | 3 | 4 {
 
 const intensityClasses: Record<0 | 1 | 2 | 3 | 4, string> = {
   0: "bg-[var(--surface-2)]",
-  1: "bg-[var(--accent)]/20",
-  2: "bg-[var(--accent)]/40",
-  3: "bg-[var(--accent)]/70",
+  1: "bg-[var(--accent)]/18",
+  2: "bg-[var(--accent)]/36",
+  3: "bg-[var(--accent)]/64",
   4: "bg-[var(--accent)]"
 };
 
@@ -65,8 +65,8 @@ export function SubmissionHeatmap({ data, weeks = 24 }: HeatmapProps) {
               {column.map((cell) => (
                 <div
                   key={cell.date}
-                  title={`${cell.date}，${cell.count} 次提交`}
-                  className={`h-[10px] w-[10px] cursor-default rounded-[2px] transition-opacity hover:opacity-75 ${intensityClasses[cell.intensity]}`}
+                  title={`${cell.date}: ${cell.count} 次提交`}
+                  className={`h-[10px] w-[10px] cursor-default rounded-[2px] transition-opacity duration-300 ease-out hover:opacity-75 ${intensityClasses[cell.intensity]}`}
                 />
               ))}
             </div>

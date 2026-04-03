@@ -22,39 +22,37 @@ export function AppShell({ children, rail, immersive, demoMode = false }: AppShe
   const hasRail = Boolean(rail);
 
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-40 border-b border-[var(--border-soft)] bg-[var(--bg)]/80 backdrop-blur-md">
-        <div className={`mx-auto flex h-14 items-center justify-between px-6 ${immersive ? "w-full" : "max-w-[1720px]"}`}>
-          <a className="flex items-center gap-3 transition-opacity hover:opacity-80" href={appPublicPath("/")}>
-            <div className="flex h-7 w-7 items-center justify-center rounded-[4px] bg-[var(--text-primary)] text-[var(--bg)] text-xs font-bold tracking-tight shadow-[var(--shadow-panel)]">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-primary)]">
+      <header className="sticky top-0 z-40 border-b border-[var(--border-soft)] bg-[var(--bg)]/88 backdrop-blur-md">
+        <div className={`mx-auto flex h-14 items-center justify-between px-5 md:px-6 ${immersive ? "w-full" : "max-w-[var(--shell-max)]"}`}>
+          <a className="flex items-center gap-3 transition-opacity duration-300 ease-out hover:opacity-80" href={appPublicPath("/")}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-[var(--border-soft)] bg-[var(--surface-2)] text-[11px] font-semibold tracking-[0.12em] text-[var(--text-primary)]">
               SC
             </div>
             <div>
-              <p className="text-[13px] font-semibold leading-tight tracking-wide text-[var(--text-primary)]">SynCode</p>
-              <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
-                {productTagline}
-              </p>
+              <p className="text-[13px] font-semibold leading-tight tracking-[0.02em] text-[var(--text-primary)]">SynCode</p>
+              <p className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-[var(--text-faint)]">{productTagline}</p>
             </div>
           </a>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <a href={`${appPublicPath("/")}#announcements`}>
               <Button size="sm" variant="ghost">
                 <BellDot size={14} className="text-[var(--text-muted)]" />
-                <span className="ml-0.5">公告</span>
+                <span>公告</span>
               </Button>
             </a>
             <a href={appPublicPath("/settings")}>
               <Button size="sm" variant="ghost">
                 <Settings size={14} className="text-[var(--text-muted)]" />
-                <span className="ml-0.5">设置</span>
+                <span>设置</span>
               </Button>
             </a>
             {demoMode ? (
               <a href={appPublicPath("/login")}>
-                <Button size="sm" variant="secondary" className="font-medium">
+                <Button size="sm" variant="secondary">
                   <LogIn size={14} className="text-[var(--text-secondary)]" />
-                  <span className="ml-1">登录</span>
+                  <span>登录</span>
                 </Button>
               </a>
             ) : null}
@@ -64,10 +62,10 @@ export function AppShell({ children, rail, immersive, demoMode = false }: AppShe
       </header>
 
       {demoMode ? (
-        <div className="border-b border-[var(--border-soft)] bg-[var(--surface-2)]/80 backdrop-blur-md">
-          <div className={`mx-auto flex items-center justify-between gap-4 px-6 py-3 ${immersive ? "w-full" : "max-w-[1720px]"}`}>
-            <p className="text-sm leading-6 text-[var(--text-secondary)]">
-              当前浏览的是公开内容。登录后可继续查看个人训练计划、提交记录、实时判题结果和 AI 辅助能力。
+        <div className="border-b border-[var(--border-soft)] bg-[var(--surface-muted)]">
+          <div className={`mx-auto flex items-center justify-between gap-4 px-5 py-3 md:px-6 ${immersive ? "w-full" : "max-w-[var(--shell-max)]"}`}>
+            <p className="max-w-4xl text-sm leading-6 text-[var(--text-secondary)]">
+              当前查看的是公开体验内容。登录后可以访问个人训练计划、提交记录、考试工作区和 AI 辅助能力。
             </p>
             <a href={appPublicPath("/login")} className="shrink-0">
               <Button size="sm">立即登录</Button>
@@ -76,18 +74,16 @@ export function AppShell({ children, rail, immersive, demoMode = false }: AppShe
         </div>
       ) : null}
 
-      <div className={`mx-auto flex ${immersive ? "w-full" : "max-w-[1720px]"}`}>
+      <div className={`mx-auto flex ${immersive ? "w-full" : "max-w-[var(--shell-max)]"}`}>
         {!immersive ? (
-          <aside className="hidden w-[260px] shrink-0 border-r border-[var(--border-soft)] xl:block">
-            <div className="sticky top-14 p-4">
-              <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                Menu
-              </p>
-              <nav className="space-y-[2px]">
+          <aside className="hidden w-[240px] shrink-0 border-r border-[var(--border-soft)] xl:block">
+            <div className="sticky top-14 px-4 py-6">
+              <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-faint)]">Workspace</p>
+              <nav className="space-y-1">
                 {appNav.map((item) => (
                   <a
                     key={item.label}
-                    className="group flex items-center rounded-[var(--radius-sm)] px-3 py-2 text-sm font-medium text-[var(--text-secondary)] transition-all duration-200 hover:bg-[var(--surface-2)] hover:text-[var(--text-primary)]"
+                    className="group flex items-center rounded-[var(--radius-sm)] px-3 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-all duration-300 ease-out hover:bg-[var(--surface-1)] hover:text-[var(--text-primary)]"
                     href={appPublicPath(item.href)}
                   >
                     {item.label}
@@ -98,12 +94,12 @@ export function AppShell({ children, rail, immersive, demoMode = false }: AppShe
           </aside>
         ) : null}
 
-        <main className={`min-w-0 flex-1 ${hasRail && !immersive ? "grid xl:grid-cols-[minmax(0,1fr)_340px]" : ""}`}>
-          <div className={immersive ? "h-[calc(100vh-56px)]" : "space-y-8 p-8 md:p-10 xl:pr-10"}>{children}</div>
+        <main className={`min-w-0 flex-1 ${hasRail && !immersive ? "grid xl:grid-cols-[minmax(0,1fr)_320px]" : ""}`}>
+          <div className={immersive ? "h-[calc(100vh-56px)]" : "space-y-8 px-5 py-8 md:px-8 xl:pr-8"}>{children}</div>
 
           {!immersive && hasRail ? (
             <aside className="hidden border-l border-[var(--border-soft)] xl:block">
-              <div className="space-y-6 p-6">{rail}</div>
+              <div className="space-y-5 px-5 py-8">{rail}</div>
             </aside>
           ) : null}
         </main>

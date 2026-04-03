@@ -1,120 +1,155 @@
-/* ─────────────────────────────────────────────────────────────
-   SynCode Design Tokens  —  Emotional & Elegant Dual-Theme System
-   Dark  = :root  (prefers-color-scheme: dark default)
-   Light = :root.light
-   ───────────────────────────────────────────────────────────── */
+/* SynCode Precision Console tokens */
 
-/* ── Dark Mode (Default) ── */
 :root {
   color-scheme: dark;
 
-  /* Backgrounds — 极深的主背景 & 略亮的卡片 */
-  --bg:            #071018;
-  --bg-elevated:   #0d1821;
+  /* Brand */
+  --brand-50: #f4f9f8;
+  --brand-100: #dbe9e6;
+  --brand-300: #9ec2ba;
+  --brand-400: #6faca0;
+  --brand-500: #4a9385;
+  --brand-600: #3d7a6e;
+  --brand-700: #2f5f56;
 
-  /* Surfaces */
-  --surface-1:     rgba(13, 24, 33, 0.88);
-  --surface-2:     rgba(20, 34, 45, 0.94);
-  --surface-muted: rgba(11, 20, 28, 0.7);
+  /* Canvas */
+  --bg: #090b0d;
+  --bg-elevated: #0f1216;
+  --surface-1: rgba(255, 255, 255, 0.028);
+  --surface-2: rgba(255, 255, 255, 0.045);
+  --surface-3: rgba(255, 255, 255, 0.072);
+  --surface-muted: rgba(255, 255, 255, 0.018);
 
-  /* Borders — 完全靠 1px 半透明界定，绝不发光 */
-  --border-soft:   rgba(148, 163, 184, 0.14);
-  --border-strong: rgba(148, 163, 184, 0.28);
+  /* Borders */
+  --border-soft: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --border-focus: rgba(111, 172, 160, 0.5);
 
   /* Typography */
-  --text-primary:   #edf5fb;
-  --text-secondary: #a0b1bf;
-  --text-muted:     #6d8293;
+  --text-primary: #f5f7f8;
+  --text-secondary: #c0c7cd;
+  --text-muted: #8d959d;
+  --text-faint: #69707a;
 
-  /* Primary CTA — 暗色：白底黑字，无渐变 */
-  --cta-bg:    #d7f4ee;
-  --cta-fg:    #08211b;
-  --cta-hover: #bfece2;
+  /* Accent and semantic */
+  --accent: var(--brand-400);
+  --accent-strong: var(--brand-300);
+  --accent-bg: rgba(111, 172, 160, 0.14);
+  --success: #77c58a;
+  --success-bg: rgba(119, 197, 138, 0.12);
+  --warning: #d7a15d;
+  --warning-bg: rgba(215, 161, 93, 0.14);
+  --danger: #d67c7c;
+  --danger-bg: rgba(214, 124, 124, 0.14);
 
-  /* Semantic & Emotional Accents */
-  --accent:    #5eead4;
-  --success:   #4ade80;  /* 柔和绿 */
-  --warning:   #fb923c;
-  --danger:    #f87171;  /* 柔和红 */
+  /* Actions */
+  --cta-bg: #eef3f2;
+  --cta-fg: #111416;
+  --cta-hover: #ffffff;
+  --cta-secondary-bg: rgba(255, 255, 255, 0.035);
+  --cta-secondary-hover: rgba(255, 255, 255, 0.06);
 
-  --success-bg: rgba(74, 222, 128, 0.12);
-  --warning-bg: rgba(245, 158, 11, 0.14);
-  --danger-bg:  rgba(248, 113, 113, 0.14);
-  --accent-bg:  rgba(94, 234, 212, 0.14);
+  /* Shape */
+  --radius-xs: 10px;
+  --radius-sm: 14px;
+  --radius-card: 20px;
+  --radius-pill: 999px;
 
-  /* Radius — 极致网格 */
-  --radius-card: 22px;
-  --radius-sm:   12px;
+  /* Shadow */
+  --shadow-panel: 0 0 0 rgba(0, 0, 0, 0);
+  --shadow-float: 0 24px 80px rgba(0, 0, 0, 0.28);
 
-  /* Shadows — 暗色下所有常规面板【无投影】，只保留纯黑色的极端浮层弥散(如下拉菜单) */
-  --shadow-panel: 0 24px 70px rgba(2, 8, 15, 0.36);
-  --shadow-float: 0 28px 90px rgba(2, 8, 15, 0.5);
+  /* Layout */
+  --shell-max: 1560px;
+  --content-max: 1280px;
 
-  /* Fonts — 引入 Geist */
+  /* Typography stack */
   --font-sans:
     "Geist", "Inter", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono:
-    "Geist Mono", "Monaco", "JetBrains Mono", ui-monospace, monospace;
+    "Geist Mono", "JetBrains Mono", "SFMono-Regular", "Consolas", monospace;
 }
 
-/* ── Light Mode Base Variables ── */
 :root.light {
-    color-scheme: light;
-    --bg:            #f4efe7;
-    --bg-elevated:   #ffffff;
-    --surface-1:     #ffffff;
-    --surface-2:     #eef2f3;
-    --surface-muted: rgba(255, 255, 255, 0.78);
-    --border-soft:   rgba(15, 23, 42, 0.10);
-    --border-strong: rgba(15, 23, 42, 0.18);
-    --text-primary:   #14212b;
-    --text-secondary: #4d6372;
-    --text-muted:     #8493a1;
-    --cta-bg:    #143c36;
-    --cta-fg:    #f4fbf9;
-    --cta-hover: #0f312c;
-    --accent:    #0f8f7c;
-    --success:   #16a34a;
-    --warning:   #ea580c;
-    --danger:    #dc2626;
-    --success-bg: rgba(22, 163, 74, 0.08);
-    --warning-bg: rgba(234, 88, 12, 0.10);
-    --danger-bg:  rgba(220, 38, 38, 0.08);
-    --accent-bg:  rgba(15, 143, 124, 0.10);
-    --shadow-panel: 0 18px 42px rgba(15, 23, 42, 0.08);
-    --shadow-float: 0 24px 56px rgba(15, 23, 42, 0.12);
+  color-scheme: light;
+
+  --bg: #f5f3ee;
+  --bg-elevated: #fcfbf8;
+  --surface-1: rgba(255, 255, 255, 0.78);
+  --surface-2: rgba(255, 255, 255, 0.96);
+  --surface-3: rgba(242, 240, 234, 0.96);
+  --surface-muted: rgba(255, 255, 255, 0.58);
+
+  --border-soft: rgba(17, 20, 22, 0.08);
+  --border-strong: rgba(17, 20, 22, 0.14);
+  --border-focus: rgba(61, 122, 110, 0.34);
+
+  --text-primary: #171b1f;
+  --text-secondary: #46505a;
+  --text-muted: #6e7781;
+  --text-faint: #8e97a2;
+
+  --accent: var(--brand-600);
+  --accent-strong: var(--brand-700);
+  --accent-bg: rgba(61, 122, 110, 0.1);
+  --success: #1f8f48;
+  --success-bg: rgba(31, 143, 72, 0.1);
+  --warning: #b86d18;
+  --warning-bg: rgba(184, 109, 24, 0.1);
+  --danger: #ba4a4a;
+  --danger-bg: rgba(186, 74, 74, 0.1);
+
+  --cta-bg: #171b1f;
+  --cta-fg: #f7f7f4;
+  --cta-hover: #08090a;
+  --cta-secondary-bg: rgba(17, 20, 22, 0.04);
+  --cta-secondary-hover: rgba(17, 20, 22, 0.08);
+
+  --shadow-panel: 0 1px 0 rgba(17, 20, 22, 0.02);
+  --shadow-float: 0 24px 60px rgba(17, 20, 22, 0.12);
 }
 
 @media (prefers-color-scheme: light) {
   :root:not(.dark) {
     color-scheme: light;
-    --bg:            #f4efe7;
-    --bg-elevated:   #ffffff;
-    --surface-1:     #ffffff;
-    --surface-2:     #eef2f3;
-    --surface-muted: rgba(255, 255, 255, 0.78);
-    --border-soft:   rgba(15, 23, 42, 0.10);
-    --border-strong: rgba(15, 23, 42, 0.18);
-    --text-primary:   #14212b;
-    --text-secondary: #4d6372;
-    --text-muted:     #8493a1;
-    --cta-bg:    #143c36;
-    --cta-fg:    #f4fbf9;
-    --cta-hover: #0f312c;
-    --accent:    #0f8f7c;
-    --success:   #16a34a;
-    --warning:   #ea580c;
-    --danger:    #dc2626;
-    --success-bg: rgba(22, 163, 74, 0.08);
-    --warning-bg: rgba(234, 88, 12, 0.10);
-    --danger-bg:  rgba(220, 38, 38, 0.08);
-    --accent-bg:  rgba(15, 143, 124, 0.10);
-    --shadow-panel: 0 18px 42px rgba(15, 23, 42, 0.08);
-    --shadow-float: 0 24px 56px rgba(15, 23, 42, 0.12);
+
+    --bg: #f5f3ee;
+    --bg-elevated: #fcfbf8;
+    --surface-1: rgba(255, 255, 255, 0.78);
+    --surface-2: rgba(255, 255, 255, 0.96);
+    --surface-3: rgba(242, 240, 234, 0.96);
+    --surface-muted: rgba(255, 255, 255, 0.58);
+
+    --border-soft: rgba(17, 20, 22, 0.08);
+    --border-strong: rgba(17, 20, 22, 0.14);
+    --border-focus: rgba(61, 122, 110, 0.34);
+
+    --text-primary: #171b1f;
+    --text-secondary: #46505a;
+    --text-muted: #6e7781;
+    --text-faint: #8e97a2;
+
+    --accent: var(--brand-600);
+    --accent-strong: var(--brand-700);
+    --accent-bg: rgba(61, 122, 110, 0.1);
+    --success: #1f8f48;
+    --success-bg: rgba(31, 143, 72, 0.1);
+    --warning: #b86d18;
+    --warning-bg: rgba(184, 109, 24, 0.1);
+    --danger: #ba4a4a;
+    --danger-bg: rgba(186, 74, 74, 0.1);
+
+    --cta-bg: #171b1f;
+    --cta-fg: #f7f7f4;
+    --cta-hover: #08090a;
+    --cta-secondary-bg: rgba(17, 20, 22, 0.04);
+    --cta-secondary-hover: rgba(17, 20, 22, 0.08);
+
+    --shadow-panel: 0 1px 0 rgba(17, 20, 22, 0.02);
+    --shadow-float: 0 24px 60px rgba(17, 20, 22, 0.12);
   }
 }
 
-/* ── Reset & Base ── */
 *,
 *::before,
 *::after {
@@ -132,19 +167,18 @@ html {
 
 body {
   margin: 0;
-  background-color: var(--bg);
+  background: var(--bg);
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-feature-settings: "liga" 1, "calt" 1;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  transition: background-color 0.2s ease, color 0.2s ease;
-  line-height: 1.6; /* 增大正文呼吸感 */
+  line-height: 1.55;
 }
 
 ::selection {
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--text-primary);
 }
 
 a {
@@ -164,20 +198,19 @@ pre {
   font-family: var(--font-mono);
 }
 
-/* ── Typography Utilities ── */
 .kicker {
   font-size: 0.6875rem;
   font-weight: 600;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-faint);
 }
 
 .section-title {
   margin: 0;
-  font-size: clamp(1.75rem, 1.2rem + 1vw, 2.5rem);
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.04em;
+  font-size: clamp(1.875rem, 1.4rem + 1.2vw, 2.75rem);
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+  font-weight: 650;
   color: var(--text-primary);
 }

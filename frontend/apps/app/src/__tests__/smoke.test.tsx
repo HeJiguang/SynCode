@@ -11,8 +11,9 @@ async function main() {
   );
 
   assert.match(dashboardHtml, /SynCode/);
-  assert.match(dashboardHtml, /今日工作台/);
-  assert.match(dashboardHtml, /href="\/app"><div class="flex h-7 w-7/);
+  assert.match(dashboardHtml, /Today/);
+  assert.match(dashboardHtml, /当前训练主线/);
+  assert.match(dashboardHtml, /href="\/app"><div class="flex h-8 w-8/);
   assert.match(dashboardHtml, /href="\/app\/login"/);
 
   assert.match(workspaceHtml, /SynCode/);

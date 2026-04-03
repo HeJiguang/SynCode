@@ -12,16 +12,16 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 const sizeClasses = {
   sm: "h-8 px-3 text-[13px]",
   md: "h-9 px-4 text-sm",
-  lg: "h-11 px-6 text-base"
+  lg: "h-11 px-5 text-sm"
 };
 
 const variantClasses = {
   primary:
-    "bg-[var(--cta-bg)] text-[var(--cta-fg)] shadow-[0_10px_30px_rgba(0,0,0,0.12)] hover:bg-[var(--cta-hover)]",
+    "bg-[var(--cta-bg)] text-[var(--cta-fg)] hover:bg-[var(--cta-hover)]",
   secondary:
-    "border border-[var(--border-strong)] bg-[var(--surface-2)]/82 text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]",
+    "border border-[var(--border-soft)] bg-[var(--cta-secondary-bg)] text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--cta-secondary-hover)]",
   ghost:
-    "text-[var(--text-secondary)] hover:bg-[var(--surface-2)]/72 hover:text-[var(--text-primary)]"
+    "text-[var(--text-secondary)] hover:bg-[var(--cta-secondary-bg)] hover:text-[var(--text-primary)]"
 };
 
 export function Button({
@@ -35,11 +35,10 @@ export function Button({
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-sm)] font-medium",
-        "transition-[transform,background-color,border-color,box-shadow,color] duration-200 ease-out",
-        "active:scale-[0.96]", 
-        "disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
+        "inline-flex items-center justify-center gap-2 rounded-[var(--radius-sm)] font-medium",
+        "transition-all duration-300 ease-out",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-0",
+        "active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0",
         sizeClasses[size],
         variantClasses[variant],
         className
