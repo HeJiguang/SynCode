@@ -29,22 +29,28 @@ jobs:
           date
           echo "=== docker service ls ==="
           docker service ls
-          echo "=== docker stack services ${STACK_NAME} ==="
-          docker stack services "${STACK_NAME}"
-          echo "=== docker stack ps ${STACK_NAME} ==="
-          docker stack ps "${STACK_NAME}" --no-trunc
+          echo "=== docker stack services onlineoj-prod ==="
+          docker stack services "onlineoj-prod"
+          echo "=== docker stack ps onlineoj-prod ==="
+          docker stack ps "onlineoj-prod" --no-trunc
           echo "=== docker ps ==="
           docker ps
           for service in \
-            "${STACK_NAME}_nginx" \
-            "${STACK_NAME}_web" \
-            "${STACK_NAME}_app" \
-            "${STACK_NAME}_oj-gateway" \
-            "${STACK_NAME}_oj-system" \
-            "${STACK_NAME}_oj-agent"
+            "onlineoj-prod_nginx" \
+            "onlineoj-prod_web" \
+            "onlineoj-prod_app" \
+            "onlineoj-prod_admin" \
+            "onlineoj-prod_oj-gateway" \
+            "onlineoj-prod_oj-system" \
+            "onlineoj-prod_oj-agent" \
+            "onlineoj-prod_oj-friend" \
+            "onlineoj-prod_oj-job" \
+            "onlineoj-prod_oj-judge"
           do
             echo "=== service inspect: ${service} ==="
             docker service inspect "${service}" --pretty || true
+            echo "=== service ps: ${service} ==="
+            docker service ps "${service}" --no-trunc || true
             echo "=== service logs: ${service} ==="
             docker service logs --tail 120 "${service}" || true
           done
