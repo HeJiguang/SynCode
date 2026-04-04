@@ -1,0 +1,65 @@
+name: prod-recover
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Image tag to pre-pull and roll out
+        required: true
+        type: string
+
+jobs:
+  recover:
+    name: Recover Production Services
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare SSH key
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.DEPLOY_SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Log manager in to GHCR
+        shell: bash
+        run: |
+          printf '%s\n' "${{ secrets.REGISTRY_PASSWORD }}" | ssh "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}" "\
+            docker login ghcr.io \
+              -u '${{ secrets.REGISTRY_USERNAME }}' \
+              --password-stdin"
+
+      - name: Pre-pull manager images and force updates
+        shell: bash
+        run: |
+          TAG="${{ inputs.image_tag }}"
+          ssh "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}" "bash -s" <<EOF
+          set -euo pipefail
+          images=(
+            ghcr.io/hejiguang/syncode-web:${TAG}
+            ghcr.io/hejiguang/syncode-app:${TAG}
+            ghcr.io/hejiguang/syncode-admin:${TAG}
+            ghcr.io/hejiguang/oj-gateway:${TAG}
+            ghcr.io/hejiguang/oj-system:${TAG}
+            ghcr.io/hejiguang/oj-friend:${TAG}
+            ghcr.io/hejiguang/oj-job:${TAG}
+          )
+          for image in "\${images[@]}"; do
+            echo "=== docker pull \${image} ==="
+            docker pull "\${image}"
+          done
+          services=(
+            onlineoj-prod_web
+            onlineoj-prod_app
+            onlineoj-prod_admin
+            onlineoj-prod_oj-gateway
+            onlineoj-prod_oj-system
+            onlineoj-prod_oj-friend
+            onlineoj-prod_oj-job
+          )
+          for service in "\${services[@]}"; do
+            echo "=== docker service update --force \${service} ==="
+            docker service update --force "\${service}"
+          done
+          docker service ls
+          EOF
