@@ -23,28 +23,37 @@ jobs:
         id: meta
         shell: bash
         run: |
-          owner_lower="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
-          image_tag="sha-${GITHUB_SHA::12}"
           runner_name="${{ github.event.inputs.runner_name }}"
           if [[ -z "${runner_name}" ]]; then
             runner_name="syncode-prod-101-96-200-76"
           fi
-          echo "registry_namespace=ghcr.io/${owner_lower}" >> "$GITHUB_OUTPUT"
-          echo "image_tag=${image_tag}" >> "$GITHUB_OUTPUT"
           echo "runner_name=${runner_name}" >> "$GITHUB_OUTPUT"
 
-      - name: Build runner image
+      - name: Resolve runner package
+        id: runner
         shell: bash
         run: |
-          docker build \
-            -t "syncode-self-hosted-runner:${{ steps.meta.outputs.image_tag }}" \
-            -f deploy/runner/Dockerfile .
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import urllib.request
 
-      - name: Pack runner image
+          with urllib.request.urlopen("https://api.github.com/repos/actions/runner/releases/latest") as response:
+              release = json.load(response)
+
+          asset = next(
+              item for item in release["assets"]
+              if item["name"].startswith("actions-runner-linux-x64-") and item["name"].endswith(".tar.gz")
+          )
+
+          print(f"asset_name={asset['name']}")
+          print(f"asset_url={asset['browser_download_url']}")
+          PY
+
+      - name: Download runner package
         shell: bash
         run: |
           mkdir -p .cd-tmp
-          docker save "syncode-self-hosted-runner:${{ steps.meta.outputs.image_tag }}" | gzip > .cd-tmp/syncode-self-hosted-runner.tar.gz
+          curl -L "${{ steps.runner.outputs.asset_url }}" -o ".cd-tmp/${{ steps.runner.outputs.asset_name }}"
 
       - name: Prepare SSH key
         shell: bash
@@ -57,41 +66,26 @@ jobs:
       - name: Install runner on manager
         shell: bash
         run: |
-          runner_image="syncode-self-hosted-runner:${{ steps.meta.outputs.image_tag }}"
+          archive_name="${{ steps.runner.outputs.asset_name }}"
           runner_name="${{ steps.meta.outputs.runner_name }}"
 
           ssh "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}" "mkdir -p ~/onlineoj-runner"
-          scp .cd-tmp/syncode-self-hosted-runner.tar.gz "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}:~/onlineoj-runner/syncode-self-hosted-runner.tar.gz"
+          scp ".cd-tmp/${archive_name}" "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}:~/onlineoj-runner/${archive_name}"
 
           ssh "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}" "\
             set -euo pipefail && \
-            gunzip -c ~/onlineoj-runner/syncode-self-hosted-runner.tar.gz | docker load >/dev/null && \
-            docker volume create syncode_runner_data >/dev/null && \
-            docker rm -f syncode-runner-bootstrap syncode-runner >/dev/null 2>&1 || true && \
-            docker run -d --name syncode-runner-bootstrap \
-              -e RUNNER_NAME='${runner_name}' \
-              -e RUNNER_REPO_URL='https://github.com/${{ github.repository }}' \
-              -e RUNNER_TOKEN='${{ secrets.SELF_HOSTED_RUNNER_BOOTSTRAP_TOKEN }}' \
-              -e RUNNER_LABELS='syncode-prod' \
-              -v syncode_runner_data:/runner \
-              -v /var/run/docker.sock:/var/run/docker.sock \
-              '${runner_image}' >/dev/null && \
-            i=0 && \
-            until docker exec syncode-runner-bootstrap test -f /runner/.runner; do \
-              i=\$((i+1)); \
-              if [ \${i} -ge 30 ]; then \
-                docker logs syncode-runner-bootstrap; \
-                exit 1; \
-              fi; \
-              sleep 2; \
-            done && \
-            docker rm -f syncode-runner-bootstrap >/dev/null && \
-            docker run -d --name syncode-runner --restart unless-stopped \
-              -e RUNNER_NAME='${runner_name}' \
-              -e RUNNER_REPO_URL='https://github.com/${{ github.repository }}' \
-              -e RUNNER_LABELS='syncode-prod' \
-              -v syncode_runner_data:/runner \
-              -v /var/run/docker.sock:/var/run/docker.sock \
-              '${runner_image}' >/dev/null && \
-            rm -f ~/onlineoj-runner/syncode-self-hosted-runner.tar.gz && \
-            docker ps --filter name=syncode-runner"
+            id -u syncode-runner >/dev/null 2>&1 || useradd --create-home --home-dir /opt/syncode-runner --shell /bin/bash syncode-runner && \
+            usermod -aG docker syncode-runner || true && \
+            command -v git >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1 && command -v mvn >/dev/null 2>&1 || \
+              (export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y git python3 python3-venv maven) && \
+            mkdir -p /opt/syncode-runner && \
+            tar xzf ~/onlineoj-runner/${archive_name} -C /opt/syncode-runner && \
+            chown -R syncode-runner:syncode-runner /opt/syncode-runner && \
+            cd /opt/syncode-runner && \
+            ./svc.sh stop >/dev/null 2>&1 || true && \
+            ./svc.sh uninstall >/dev/null 2>&1 || true && \
+            su -s /bin/bash syncode-runner -c \"cd /opt/syncode-runner && ./config.sh --unattended --replace --disableupdate --url https://github.com/${{ github.repository }} --token '${{ secrets.SELF_HOSTED_RUNNER_BOOTSTRAP_TOKEN }}' --name '${runner_name}' --labels syncode-prod --work _work\" && \
+            ./svc.sh install syncode-runner && \
+            ./svc.sh start && \
+            rm -f ~/onlineoj-runner/${archive_name} && \
+            ./svc.sh status"
