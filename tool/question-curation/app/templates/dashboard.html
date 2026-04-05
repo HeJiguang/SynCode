@@ -2,25 +2,25 @@
 
 {% block content %}
 <section class="panel">
-  <h1>Question Curation Dashboard</h1>
-  <p class="muted">Standalone local review console for curating OnlineOJ problems.</p>
+  <h1>题库补充工作台</h1>
+  <p class="muted">独立运行的本地审核后台，用于补充、加工并导入 OnlineOJ 题目。</p>
 </section>
 
 <section class="stats-grid">
   <article class="stat-card">
-    <span class="stat-label">Discovered</span>
+    <span class="stat-label">已发现</span>
     <strong>{{ stats.discovered }}</strong>
   </article>
   <article class="stat-card">
-    <span class="stat-label">Review Ready</span>
+    <span class="stat-label">待审核</span>
     <strong>{{ stats.review_ready }}</strong>
   </article>
   <article class="stat-card">
-    <span class="stat-label">Approved</span>
+    <span class="stat-label">已通过审核</span>
     <strong>{{ stats.approved }}</strong>
   </article>
   <article class="stat-card">
-    <span class="stat-label">Imported</span>
+    <span class="stat-label">已导入</span>
     <strong>{{ stats.imported }}</strong>
   </article>
 </section>

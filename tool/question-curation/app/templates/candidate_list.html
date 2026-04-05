@@ -2,30 +2,50 @@
 
 {% block content %}
 <section class="panel">
-  <h2>Candidate Problems</h2>
-  <p class="muted">No candidates yet. Create and review candidates here.</p>
+  <h2>候选题列表</h2>
+  <p class="muted">本地 SQLite 保存候选题、审核状态和上传记录。审核通过后，再批量上传到远端 OnlineOJ 数据库。</p>
 </section>
 
 <section class="panel">
-  <h3>Create Candidate</h3>
+  <h3>远端数据库</h3>
+  {% if remote_config %}
+    <p class="muted">
+      当前已绑定：{{ remote_config.username }}@{{ remote_config.host }}:{{ remote_config.port }}/{{ remote_config.database_name }}
+    </p>
+  {% else %}
+    <p class="muted">当前还没有保存远端数据库配置，请先去“数据库配置”页面完成绑定。</p>
+  {% endif %}
+  <div class="action-row">
+    <a class="button-link" href="/settings/database">打开数据库配置</a>
+    <form method="post" action="/imports/batch-upload">
+      <button type="submit" {% if not remote_config %}disabled{% endif %}>批量上传已审核题目</button>
+    </form>
+  </div>
+  {% if batch_result %}
+    <p class="muted">本次上传：尝试 {{ batch_result.attempted }} 题，成功 {{ batch_result.imported }} 题，失败 {{ batch_result.failed }} 题。</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h3>手动创建候选题</h3>
   <form class="stack-form" method="post" action="/candidates">
     <label>
-      <span>Title</span>
+      <span>题目标题</span>
       <input type="text" name="title" required>
     </label>
     <label>
-      <span>Source Type</span>
+      <span>来源类型</span>
       <input type="text" name="source_type" value="manual" required>
     </label>
     <label>
-      <span>Source Platform</span>
+      <span>来源平台</span>
       <input type="text" name="source_platform" value="reference" required>
     </label>
     <label>
-      <span>Statement</span>
+      <span>题目描述</span>
       <textarea name="statement_markdown" rows="6" required></textarea>
     </label>
-    <button type="submit">Create Candidate</button>
+    <button type="submit">创建候选题</button>
   </form>
 </section>
 
@@ -33,11 +53,12 @@
   <table class="data-table">
     <thead>
       <tr>
-        <th>Title</th>
-        <th>Status</th>
-        <th>Source</th>
-        <th>Dedup Risk</th>
-        <th>Readiness</th>
+        <th>题目标题</th>
+        <th>审核状态</th>
+        <th>上传状态</th>
+        <th>来源平台</th>
+        <th>重复风险</th>
+        <th>审核就绪度</th>
       </tr>
     </thead>
     <tbody>
@@ -45,22 +66,28 @@
         {% for row in candidate_rows %}
         <tr>
           <td><a href="/candidates/{{ row.candidate.candidate_id }}">{{ row.candidate.title }}</a></td>
-          <td>{{ row.candidate.status.value }}</td>
+          <td>{{ format_status(row.candidate.status) }}</td>
+          <td>
+            {{ format_upload_status(row.candidate.upload_status) }}
+            {% if row.candidate.upload_error %}
+              <div class="muted">{{ row.candidate.upload_error }}</div>
+            {% endif %}
+          </td>
           <td>{{ row.candidate.source_platform }}</td>
           <td>
             {% if row.top_dedup_match %}
-              {{ row.top_dedup_match.decision }}
+              {{ format_dedup_decision(row.top_dedup_match.decision) }}
               ({{ "%.2f"|format(row.top_dedup_match.overall_similarity) }})
             {% else %}
-              no-scan
+              {{ format_dedup_decision("no-scan") }}
             {% endif %}
           </td>
-          <td>{{ row.readiness }}</td>
+          <td>{{ format_readiness(row.readiness) }}</td>
         </tr>
         {% endfor %}
       {% else %}
         <tr>
-          <td colspan="5">No candidate records available.</td>
+          <td colspan="6">当前还没有候选题记录。</td>
         </tr>
       {% endif %}
     </tbody>

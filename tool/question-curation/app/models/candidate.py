@@ -21,6 +21,13 @@ class CandidateStatus(str, Enum):
     IMPORTED = "IMPORTED"
 
 
+class UploadStatus(str, Enum):
+    NOT_READY = "NOT_READY"
+    READY = "READY"
+    UPLOADED = "UPLOADED"
+    FAILED = "FAILED"
+
+
 class CandidateProblem(Base):
     __tablename__ = "candidate_problem"
 
@@ -48,6 +55,13 @@ class CandidateProblem(Base):
     main_fuc_java: Mapped[str | None] = mapped_column(Text, nullable=True)
     solution_outline: Mapped[str | None] = mapped_column(Text, nullable=True)
     solution_code_java: Mapped[str | None] = mapped_column(Text, nullable=True)
+    upload_status: Mapped[UploadStatus] = mapped_column(
+        SqlEnum(UploadStatus),
+        nullable=False,
+        default=UploadStatus.NOT_READY,
+    )
+    remote_question_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    upload_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         nullable=False,

@@ -1,16 +1,16 @@
-# Question Curation Tool
+# 题库补充工具
 
-Local web tool for curating candidate programming problems before importing them into OnlineOJ.
+一个独立运行的本地 Web 后台，用于抓取题目来源、生成候选题、人工审核，并在通过后导入 OnlineOJ。
 
-## Run
+## 启动方式
 
 ```bash
 uvicorn app.main:create_app --factory --reload --app-dir tool/question-curation
 ```
 
-## Environment
+## 环境变量
 
-Copy `.env.example` and configure:
+复制 `.env.example` 后，至少按需配置下面这些变量：
 
 ```bash
 QUESTION_CURATION_OJ_DATABASE_URL=mysql+pymysql://user:password@host:3306/dbname?charset=utf8mb4
@@ -21,25 +21,23 @@ QUESTION_CURATION_LLM_API_KEY=your_key
 QUESTION_CURATION_LLM_MODEL=gpt-4.1-mini
 ```
 
-The tool keeps its own local SQLite workspace and only writes to the OnlineOJ database when:
+说明：
 
-- the candidate has been manually approved
-- `QUESTION_CURATION_OJ_DATABASE_URL` is configured
+- 工具自己的候选题工作区使用本地 SQLite。
+- 只有在候选题被人工审核通过后，并且配置了 `QUESTION_CURATION_OJ_DATABASE_URL`，工具才会写入 OnlineOJ 数据库。
+- 如果配置了 `QUESTION_CURATION_LLM_*`，会优先走 AI 生成。
+- 如果 AI 没配置或调用失败，会自动回退到内置规则生成。
 
-AI generation:
+## 首次使用流程
 
-- if the `QUESTION_CURATION_LLM_*` variables are configured, the tool will try AI-first candidate generation
-- if AI is not configured or the request fails, the tool falls back to the built-in rule generator
+1. 打开 `/discover`
+2. 导入单题链接或批量题目链接
+3. 系统自动生成候选题草稿
+4. 到 `/candidates` 和详情页中人工审核
+5. 点击“通过审核”
+6. 点击“导入 OnlineOJ”
 
-## First-Use Flow
-
-1. Open `/candidates`
-2. Create a candidate
-3. Fill in statement, tags, limits, `question_case_json`, Java code fields
-4. Click `Approve Candidate`
-5. Click `Import Into OnlineOJ`
-
-## Test
+## 运行测试
 
 ```bash
 pytest tool/question-curation/tests -v

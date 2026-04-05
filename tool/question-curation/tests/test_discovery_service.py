@@ -87,6 +87,31 @@ def test_discovery_service_extracts_leetcode_description_block() -> None:
     assert "Return indices of the two numbers." in extracted
 
 
+def test_discovery_service_builds_leetcode_statement_from_graphql_payload() -> None:
+    service = DiscoveryService()
+
+    statement = service._build_leetcode_statement(
+        {
+            "content": """
+            <p>Given an array of integers <code>nums</code> and an integer <code>target</code>.</p>
+            <pre>
+            <strong>Input:</strong> nums = [2,7,11,15], target = 9
+            <strong>Output:</strong> [0,1]
+            </pre>
+            """,
+            "translatedContent": None,
+            "metaData": '{"name":"twoSum","params":[{"name":"nums","type":"integer[]"},{"name":"target","type":"integer"}],"return":{"type":"integer[]"}}',
+        }
+    )
+
+    assert "Given an array of integers nums and an integer target" in statement
+    assert "Sample Input" in statement
+    assert "[2,7,11,15]\n9" in statement
+    assert "Sample Output" in statement
+    assert "[0,1]" in statement
+    assert "Function Metadata" in statement
+
+
 def test_discovery_service_extracts_luogu_main_content_block() -> None:
     service = DiscoveryService()
 
@@ -108,6 +133,32 @@ def test_discovery_service_extracts_luogu_main_content_block() -> None:
 
     assert "P1001 A+B Problem" in extracted
     assert "输入两个整数，输出它们的和。" in extracted
+
+
+def test_discovery_service_builds_luogu_statement_from_embedded_payload() -> None:
+    service = DiscoveryService()
+
+    statement = service._build_luogu_statement(
+        {
+            "contenu": {
+                "background": "背景说明",
+                "description": "输入两个整数，输出它们的和。",
+                "inputFormat": "输入一行，包含两个整数。",
+                "outputFormat": "输出一个整数。",
+                "hint": "注意整数范围。",
+            },
+            "samples": [
+                {"input": "1 2", "output": "3"},
+                {"input": "5 7", "output": "12"},
+            ],
+        }
+    )
+
+    assert "背景说明" in statement
+    assert "输入两个整数，输出它们的和。" in statement
+    assert "样例输入" in statement
+    assert "1 2" in statement
+    assert "12" in statement
 
 
 def test_discovery_service_extracts_codeforces_problem_statement_block() -> None:

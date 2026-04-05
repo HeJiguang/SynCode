@@ -12,7 +12,7 @@ from app.schemas.training_plan_request import (
     TrainingPlanRequest,
 )
 
-
+# 交互任务，创建后立刻开始运行
 INTERACTIVE_RUN_TYPES = {
     RunType.INTERACTIVE_TUTOR,
     RunType.INTERACTIVE_DIAGNOSIS,
@@ -26,6 +26,7 @@ def should_execute_runtime(run_type: str) -> bool:
     return RunType(run_type) in INTERACTIVE_RUN_TYPES
 
 
+# 训练计划流程和普通流程的分流
 def execute_run_request(
     request: CreateRunRequest,
     *,
@@ -128,7 +129,7 @@ def _task_type_for_run(run_type: RunType) -> TaskType:
     }
     return mapping.get(run_type, TaskType.CHAT)
 
-
+# 根据不同任务类型，补默认提示
 def _default_prompt_for_run(run_type: RunType) -> str:
     if run_type is RunType.INTERACTIVE_DIAGNOSIS:
         return "Help me diagnose the latest failure."

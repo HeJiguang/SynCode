@@ -5,7 +5,7 @@ import re
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
-from app.models.candidate import CandidateProblem, CandidateStatus
+from app.models.candidate import CandidateProblem, CandidateStatus, UploadStatus
 
 
 class CandidateService:
@@ -49,6 +49,8 @@ class CandidateService:
 
     def set_status(self, candidate: CandidateProblem, status: CandidateStatus) -> CandidateProblem:
         candidate.status = status
+        if status == CandidateStatus.APPROVED and candidate.upload_status == UploadStatus.NOT_READY:
+            candidate.upload_status = UploadStatus.READY
         self.session.add(candidate)
         self.session.commit()
         self.session.refresh(candidate)

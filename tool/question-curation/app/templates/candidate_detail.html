@@ -3,102 +3,102 @@
 {% block content %}
 <section class="panel">
   <h2>{{ candidate.title }}</h2>
-  <p class="muted">Status: {{ candidate.status.value }}</p>
+  <p class="muted">当前状态：{{ format_status(candidate.status) }}</p>
   <form method="post" action="/candidates/{{ candidate.candidate_id }}/generate">
-    <button type="submit">Generate Draft</button>
+    <button type="submit">生成题目草稿</button>
   </form>
   <form class="stack-form" method="post" action="/candidates/{{ candidate.candidate_id }}/save">
     <label>
-      <span>Title</span>
+      <span>题目标题</span>
       <input type="text" name="title" value="{{ candidate.title }}" required>
     </label>
     <div class="two-column">
       <label>
-        <span>Difficulty</span>
+        <span>难度</span>
         <input type="number" name="difficulty" value="{{ candidate.difficulty or '' }}">
       </label>
       <label>
-        <span>Estimated Minutes</span>
+        <span>预计完成时间（分钟）</span>
         <input type="number" name="estimated_minutes" value="{{ candidate.estimated_minutes or '' }}">
       </label>
       <label>
-        <span>Algorithm Tag</span>
+        <span>算法标签</span>
         <input type="text" name="algorithm_tag" value="{{ candidate.algorithm_tag or '' }}">
       </label>
       <label>
-        <span>Knowledge Tags</span>
+        <span>知识点标签</span>
         <input type="text" name="knowledge_tags" value="{{ candidate.knowledge_tags or '' }}">
       </label>
       <label>
-        <span>Time Limit (ms)</span>
+        <span>时间限制（毫秒）</span>
         <input type="number" name="time_limit_ms" value="{{ candidate.time_limit_ms or '' }}">
       </label>
       <label>
-        <span>Space Limit (KB)</span>
+        <span>空间限制（KB）</span>
         <input type="number" name="space_limit_kb" value="{{ candidate.space_limit_kb or '' }}">
       </label>
     </div>
     <label>
-      <span>Statement</span>
+      <span>题目描述</span>
       <textarea name="statement_markdown" rows="8">{{ candidate.statement_markdown }}</textarea>
     </label>
     <label>
-      <span>Question Case JSON</span>
+      <span>样例与测试数据 JSON</span>
       <textarea name="question_case_json" rows="6">{{ candidate.question_case_json or '[]' }}</textarea>
     </label>
     <label>
-      <span>Default Code (Java)</span>
+      <span>默认代码（Java）</span>
       <textarea name="default_code_java" rows="8">{{ candidate.default_code_java or '' }}</textarea>
     </label>
     <label>
-      <span>Main Fuc (Java)</span>
+      <span>主函数片段（Java）</span>
       <textarea name="main_fuc_java" rows="6">{{ candidate.main_fuc_java or '' }}</textarea>
     </label>
     <label>
-      <span>Solution Outline</span>
+      <span>解题思路草稿</span>
       <textarea name="solution_outline" rows="5">{{ candidate.solution_outline or '' }}</textarea>
     </label>
     <label>
-      <span>Solution Draft (Java)</span>
+      <span>标准解草稿（Java）</span>
       <textarea name="solution_code_java" rows="10">{{ candidate.solution_code_java or '' }}</textarea>
     </label>
-    <button type="submit">Save Candidate</button>
+    <button type="submit">保存候选题</button>
   </form>
 </section>
 
 <section class="panel">
-  <h3>Solution Draft</h3>
+  <h3>标准解草稿</h3>
   {% if candidate.solution_outline or candidate.solution_code_java %}
     <div class="execution-grid">
       <div>
-        <h4>Outline</h4>
+        <h4>解题思路</h4>
         <pre class="code-block">{{ candidate.solution_outline or '' }}</pre>
       </div>
       <div>
-        <h4>Java Reference</h4>
+        <h4>Java 参考实现</h4>
         <pre class="code-block">{{ candidate.solution_code_java or '' }}</pre>
       </div>
     </div>
   {% else %}
-    <p class="muted">No solution draft generated yet.</p>
+    <p class="muted">当前还没有生成标准解草稿。</p>
   {% endif %}
 </section>
 
 <section class="panel">
-  <h3>Review Pack</h3>
-  <p class="muted">Generated at: {{ review_pack_path }}</p>
+  <h3>审核包</h3>
+  <p class="muted">审核包路径：{{ review_pack_path }}</p>
 </section>
 
 <section class="panel">
-  <h3>Duplicate Review</h3>
+  <h3>重复题检查</h3>
   {% if dedup_matches %}
     <table class="data-table">
       <thead>
         <tr>
-          <th>Matched Title</th>
-          <th>Similarity</th>
-          <th>Decision</th>
-          <th>Reason</th>
+          <th>匹配题目</th>
+          <th>相似度</th>
+          <th>判定结果</th>
+          <th>判定依据</th>
         </tr>
       </thead>
       <tbody>
@@ -106,34 +106,34 @@
         <tr>
           <td>{{ match.matched_title }}</td>
           <td>{{ "%.2f"|format(match.overall_similarity) }}</td>
-          <td>{{ match.decision }}</td>
-          <td>{{ match.reason }}</td>
+          <td>{{ format_dedup_decision(match.decision) }}</td>
+          <td>{{ format_dedup_reason(match.reason) }}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   {% else %}
-    <p class="muted">No duplicate analysis stored yet.</p>
+    <p class="muted">当前还没有保存重复题分析结果。</p>
   {% endif %}
 </section>
 
 <section class="panel">
-  <h3>Run Java Draft</h3>
+  <h3>运行 Java 草稿</h3>
   <form method="post" action="/candidates/{{ candidate.candidate_id }}/run-java">
-    <button type="submit">Run Java Draft</button>
+    <button type="submit">运行 Java 草稿</button>
   </form>
   {% if execution_result %}
     <div class="execution-grid">
       <div>
-        <h4>Execution Result</h4>
-        <p class="muted">Exit code: {{ execution_result.exit_code }} · {{ execution_result.elapsed_ms }} ms</p>
+        <h4>执行结果</h4>
+        <p class="muted">退出码：{{ execution_result.exit_code }}，耗时：{{ execution_result.elapsed_ms }} ms</p>
       </div>
       <div>
-        <h4>Stdout</h4>
+        <h4>标准输出</h4>
         <pre class="code-block">{{ execution_result.stdout }}</pre>
       </div>
       <div>
-        <h4>Stderr</h4>
+        <h4>标准错误</h4>
         <pre class="code-block">{{ execution_result.stderr }}</pre>
       </div>
     </div>
@@ -141,19 +141,19 @@
 </section>
 
 <section class="panel">
-  <h3>Import Preview</h3>
+  <h3>导入预览</h3>
   <pre class="code-block">{{ import_preview.model_dump_json(indent=2) }}</pre>
 </section>
 
 <section class="panel action-row">
   <form method="post" action="/candidates/{{ candidate.candidate_id }}/approve">
-    <button type="submit">Approve Candidate</button>
+    <button type="submit">通过审核</button>
   </form>
   <form method="post" action="/candidates/{{ candidate.candidate_id }}/reject">
-    <button type="submit" class="secondary">Reject Candidate</button>
+    <button type="submit" class="secondary">驳回候选题</button>
   </form>
   <form method="post" action="/candidates/{{ candidate.candidate_id }}/import">
-    <button type="submit" {% if candidate.status.value != 'APPROVED' %}disabled{% endif %}>Import Into OnlineOJ</button>
+    <button type="submit" {% if candidate.status.value != 'APPROVED' %}disabled{% endif %}>导入 OnlineOJ</button>
   </form>
 </section>
 {% endblock %}

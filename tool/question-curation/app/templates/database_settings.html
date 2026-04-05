@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="panel">
+  <h2>远端数据库配置</h2>
+  <p class="muted">这里保存的是远端 OnlineOJ 数据库连接信息，配置会保存在本地 SQLite 工作库中，之后批量上传直接使用这套配置。</p>
+</section>
+
+<section class="panel">
+  <form class="stack-form" method="post" action="/settings/database/save">
+    <div class="two-column">
+      <label>
+        <span>主机地址</span>
+        <input type="text" name="host" value="{{ config.host if config else '127.0.0.1' }}" required>
+      </label>
+      <label>
+        <span>端口</span>
+        <input type="number" name="port" value="{{ config.port if config else 3306 }}" required>
+      </label>
+      <label>
+        <span>数据库名</span>
+        <input type="text" name="database_name" value="{{ config.database_name if config else '' }}" required>
+      </label>
+      <label>
+        <span>用户名</span>
+        <input type="text" name="username" value="{{ config.username if config else '' }}" required>
+      </label>
+      <label>
+        <span>密码</span>
+        <input type="password" name="password" value="{{ config.password if config else '' }}" required>
+      </label>
+    </div>
+    <div class="action-row">
+      <button type="submit">保存配置</button>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <h3>测试连接</h3>
+  <form class="stack-form" method="post" action="/settings/database/test">
+    <div class="two-column">
+      <label>
+        <span>主机地址</span>
+        <input type="text" name="host" value="{{ config.host if config else '127.0.0.1' }}" required>
+      </label>
+      <label>
+        <span>端口</span>
+        <input type="number" name="port" value="{{ config.port if config else 3306 }}" required>
+      </label>
+      <label>
+        <span>数据库名</span>
+        <input type="text" name="database_name" value="{{ config.database_name if config else '' }}" required>
+      </label>
+      <label>
+        <span>用户名</span>
+        <input type="text" name="username" value="{{ config.username if config else '' }}" required>
+      </label>
+      <label>
+        <span>密码</span>
+        <input type="password" name="password" value="{{ config.password if config else '' }}" required>
+      </label>
+    </div>
+    <div class="action-row">
+      <button type="submit">测试连接</button>
+    </div>
+  </form>
+  {% if connection_result %}
+    <p class="muted">{{ connection_result.message }}</p>
+  {% endif %}
+</section>
+{% endblock %}

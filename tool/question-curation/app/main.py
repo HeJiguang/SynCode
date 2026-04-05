@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from app import models as _models  # noqa: F401
 from app.config import get_settings
 from app.db import create_sqlite_engine, init_db
 from app.routes.web import router as web_router

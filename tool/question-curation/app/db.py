@@ -41,11 +41,19 @@ def _rebuild_candidate_problem_if_incompatible(engine) -> None:
         "main_fuc_java",
         "solution_outline",
         "solution_code_java",
+        "upload_status",
+        "remote_question_id",
+        "upload_error",
     }
     if required_columns.issubset(existing_columns):
-        return
+        remote_tables = set(inspector.get_table_names())
+        if "remote_database_config" in remote_tables:
+            import_record_columns = {column["name"] for column in inspector.get_columns("import_record")} if "import_record" in remote_tables else set()
+            if {"remote_config_name", "error_message"}.issubset(import_record_columns):
+                return
     with engine.begin() as connection:
         connection.execute(text("DROP TABLE IF EXISTS import_record"))
+        connection.execute(text("DROP TABLE IF EXISTS remote_database_config"))
         connection.execute(text("DROP TABLE IF EXISTS review_decision"))
         connection.execute(text("DROP TABLE IF EXISTS dedup_match"))
         connection.execute(text("DROP TABLE IF EXISTS candidate_judge_case"))

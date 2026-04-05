@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy.orm import Session
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session
 
 from app.dependencies import get_app_settings, get_db_session
-from app.models.candidate import CandidateStatus
+from app.models.candidate import CandidateStatus, UploadStatus
 from app.services.ai_client import AIClient
 from app.services.candidate_service import CandidateService
 from app.services.dedup_service import DedupService, ExistingQuestion
@@ -15,22 +17,63 @@ from app.services.execution_service import ExecutionService
 from app.services.generation_service import GenerationService
 from app.services.importer_service import ImporterService
 from app.services.oj_reader import OJReader
+from app.services.remote_db_config_service import RemoteDatabaseConfigService
 from app.services.review_pack_service import ReviewPackService
 
 templates = Jinja2Templates(directory="tool/question-curation/app/templates")
 router = APIRouter()
 
 
+STATUS_LABELS = {
+    CandidateStatus.DISCOVERED: "已发现",
+    CandidateStatus.MATERIAL_COLLECTED: "已采集材料",
+    CandidateStatus.NORMALIZED: "已规范化",
+    CandidateStatus.DEDUP_CHECKED: "已查重",
+    CandidateStatus.ARTIFACTS_GENERATED: "已生成草稿",
+    CandidateStatus.REVIEW_READY: "待审核",
+    CandidateStatus.APPROVED: "已审核通过",
+    CandidateStatus.REJECTED: "已驳回",
+    CandidateStatus.IMPORTED: "已导入",
+}
+
+UPLOAD_STATUS_LABELS = {
+    UploadStatus.NOT_READY: "未准备上传",
+    UploadStatus.READY: "待上传",
+    UploadStatus.UPLOADED: "已上传",
+    UploadStatus.FAILED: "上传失败",
+}
+
+DEDUP_DECISION_LABELS = {
+    "probable_duplicate": "高度疑似重复题",
+    "similar_problem": "疑似同类题",
+    "likely_distinct": "大概率不同题",
+    "no-scan": "未查重",
+}
+
+READINESS_LABELS = {
+    "missing-samples": "缺少样例数据",
+    "missing-solution": "缺少标准解草稿",
+    "missing-java-draft": "缺少 Java 草稿",
+    "missing-run-check": "未完成运行校验",
+    "review-ready": "可进入审核",
+}
+
+
 @router.get("/dashboard", response_class=HTMLResponse)
-def dashboard(request: Request) -> HTMLResponse:
+def dashboard(
+    request: Request,
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    service = CandidateService(session)
+    candidates = service.list_candidates()
     context = {
         "request": request,
-        "page_title": "Question Curation Dashboard",
+        "page_title": "题库补充工作台",
         "stats": {
-            "discovered": 0,
-            "review_ready": 0,
-            "approved": 0,
-            "imported": 0,
+            "discovered": len(candidates),
+            "review_ready": sum(1 for item in candidates if item.status == CandidateStatus.REVIEW_READY),
+            "approved": sum(1 for item in candidates if item.status == CandidateStatus.APPROVED),
+            "imported": sum(1 for item in candidates if item.status == CandidateStatus.IMPORTED),
         },
     }
     return templates.TemplateResponse(request, "dashboard.html", context)
@@ -43,17 +86,93 @@ async def discover_page(request: Request, keyword: str | None = Query(default=No
         leads = await DiscoveryService().search_codeforces(keyword)
     context = {
         "request": request,
-        "page_title": "Inspiration Discovery",
+        "page_title": "导入题目",
         "keyword": keyword or "",
         "leads": leads,
+        "format_dedup_decision": _format_dedup_decision,
     }
     return templates.TemplateResponse(request, "discover.html", context)
 
 
+@router.get("/settings/database", response_class=HTMLResponse)
+def database_settings_page(
+    request: Request,
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    config_service = RemoteDatabaseConfigService(session)
+    config = config_service.get_active_config()
+    context = {
+        "request": request,
+        "page_title": "远端数据库配置",
+        "config": config,
+        "connection_result": None,
+    }
+    return templates.TemplateResponse(request, "database_settings.html", context)
+
+
+@router.post("/settings/database/save", response_class=HTMLResponse)
+def save_database_settings(
+    request: Request,
+    host: str = Form(...),
+    port: int = Form(...),
+    database_name: str = Form(...),
+    username: str = Form(...),
+    password: str = Form(...),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    config_service = RemoteDatabaseConfigService(session)
+    config = config_service.save_active_config(
+        host=host,
+        port=port,
+        database_name=database_name,
+        username=username,
+        password=password,
+    )
+    context = {
+        "request": request,
+        "page_title": "远端数据库配置",
+        "config": config,
+        "connection_result": {"ok": True, "message": "配置已保存到本地 SQLite。"},
+    }
+    return templates.TemplateResponse(request, "database_settings.html", context)
+
+
+@router.post("/settings/database/test", response_class=HTMLResponse)
+def test_database_settings(
+    request: Request,
+    host: str = Form(...),
+    port: int = Form(...),
+    database_name: str = Form(...),
+    username: str = Form(...),
+    password: str = Form(...),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    config_service = RemoteDatabaseConfigService(session)
+    config = config_service.save_active_config(
+        host=host,
+        port=port,
+        database_name=database_name,
+        username=username,
+        password=password,
+    )
+    result = config_service.test_connection(config)
+    context = {
+        "request": request,
+        "page_title": "远端数据库配置",
+        "config": config,
+        "connection_result": {"ok": result.ok, "message": result.message},
+    }
+    return templates.TemplateResponse(request, "database_settings.html", context)
+
+
 @router.get("/candidates", response_class=HTMLResponse)
-def candidate_list(request: Request, session: Session = Depends(get_db_session)) -> HTMLResponse:
+def candidate_list(
+    request: Request,
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
     service = CandidateService(session)
     dedup_service = DedupService(session)
+    importer = ImporterService(get_app_settings(), session=session)
     candidates = service.list_candidates()
     candidate_rows = []
     for candidate in candidates:
@@ -67,10 +186,54 @@ def candidate_list(request: Request, session: Session = Depends(get_db_session))
                 "readiness": readiness,
             }
         )
+    config = RemoteDatabaseConfigService(session).get_active_config()
     context = {
         "request": request,
-        "page_title": "Candidates",
+        "page_title": "候选题",
         "candidate_rows": candidate_rows,
+        "remote_config": config,
+        "format_status": _format_status,
+        "format_upload_status": _format_upload_status,
+        "format_dedup_decision": _format_dedup_decision,
+        "format_readiness": _format_readiness,
+        "batch_result": None,
+        "importer": importer,
+    }
+    return templates.TemplateResponse(request, "candidate_list.html", context)
+
+
+@router.post("/imports/batch-upload", response_class=HTMLResponse)
+def batch_upload_candidates(
+    request: Request,
+    session: Session = Depends(get_db_session),
+    settings=Depends(get_app_settings),
+) -> HTMLResponse:
+    service = CandidateService(session)
+    dedup_service = DedupService(session)
+    importer = ImporterService(settings, session=session)
+    summary = importer.batch_import_approved_candidates(service.list_candidates())
+    candidate_rows = []
+    for candidate in service.list_candidates():
+        matches = dedup_service.list_matches(candidate.candidate_id)
+        top_match = matches[0] if matches else None
+        candidate_rows.append(
+            {
+                "candidate": candidate,
+                "top_dedup_match": top_match,
+                "readiness": _candidate_readiness(candidate),
+            }
+        )
+    context = {
+        "request": request,
+        "page_title": "候选题",
+        "candidate_rows": candidate_rows,
+        "remote_config": RemoteDatabaseConfigService(session).get_active_config(),
+        "format_status": _format_status,
+        "format_upload_status": _format_upload_status,
+        "format_dedup_decision": _format_dedup_decision,
+        "format_readiness": _format_readiness,
+        "batch_result": summary,
+        "importer": importer,
     }
     return templates.TemplateResponse(request, "candidate_list.html", context)
 
@@ -210,19 +373,22 @@ def candidate_detail(
     service = CandidateService(session)
     candidate = service.get_candidate(candidate_id)
     if candidate is None:
-        raise HTTPException(status_code=404, detail="Candidate not found")
+        raise HTTPException(status_code=404, detail="未找到候选题。")
     review_pack_path = ReviewPackService(settings).write_review_pack(candidate)
-    import_preview = ImporterService(settings).build_preview(candidate)
+    import_preview = ImporterService(settings, session=session).build_preview(candidate)
     dedup_matches = DedupService(session).list_matches(candidate.candidate_id)
     context = {
         "request": request,
-        "page_title": f"Candidate #{candidate.candidate_id}",
+        "page_title": f"候选题 #{candidate.candidate_id}",
         "candidate": candidate,
         "review_pack_path": str(review_pack_path),
         "import_preview": import_preview,
         "dedup_matches": dedup_matches,
         "execution_result": None,
-        "statuses": list(CandidateStatus),
+        "format_status": _format_status,
+        "format_upload_status": _format_upload_status,
+        "format_dedup_decision": _format_dedup_decision,
+        "format_dedup_reason": _format_dedup_reason,
     }
     return templates.TemplateResponse(request, "candidate_detail.html", context)
 
@@ -248,7 +414,7 @@ def save_candidate(
     service = CandidateService(session)
     candidate = service.get_candidate(candidate_id)
     if candidate is None:
-        raise HTTPException(status_code=404, detail="Candidate not found")
+        raise HTTPException(status_code=404, detail="未找到候选题。")
     service.update_candidate(
         candidate,
         title=title,
@@ -277,7 +443,7 @@ def generate_candidate(
     service = CandidateService(session)
     candidate = service.get_candidate(candidate_id)
     if candidate is None:
-        raise HTTPException(status_code=404, detail="Candidate not found")
+        raise HTTPException(status_code=404, detail="未找到候选题。")
     draft = GenerationService(ai_client=AIClient(settings)).generate_from_statement(
         title=candidate.title,
         statement_markdown=candidate.statement_markdown,
@@ -311,7 +477,7 @@ def run_java_draft(
     service = CandidateService(session)
     candidate = service.get_candidate(candidate_id)
     if candidate is None:
-        raise HTTPException(status_code=404, detail="Candidate not found")
+        raise HTTPException(status_code=404, detail="未找到候选题。")
     execution_service = ExecutionService(settings)
     result = execution_service.run_java_source(
         java_source=f"{candidate.default_code_java or ''}\n{candidate.main_fuc_java or ''}",
@@ -319,17 +485,20 @@ def run_java_draft(
         workdir=settings.execution_dir / str(candidate.candidate_id),
     )
     review_pack_path = ReviewPackService(settings).write_review_pack(candidate)
-    import_preview = ImporterService(settings).build_preview(candidate)
+    import_preview = ImporterService(settings, session=session).build_preview(candidate)
     dedup_matches = DedupService(session).list_matches(candidate.candidate_id)
     context = {
         "request": request,
-        "page_title": f"Candidate #{candidate.candidate_id}",
+        "page_title": f"候选题 #{candidate.candidate_id}",
         "candidate": candidate,
         "review_pack_path": str(review_pack_path),
         "import_preview": import_preview,
         "dedup_matches": dedup_matches,
         "execution_result": result,
-        "statuses": list(CandidateStatus),
+        "format_status": _format_status,
+        "format_upload_status": _format_upload_status,
+        "format_dedup_decision": _format_dedup_decision,
+        "format_dedup_reason": _format_dedup_reason,
     }
     return templates.TemplateResponse(request, "candidate_detail.html", context)
 
@@ -339,7 +508,7 @@ def approve_candidate(candidate_id: int, session: Session = Depends(get_db_sessi
     service = CandidateService(session)
     candidate = service.get_candidate(candidate_id)
     if candidate is None:
-        raise HTTPException(status_code=404, detail="Candidate not found")
+        raise HTTPException(status_code=404, detail="未找到候选题。")
     service.set_status(candidate, CandidateStatus.APPROVED)
     return RedirectResponse(url=f"/candidates/{candidate_id}", status_code=303)
 
@@ -349,7 +518,7 @@ def reject_candidate(candidate_id: int, session: Session = Depends(get_db_sessio
     service = CandidateService(session)
     candidate = service.get_candidate(candidate_id)
     if candidate is None:
-        raise HTTPException(status_code=404, detail="Candidate not found")
+        raise HTTPException(status_code=404, detail="未找到候选题。")
     service.set_status(candidate, CandidateStatus.REJECTED)
     return RedirectResponse(url=f"/candidates/{candidate_id}", status_code=303)
 
@@ -363,9 +532,8 @@ def import_candidate(
     service = CandidateService(session)
     candidate = service.get_candidate(candidate_id)
     if candidate is None:
-        raise HTTPException(status_code=404, detail="Candidate not found")
-    ImporterService(settings).import_candidate(candidate)
-    service.set_status(candidate, CandidateStatus.IMPORTED)
+        raise HTTPException(status_code=404, detail="未找到候选题。")
+    ImporterService(settings, session=session).import_candidate(candidate)
     return RedirectResponse(url=f"/candidates/{candidate_id}", status_code=303)
 
 
@@ -392,8 +560,6 @@ def _refresh_candidate_dedup(session: Session, settings, candidate) -> None:
 
 
 def _load_sample_inputs(question_case_json: str) -> list[str]:
-    import json
-
     try:
         payload = json.loads(question_case_json)
     except json.JSONDecodeError:
@@ -420,3 +586,40 @@ def _candidate_readiness(candidate) -> str:
     if not missing:
         return "review-ready"
     return ", ".join(missing)
+
+
+def _format_status(status: CandidateStatus | str) -> str:
+    if isinstance(status, CandidateStatus):
+        return STATUS_LABELS.get(status, status.value)
+    return STATUS_LABELS.get(CandidateStatus(status), status) if status in CandidateStatus._value2member_map_ else status
+
+
+def _format_upload_status(status: UploadStatus | str) -> str:
+    if isinstance(status, UploadStatus):
+        return UPLOAD_STATUS_LABELS.get(status, status.value)
+    return UPLOAD_STATUS_LABELS.get(UploadStatus(status), status) if status in UploadStatus._value2member_map_ else status
+
+
+def _format_dedup_decision(decision: str) -> str:
+    return DEDUP_DECISION_LABELS.get(decision, decision)
+
+
+def _format_readiness(readiness: str) -> str:
+    parts = [item.strip() for item in readiness.split(",") if item.strip()]
+    translated = [READINESS_LABELS.get(item, item) for item in parts]
+    return "、".join(translated) if translated else readiness
+
+
+def _format_dedup_reason(reason: str) -> str:
+    segments = []
+    for chunk in reason.split(","):
+        key, _, value = chunk.strip().partition("=")
+        if not key:
+            continue
+        label = {
+            "title": "标题相似度",
+            "semantic": "题意相似度",
+            "tag": "标签相似度",
+        }.get(key, key)
+        segments.append(f"{label}={value}")
+    return "，".join(segments) if segments else reason
