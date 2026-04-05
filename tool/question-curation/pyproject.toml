@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "question-curation"
+version = "0.1.0"
+description = "Local web tool for curating OnlineOJ problems."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115,<1.0",
+  "httpx>=0.28,<1.0",
+  "jinja2>=3.1,<4.0",
+  "pymysql>=1.1,<2.0",
+  "python-multipart>=0.0.20,<1.0",
+  "sqlalchemy>=2.0,<3.0",
+  "uvicorn>=0.34,<1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0,<9.0",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["data*", "tests*"]
+
+[tool.setuptools.package-data]
+app = ["templates/*.html", "static/*.css"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tool/question-curation/tests"]

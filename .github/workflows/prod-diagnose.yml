@@ -50,18 +50,26 @@ jobs:
           done
 
       - name: Prepare worker SSH key
-        if: ${{ secrets.WORKER_SSH_KEY != '' }}
         shell: bash
+        env:
+          WORKER_SSH_KEY: ${{ secrets.WORKER_SSH_KEY }}
         run: |
+          if [[ -z "${WORKER_SSH_KEY}" ]]; then
+            echo "WORKER_SSH_KEY is empty, skip worker diagnostics bootstrap"
+            exit 0
+          fi
           mkdir -p .cd-tmp
-          printf '%s\n' "${{ secrets.WORKER_SSH_KEY }}" > .cd-tmp/worker_id_ed25519
+          printf '%s\n' "${WORKER_SSH_KEY}" > .cd-tmp/worker_id_ed25519
           chmod 600 .cd-tmp/worker_id_ed25519
 
       - name: Collect worker diagnostics
-        if: ${{ secrets.WORKER_SSH_KEY != '' }}
         shell: bash
         run: |
           set -euo pipefail
+          if [[ ! -f .cd-tmp/worker_id_ed25519 ]]; then
+            echo "worker ssh key not prepared, skip worker diagnostics"
+            exit 0
+          fi
           ssh_opts=(
             -i .cd-tmp/worker_id_ed25519
             -o StrictHostKeyChecking=accept-new

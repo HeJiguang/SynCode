@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="panel">
+  <h2>Inspiration Discovery</h2>
+  <p class="muted">Use direct problem URLs as the main ingestion path. Search is secondary and only for optional inspiration.</p>
+</section>
+
+<section class="panel">
+  <h3>Fetch Reference URL</h3>
+  <form class="stack-form" method="post" action="/discover/fetch">
+    <label>
+      <span>Source Platform</span>
+      <input type="text" name="source_platform" value="leetcode" required>
+    </label>
+    <label>
+      <span>Reference URL</span>
+      <input type="url" name="source_url" placeholder="https://..." required>
+    </label>
+    <button type="submit">Fetch And Create Candidate</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h3>Batch Import URLs</h3>
+  <form class="stack-form" method="post" action="/discover/batch">
+    <label>
+      <span>Source Platform</span>
+      <input type="text" name="source_platform" value="leetcode" required>
+    </label>
+    <label>
+      <span>URLs</span>
+      <textarea name="urls_text" rows="8" placeholder="One URL per line" required></textarea>
+    </label>
+    <button type="submit">Batch Import URLs</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h3>Optional Search</h3>
+  <form class="stack-form" method="get" action="/discover">
+    <label>
+      <span>Keyword</span>
+      <input type="text" name="keyword" value="{{ keyword }}" placeholder="sum, tree, graph">
+    </label>
+    <button type="submit">Search Codeforces</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h3>Search Results</h3>
+  {% if leads %}
+    <div class="lead-list">
+      {% for lead in leads %}
+      <article class="lead-card">
+        <h4>{{ lead.title }}</h4>
+        <p class="muted">Problem ID: {{ lead.source_problem_id }} · Difficulty: {{ lead.difficulty }}</p>
+        <p class="muted">{{ lead.source_url }}</p>
+        <p class="muted">Tags: {{ lead.tags | join(', ') }}</p>
+        <form class="stack-form" method="post" action="/discover/intake">
+          <input type="hidden" name="title" value="{{ lead.title }}">
+          <input type="hidden" name="source_platform" value="{{ lead.source_platform }}">
+          <input type="hidden" name="source_url" value="{{ lead.source_url }}">
+          <input type="hidden" name="source_problem_id" value="{{ lead.source_problem_id }}">
+          <input type="hidden" name="difficulty" value="{{ lead.difficulty }}">
+          <input type="hidden" name="tags" value="{{ lead.tags | join(', ') }}">
+          <button type="submit">Add To Candidates</button>
+        </form>
+      </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">No search results yet. Search is optional; direct URL intake is the main workflow.</p>
+  {% endif %}
+</section>
+{% endblock %}

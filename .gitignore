@@ -49,5 +49,14 @@ deploy/**/*.zip
 tmp_pytest_config/
 tmp_pytest_dense/
 
+# Question curation tool runtime artifacts
+tool/question-curation/.env
+tool/question-curation/.pytest_cache/
+tool/question-curation/question_curation.egg-info/
+tool/question-curation/data/execution/
+tool/question-curation/data/raw_sources/
+tool/question-curation/data/review_packs/
+tool/question-curation/data/sqlite/
+
 # Maven local repository cache
 .m2-repo/

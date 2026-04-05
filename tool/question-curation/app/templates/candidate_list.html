@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="panel">
+  <h2>Candidate Problems</h2>
+  <p class="muted">No candidates yet. Create and review candidates here.</p>
+</section>
+
+<section class="panel">
+  <h3>Create Candidate</h3>
+  <form class="stack-form" method="post" action="/candidates">
+    <label>
+      <span>Title</span>
+      <input type="text" name="title" required>
+    </label>
+    <label>
+      <span>Source Type</span>
+      <input type="text" name="source_type" value="manual" required>
+    </label>
+    <label>
+      <span>Source Platform</span>
+      <input type="text" name="source_platform" value="reference" required>
+    </label>
+    <label>
+      <span>Statement</span>
+      <textarea name="statement_markdown" rows="6" required></textarea>
+    </label>
+    <button type="submit">Create Candidate</button>
+  </form>
+</section>
+
+<section class="panel">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Status</th>
+        <th>Source</th>
+        <th>Dedup Risk</th>
+        <th>Readiness</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if candidate_rows %}
+        {% for row in candidate_rows %}
+        <tr>
+          <td><a href="/candidates/{{ row.candidate.candidate_id }}">{{ row.candidate.title }}</a></td>
+          <td>{{ row.candidate.status.value }}</td>
+          <td>{{ row.candidate.source_platform }}</td>
+          <td>
+            {% if row.top_dedup_match %}
+              {{ row.top_dedup_match.decision }}
+              ({{ "%.2f"|format(row.top_dedup_match.overall_similarity) }})
+            {% else %}
+              no-scan
+            {% endif %}
+          </td>
+          <td>{{ row.readiness }}</td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr>
+          <td colspan="5">No candidate records available.</td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

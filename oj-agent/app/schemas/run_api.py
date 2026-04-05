@@ -40,6 +40,7 @@ class RunContextPayload(_CamelCaseModel):
     user_message: str | None = Field(default=None)
 
 
+# 创建run的请求体
 class CreateRunRequest(_CamelCaseModel):
     run_type: str
     source: str

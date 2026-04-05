@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page_title }}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="shell-header">
+    <div>
+      <p class="eyebrow">OnlineOJ Tooling</p>
+      <h1 class="shell-title">{{ page_title }}</h1>
+    </div>
+    <nav class="shell-nav">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/candidates">Candidates</a>
+      <a href="/discover">Discover</a>
+    </nav>
+  </header>
+  <main class="shell-main">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

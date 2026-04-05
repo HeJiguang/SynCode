@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="panel">
+  <h1>Question Curation Dashboard</h1>
+  <p class="muted">Standalone local review console for curating OnlineOJ problems.</p>
+</section>
+
+<section class="stats-grid">
+  <article class="stat-card">
+    <span class="stat-label">Discovered</span>
+    <strong>{{ stats.discovered }}</strong>
+  </article>
+  <article class="stat-card">
+    <span class="stat-label">Review Ready</span>
+    <strong>{{ stats.review_ready }}</strong>
+  </article>
+  <article class="stat-card">
+    <span class="stat-label">Approved</span>
+    <strong>{{ stats.approved }}</strong>
+  </article>
+  <article class="stat-card">
+    <span class="stat-label">Imported</span>
+    <strong>{{ stats.imported }}</strong>
+  </article>
+</section>
+{% endblock %}

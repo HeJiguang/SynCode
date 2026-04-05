@@ -28,6 +28,7 @@ jobs:
             runner_name="syncode-prod-101-96-200-76"
           fi
           echo "runner_name=${runner_name}" >> "$GITHUB_OUTPUT"
+          echo "runner_labels=syncode-prod,onlineoj-prod" >> "$GITHUB_OUTPUT"
 
       - name: Resolve runner package
         id: runner
@@ -63,6 +64,7 @@ jobs:
           archive_name="${{ steps.runner.outputs.asset_name }}"
           archive_url="${{ steps.runner.outputs.asset_url }}"
           runner_name="${{ steps.meta.outputs.runner_name }}"
+          runner_labels="${{ steps.meta.outputs.runner_labels }}"
 
           ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=40 "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}" "\
             set -euo pipefail && \
@@ -71,15 +73,15 @@ jobs:
             curl --fail --retry 5 --retry-delay 5 --retry-all-errors -L -C - -o ${archive_name} ${archive_url} && \
             id -u syncode-runner >/dev/null 2>&1 || useradd --create-home --home-dir /opt/syncode-runner --shell /bin/bash syncode-runner && \
             usermod -aG docker syncode-runner || true && \
-            command -v git >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1 && command -v mvn >/dev/null 2>&1 || \
-              (export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y git python3 python3-venv maven) && \
+            command -v git >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1 && command -v mvn >/dev/null 2>&1 && command -v java >/dev/null 2>&1 || \
+              (export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y git python3 python3-venv maven openjdk-17-jdk-headless) && \
             mkdir -p /opt/syncode-runner && \
             tar xzf ~/onlineoj-runner/${archive_name} -C /opt/syncode-runner && \
             chown -R syncode-runner:syncode-runner /opt/syncode-runner && \
             cd /opt/syncode-runner && \
             ./svc.sh stop >/dev/null 2>&1 || true && \
             ./svc.sh uninstall >/dev/null 2>&1 || true && \
-            su -s /bin/bash syncode-runner -c \"cd /opt/syncode-runner && ./config.sh --unattended --replace --disableupdate --url https://github.com/${{ github.repository }} --token '${{ secrets.SELF_HOSTED_RUNNER_BOOTSTRAP_TOKEN }}' --name '${runner_name}' --labels syncode-prod --work _work\" && \
+            su -s /bin/bash syncode-runner -c \"cd /opt/syncode-runner && ./config.sh --unattended --replace --disableupdate --url https://github.com/${{ github.repository }} --token '${{ secrets.SELF_HOSTED_RUNNER_BOOTSTRAP_TOKEN }}' --name '${runner_name}' --labels '${runner_labels}' --work _work\" && \
             ./svc.sh install syncode-runner && \
             ./svc.sh start && \
             rm -f ~/onlineoj-runner/${archive_name} && \
