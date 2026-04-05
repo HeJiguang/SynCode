@@ -77,13 +77,16 @@ jobs:
           echo "artifact_name=deploy-source-${source_sha}" >> "$GITHUB_OUTPUT"
 
       - name: Download deploy bundle
-        uses: actions/download-artifact@v4
-        with:
-          github-token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          run-id: ${{ steps.meta.outputs.source_run_id }}
-          name: ${{ steps.meta.outputs.artifact_name }}
-          path: source-bundle
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          rm -rf source-bundle
+          mkdir -p source-bundle
+          gh run download "${{ steps.meta.outputs.source_run_id }}" \
+            --repo "${{ github.repository }}" \
+            --name "${{ steps.meta.outputs.artifact_name }}" \
+            --dir source-bundle
 
       - name: Extract deploy bundle
         shell: bash
