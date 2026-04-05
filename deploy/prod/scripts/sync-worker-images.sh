@@ -79,8 +79,8 @@ fi
 echo "[sync] packaging worker images"
 docker save "${worker_images[@]}" | gzip > "$archive"
 
-echo "[sync] copying worker images to ${WORKER_SSH_USER}@${WORKER_SSH_HOST}"
-scp "${ssh_opts[@]}" "$archive" "${WORKER_SSH_USER}@${WORKER_SSH_HOST}:${remote_archive}"
+echo "[sync] streaming worker images to ${WORKER_SSH_USER}@${WORKER_SSH_HOST}"
+ssh "${ssh_opts[@]}" "${WORKER_SSH_USER}@${WORKER_SSH_HOST}" "cat > '${remote_archive}'" < "$archive"
 
 remote_prepare_cmd="set -euo pipefail"
 for dir_var in JUDGE_HOST_USER_CODE_DIR JUDGE_HOST_USER_CODE_POOL_DIR; do

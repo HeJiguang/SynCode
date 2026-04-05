@@ -24,3 +24,5 @@ Require-Pattern '-o StrictHostKeyChecking=yes' `
     "missing strict host key enforcement after keyscan"
 Require-Pattern 'ssh-keyscan -H -p "$WORKER_SSH_PORT" "$WORKER_SSH_HOST" > "$known_hosts_file" 2>/dev/null' `
     "missing worker host key preseed step"
+Require-Pattern 'ssh "${ssh_opts[@]}" "${WORKER_SSH_USER}@${WORKER_SSH_HOST}" "cat > ''${remote_archive}''" < "$archive"' `
+    "missing ssh stream transport for worker image archive"
