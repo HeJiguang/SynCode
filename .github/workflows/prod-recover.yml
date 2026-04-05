@@ -7,6 +7,10 @@ on:
         description: Optional image tag override
         required: false
         type: string
+      source_run_id:
+        description: Optional CI run id that contains the deploy bundle artifact
+        required: false
+        type: string
       rebuild_images:
         description: Rebuild images on manager before redeploy
         required: false
@@ -17,6 +21,10 @@ on:
         required: false
         default: true
         type: boolean
+
+permissions:
+  actions: read
+  contents: read
 
 env:
   STACK_NAME: onlineoj-prod
@@ -32,23 +40,45 @@ jobs:
       - x64
       - syncode-prod
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Resolve deploy metadata
         id: meta
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          source_run_id="${{ github.event.inputs.source_run_id }}"
+          if [[ -z "${source_run_id}" ]]; then
+            source_run_id="$(gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?branch=main&status=success&per_page=1" --jq '.workflow_runs[0].id')"
+          fi
           if [[ -n "${{ github.event.inputs.image_tag }}" ]]; then
             image_tag="${{ github.event.inputs.image_tag }}"
           else
             image_tag="manual-${GITHUB_SHA::12}"
           fi
+          echo "source_run_id=${source_run_id}" >> "$GITHUB_OUTPUT"
           echo "image_tag=${image_tag}" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=deploy-source-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Download deploy bundle
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.meta.outputs.source_run_id }}
+          name: ${{ steps.meta.outputs.artifact_name }}
+          path: source-bundle
+
+      - name: Extract deploy bundle
+        shell: bash
+        run: |
+          rm -rf repo
+          mkdir -p repo
+          tar xzf source-bundle/deploy-source.tar.gz -C repo
 
       - name: Prepare runtime env files
         shell: bash
         run: |
+          cd repo
           printf '%s\n' "${{ secrets.STACK_ENV_PROD }}" > "${STACK_ENV_FILE}"
           printf '%s\n' "${{ secrets.RUNTIME_ENV_PROD }}" > "${RUNTIME_ENV_FILE}"
           sed -i "s#sha-REPLACE_ME#${{ steps.meta.outputs.image_tag }}#g" "${STACK_ENV_FILE}"
@@ -57,13 +87,14 @@ jobs:
         if: ${{ github.event.inputs.sync_worker_images == 'true' }}
         shell: bash
         run: |
-          mkdir -p .cd-tmp
-          printf '%s\n' "${{ secrets.WORKER_SSH_KEY }}" > .cd-tmp/worker_id_ed25519
-          chmod 600 .cd-tmp/worker_id_ed25519
+          mkdir -p repo/.cd-tmp
+          printf '%s\n' "${{ secrets.WORKER_SSH_KEY }}" > repo/.cd-tmp/worker_id_ed25519
+          chmod 600 repo/.cd-tmp/worker_id_ed25519
 
       - name: Redeploy locally
         shell: bash
         run: |
+          cd repo
           chmod +x deploy/prod/scripts/build-images.sh
           chmod +x deploy/prod/scripts/sync-worker-images.sh
           chmod +x deploy/prod/scripts/deploy.sh
