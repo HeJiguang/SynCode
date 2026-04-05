@@ -12,12 +12,17 @@ on:
         description: Optional image tag override
         required: false
         type: string
+      source_run_id:
+        description: Optional CI run id that contains the deploy bundle artifact
+        required: false
+        type: string
 
 concurrency:
   group: cd-prod
   cancel-in-progress: false
 
 permissions:
+  actions: read
   contents: read
 
 env:
@@ -51,11 +56,18 @@ jobs:
       - name: Resolve deploy metadata
         id: meta
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
             source_sha="${{ github.event.workflow_run.head_sha }}"
+            source_run_id="${{ github.event.workflow_run.id }}"
           else
             source_sha="${GITHUB_SHA}"
+            source_run_id="${{ github.event.inputs.source_run_id }}"
+            if [[ -z "${source_run_id}" ]]; then
+              source_run_id="$(gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?branch=main&status=success&per_page=1" --jq '.workflow_runs[0].id')"
+            fi
           fi
 
           if [[ -n "${{ github.event.inputs.image_tag }}" ]]; then
@@ -65,11 +77,30 @@ jobs:
           fi
 
           echo "source_sha=${source_sha}" >> "$GITHUB_OUTPUT"
+          echo "source_run_id=${source_run_id}" >> "$GITHUB_OUTPUT"
           echo "image_tag=${image_tag}" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=deploy-source-${source_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Download deploy bundle
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.meta.outputs.source_run_id }}
+          name: ${{ steps.meta.outputs.artifact_name }}
+          path: source-bundle
+
+      - name: Extract deploy bundle
+        shell: bash
+        run: |
+          rm -rf repo
+          mkdir -p repo
+          tar xzf source-bundle/deploy-source.tar.gz -C repo
 
       - name: Prepare runtime env files
         shell: bash
         run: |
+          cd repo
           printf '%s\n' "${{ secrets.STACK_ENV_PROD }}" > "${STACK_ENV_FILE}"
           printf '%s\n' "${{ secrets.RUNTIME_ENV_PROD }}" > "${RUNTIME_ENV_FILE}"
           sed -i "s#sha-REPLACE_ME#${{ steps.meta.outputs.image_tag }}#g" "${STACK_ENV_FILE}"
@@ -77,9 +108,9 @@ jobs:
       - name: Prepare worker SSH key
         shell: bash
         run: |
-          mkdir -p .cd-tmp
-          printf '%s\n' "${{ secrets.WORKER_SSH_KEY }}" > .cd-tmp/worker_id_ed25519
-          chmod 600 .cd-tmp/worker_id_ed25519
+          mkdir -p repo/.cd-tmp
+          printf '%s\n' "${{ secrets.WORKER_SSH_KEY }}" > repo/.cd-tmp/worker_id_ed25519
+          chmod 600 repo/.cd-tmp/worker_id_ed25519
 
       - name: Verify manager toolchain
         shell: bash
@@ -92,6 +123,7 @@ jobs:
       - name: Build and deploy locally
         shell: bash
         run: |
+          cd repo
           chmod +x deploy/prod/scripts/build-images.sh
           chmod +x deploy/prod/scripts/sync-worker-images.sh
           chmod +x deploy/prod/scripts/deploy.sh
