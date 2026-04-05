@@ -111,16 +111,17 @@ jobs:
 
       - name: Create source bundle
         run: |
+          bundle_path="${RUNNER_TEMP}/deploy-source.tar.gz"
           tar \
             --exclude=.git \
             --exclude=.github/.cache \
-            -czf deploy-source.tar.gz \
+            -czf "${bundle_path}" \
             .
 
       - name: Upload source bundle
         uses: actions/upload-artifact@v4
         with:
           name: deploy-source-${{ github.sha }}
-          path: deploy-source.tar.gz
+          path: ${{ runner.temp }}/deploy-source.tar.gz
           if-no-files-found: error
           retention-days: 3
