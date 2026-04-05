@@ -51,18 +51,30 @@ done
 
 archive="$(mktemp "${TMPDIR:-/tmp}/onlineoj-worker-images.XXXXXX.tar.gz")"
 remote_archive="/tmp/$(basename "$archive")"
+known_hosts_file="$(mktemp "${TMPDIR:-/tmp}/onlineoj-worker-known-hosts.XXXXXX")"
 ssh_opts=(
   -i "$WORKER_SSH_KEY_FILE"
   -p "$WORKER_SSH_PORT"
-  -o StrictHostKeyChecking=accept-new
+  -o UserKnownHostsFile="$known_hosts_file"
+  -o GlobalKnownHostsFile=/dev/null
+  -o StrictHostKeyChecking=yes
+  -o LogLevel=ERROR
   -o ServerAliveInterval=15
   -o ServerAliveCountMax=8
 )
 
 cleanup() {
   rm -f "$archive"
+  rm -f "$known_hosts_file"
 }
 trap cleanup EXIT
+
+echo "[sync] collecting worker host key for ${WORKER_SSH_HOST}:${WORKER_SSH_PORT}"
+ssh-keyscan -H -p "$WORKER_SSH_PORT" "$WORKER_SSH_HOST" > "$known_hosts_file" 2>/dev/null
+if [[ ! -s "$known_hosts_file" ]]; then
+  echo "failed to collect host key for ${WORKER_SSH_HOST}:${WORKER_SSH_PORT}" >&2
+  exit 1
+fi
 
 echo "[sync] packaging worker images"
 docker save "${worker_images[@]}" | gzip > "$archive"
