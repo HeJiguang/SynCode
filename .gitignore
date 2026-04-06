@@ -62,6 +62,9 @@ tool/question-curation/data/sqlite/
 # Maven local repository cache
 .m2-repo/
 
+# Local load-testing binaries
+tool/load-testing/bin/
+
 # Keep production deploy verification scripts versioned
 !deploy/prod/scripts/
 !deploy/prod/scripts/test-sync-worker-images-hostkey.ps1
