@@ -1,6 +1,43 @@
+server:
+  port: ${SERVER_PORT:19090}
+
+jwt:
+  secret: ${JWT_SECRET:zshadioasjdkasdsadassa}
+
+security:
+  ignore:
+    whites:
+      - /friend/user/sendCode
+      - /friend/user/code/login
+      - /friend/question/semiLogin/**
+      - /friend/exam/semiLogin/**
+      - /friend/message/semiLogin/**
+
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:16379}
+      password: ${REDIS_PASSWORD:change-me-local}
+  cloud:
+    gateway:
+      routes:
+        - id: oj-friend
+          uri: ${OJ_FRIEND_BASE_URL:http://127.0.0.1:9202}
+          predicates:
+            - Path=/friend/**
+          filters:
+            - StripPrefix=1
+        - id: oj-agent
+          uri: ${AI_GATEWAY_URI:http://127.0.0.1:8015}
+          predicates:
+            - Path=/ai/**
+          filters:
+            - StripPrefix=1
+
 ai:
   gateway:
     route-enabled: true
-    uri: ${AI_GATEWAY_URI:lb://oj-agent}
+    uri: ${AI_GATEWAY_URI:http://127.0.0.1:8015}
     public-prefix: /ai
     target-prefix: /api

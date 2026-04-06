@@ -74,6 +74,9 @@ This file should stay minimal. The Java business passwords and datasource detail
 
 Keep these runtime bootstrap values:
 
+- `NACOS_ENABLED=true`
+- `NACOS_CONFIG_ENABLED=true`
+- `NACOS_DISCOVERY_ENABLED=true`
 - `NACOS_SERVER_ADDR`
 - `NACOS_USERNAME`
 - `NACOS_PASSWORD`

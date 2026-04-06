@@ -2,18 +2,20 @@ spring:
   application:
     name: oj-friend
   profiles:
-    active: local
+    active: ${SPRING_PROFILES_ACTIVE:local}
   cloud:
     nacos:
       discovery:
-        namespace: 706a61a6-f9ad-49f5-856c-6350f77450bc
-        server-addr: ${NACOS_SERVER_ADDR:101.96.200.76:8848}
+        enabled: ${NACOS_DISCOVERY_ENABLED:${NACOS_ENABLED:false}}
+        namespace: ${NACOS_NAMESPACE:706a61a6-f9ad-49f5-856c-6350f77450bc}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
         username: ${NACOS_USERNAME:nacos}
         password: ${NACOS_PASSWORD:Nacos8@sin}
         # ip: ${HOST_IP:127.0.0.1}
       config:
-        namespace: 706a61a6-f9ad-49f5-856c-6350f77450bc
-        server-addr: ${NACOS_SERVER_ADDR:101.96.200.76:8848}
+        enabled: ${NACOS_CONFIG_ENABLED:${NACOS_ENABLED:false}}
+        namespace: ${NACOS_NAMESPACE:706a61a6-f9ad-49f5-856c-6350f77450bc}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
         file-extension: yaml
         username: ${NACOS_USERNAME:nacos}
         password: ${NACOS_PASSWORD:Nacos8@sin}

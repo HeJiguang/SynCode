@@ -29,6 +29,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -164,7 +165,7 @@ public class JudgeServiceImpl implements IJudgeService {
             userQuestionResultVO.setExeMessage(CodeRunStatus.NOT_ALL_PASSED.getMsg());
             return userQuestionResultVO;
         }
-        if (sandBoxExecuteResult.getUseMemory() > judgeSubmitDTO.getSpaceLimit()) {
+        if (sandBoxExecuteResult.getUseMemory() > resolveSpaceLimitBytes(judgeSubmitDTO.getSpaceLimit())) {
             userQuestionResultVO.setPass(Constants.FALSE);
             userQuestionResultVO.setScore(JudgeConstants.ERROR_SCORE);
             userQuestionResultVO.setExeMessage(CodeRunStatus.OUT_OF_MEMORY.getMsg());
@@ -241,6 +242,7 @@ public class JudgeServiceImpl implements IJudgeService {
         userSubmit.setProgramType(judgeSubmitDTO.getProgramType());
         userSubmit.setUserCode(judgeSubmitDTO.getUserCode());
         userSubmit.setCaseJudgeRes(JSON.toJSONString(userQuestionResultVO.getUserExeResultList()));
+        userSubmit.setRequestId(UUID.randomUUID().toString());
         userSubmit.setCreateBy(judgeSubmitDTO.getUserId());
         userSubmitMapper.delete(new LambdaQueryWrapper<UserSubmit>()
                 .eq(UserSubmit::getUserId, judgeSubmitDTO.getUserId())
@@ -258,5 +260,12 @@ public class JudgeServiceImpl implements IJudgeService {
             return CodeRunStatus.SUCCEED.getMsg();
         }
         return CodeRunStatus.UNKNOWN_FAILED.getMsg();
+    }
+
+    private long resolveSpaceLimitBytes(Long spaceLimit) {
+        if (spaceLimit == null || spaceLimit <= 0) {
+            return 0L;
+        }
+        return spaceLimit * 1024L;
     }
 }

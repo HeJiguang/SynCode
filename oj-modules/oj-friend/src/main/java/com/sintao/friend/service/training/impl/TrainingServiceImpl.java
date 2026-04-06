@@ -295,11 +295,19 @@ public class TrainingServiceImpl implements ITrainingService {
 
     private List<Question> loadCandidateQuestions() {
         int limit = candidateLimit == null || candidateLimit <= 0 ? 40 : candidateLimit;
-        return questionMapper.selectList(new LambdaQueryWrapper<Question>()
+        List<Question> trainingQuestions = questionMapper.selectList(new LambdaQueryWrapper<Question>()
                 .and(wrapper -> wrapper.eq(Question::getTrainingEnabled, 1).or().isNull(Question::getTrainingEnabled))
                 .orderByAsc(Question::getDifficulty)
                 .orderByAsc(Question::getQuestionId)
                 .last("limit " + limit));
+        if (trainingQuestions != null && !trainingQuestions.isEmpty()) {
+            return trainingQuestions;
+        }
+        List<Question> fallbackQuestions = questionMapper.selectList(new LambdaQueryWrapper<Question>()
+                .orderByAsc(Question::getDifficulty)
+                .orderByAsc(Question::getQuestionId)
+                .last("limit " + limit));
+        return fallbackQuestions == null ? Collections.emptyList() : fallbackQuestions;
     }
 
     private List<Exam> loadCandidateExams() {

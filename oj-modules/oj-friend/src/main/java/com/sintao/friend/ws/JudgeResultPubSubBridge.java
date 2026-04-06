@@ -22,7 +22,11 @@ public class JudgeResultPubSubBridge implements MessageListener {
         if (message == null || message.getBody() == null || message.getBody().length == 0) {
             return;
         }
-        JudgeResultPushDTO dto = JSON.parseObject(new String(message.getBody(), StandardCharsets.UTF_8), JudgeResultPushDTO.class);
+        String payload = new String(message.getBody(), StandardCharsets.UTF_8);
+        if (payload.startsWith("\"")) {
+            payload = JSON.parseObject(payload, String.class);
+        }
+        JudgeResultPushDTO dto = JSON.parseObject(payload, JudgeResultPushDTO.class);
         registry.pushFinalResult(dto);
     }
 }

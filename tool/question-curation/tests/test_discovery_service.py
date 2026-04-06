@@ -105,11 +105,11 @@ def test_discovery_service_builds_leetcode_statement_from_graphql_payload() -> N
     )
 
     assert "Given an array of integers nums and an integer target" in statement
-    assert "Sample Input" in statement
+    assert "样例输入" in statement
     assert "[2,7,11,15]\n9" in statement
-    assert "Sample Output" in statement
+    assert "样例输出" in statement
     assert "[0,1]" in statement
-    assert "Function Metadata" in statement
+    assert "函数元信息" in statement
 
 
 def test_discovery_service_extracts_luogu_main_content_block() -> None:

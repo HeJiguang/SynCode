@@ -34,7 +34,7 @@ class RunService:
         source: RunSource,
         user_id: str,
         conversation_id: str | None = None,
-        entry_graph: str = "supervisor_graph",
+        entry_graph: str = "llm_runtime",
         context_ref: ContextRef | None = None,
     ) -> Run:
         run = self.run_store.save(
@@ -191,8 +191,8 @@ class RunService:
             write_intent_id=write_intent.write_intent_id,
             user_id=write_intent.user_id,
             draft_type=draft_type,
-            title="Review proposed learning change",
-            summary="This run proposed a high-impact learning update that needs your approval.",
+            title="审核学习变更建议",
+            summary="本次运行生成了一项影响较大的学习更新，等待你确认。",
             current_state={"status": "current_state_not_loaded_yet"},
             proposed_state=write_intent.payload,
             diff={"changedKeys": sorted(write_intent.payload.keys())},

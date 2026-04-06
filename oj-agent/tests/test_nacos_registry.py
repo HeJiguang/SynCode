@@ -41,7 +41,6 @@ def _settings() -> AgentSettings:
         llm_temperature=0.2,
         llm_max_tokens=1200,
         llm_enabled=True,
-        llm_fallback_enabled=True,
         gateway_user_id_header="X-User-Id",
         rag_enabled=True,
         rag_doc_globs=(),

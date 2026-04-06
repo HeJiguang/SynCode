@@ -17,7 +17,6 @@
         WHERE
             is_public = 1
             AND status = 1
-            AND (publish_time IS NULL OR publish_time &lt;= NOW())
         ORDER BY
             is_pinned DESC,
             COALESCE(publish_time, create_time) DESC

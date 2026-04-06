@@ -114,6 +114,21 @@ class TrainingServiceImplTest {
     }
 
     @Test
+    void loadCandidateQuestionsShouldFallbackToGeneralQuestionPoolWhenTrainingPoolIsEmpty() {
+        Question fallbackQuestion = new Question();
+        fallbackQuestion.setQuestionId(101L);
+        fallbackQuestion.setTitle("Two Sum");
+        fallbackQuestion.setDifficulty(1);
+        fallbackQuestion.setTrainingEnabled(0);
+        when(questionMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Collections.emptyList(), List.of(fallbackQuestion));
+
+        List<Question> candidates = ReflectionTestUtils.invokeMethod(trainingService, "loadCandidateQuestions");
+
+        assertEquals(1, candidates.size());
+        assertEquals(101L, candidates.get(0).getQuestionId());
+    }
+
+    @Test
     void finishTaskShouldUpdateLastTestExamIdWhenTestTaskCompletes() {
         ThreadLocalUtil.set(Constants.USER_ID, 99L);
 

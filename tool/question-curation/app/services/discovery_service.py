@@ -39,7 +39,7 @@ class DiscoveryService:
             response.raise_for_status()
             html = response.text
         if self._looks_like_block_page(html):
-            raise ValueError("目标页面返回了反爬或验证页，未能获取题面正文。")
+            raise ValueError("目标页面返回了反爬或验证页面，未能获取题面正文。")
         title_match = re.search(r"<title[^>]*>(.*?)</title>", html, flags=re.IGNORECASE | re.DOTALL)
         title = self._collapse_whitespace(unescape(title_match.group(1))) if title_match else url
         return {
@@ -54,7 +54,7 @@ class DiscoveryService:
             "query": (
                 "query getQuestionDetail($titleSlug: String!) { "
                 "question(titleSlug: $titleSlug) { "
-                "questionId title titleSlug content translatedContent difficulty "
+                "questionId title translatedTitle titleSlug content translatedContent difficulty "
                 "sampleTestCase exampleTestcases metaData codeSnippets { lang langSlug code } "
                 "} }"
             ),
@@ -76,8 +76,9 @@ class DiscoveryService:
         if not question:
             raise ValueError("LeetCode GraphQL 未返回题目详情。")
         statement_markdown = self._build_leetcode_statement(question)
+        title = (question.get("translatedTitle") or "").strip() or question["title"]
         return {
-            "title": f"{question['title']} - 力扣（LeetCode）",
+            "title": title,
             "statement_markdown": statement_markdown,
             "source_url": url,
         }
@@ -199,15 +200,15 @@ class DiscoveryService:
         sections = [description]
         if examples:
             for example in examples:
-                sections.append("Sample Input")
+                sections.append("样例输入")
                 sections.append(example["input"])
                 sections.append("")
-                sections.append("Sample Output")
+                sections.append("样例输出")
                 sections.append(example["output"])
                 sections.append("")
         metadata = question.get("metaData") or ""
         if metadata:
-            sections.append("Function Metadata")
+            sections.append("函数元信息")
             sections.append(metadata)
         return "\n".join(section for section in sections if section is not None).strip()
 
@@ -225,12 +226,7 @@ class DiscoveryService:
             if not input_match or not output_match:
                 continue
             normalized_input = self._normalize_leetcode_input(input_match.group(1).strip(), param_names)
-            examples.append(
-                {
-                    "input": normalized_input,
-                    "output": output_match.group(1).strip(),
-                }
-            )
+            examples.append({"input": normalized_input, "output": output_match.group(1).strip()})
         return examples
 
     def _normalize_leetcode_input(self, raw_input: str, param_names: list[str]) -> str:
@@ -258,9 +254,17 @@ class DiscoveryService:
     def _build_luogu_statement(self, problem: dict) -> str:
         contenu = problem.get("contenu") or {}
         sections: list[str] = []
+        field_titles = {
+            "background": "题目背景",
+            "description": "题目描述",
+            "inputFormat": "输入格式",
+            "outputFormat": "输出格式",
+            "hint": "提示",
+        }
         for field in ("background", "description", "inputFormat", "outputFormat", "hint"):
             value = contenu.get(field)
             if isinstance(value, str) and value.strip():
+                sections.append(field_titles[field])
                 sections.append(value.strip())
                 sections.append("")
         for sample in problem.get("samples") or []:

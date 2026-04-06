@@ -17,7 +17,6 @@ def test_qdrant_indexer_supports_local_hash_embeddings():
         llm_temperature=0.2,
         llm_max_tokens=1200,
         llm_enabled=False,
-        llm_fallback_enabled=True,
         gateway_user_id_header="X-User-Id",
         rag_enabled=True,
         rag_doc_globs=("docs/*.md",),

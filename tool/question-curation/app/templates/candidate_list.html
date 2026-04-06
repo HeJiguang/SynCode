@@ -3,7 +3,7 @@
 {% block content %}
 <section class="panel">
   <h2>候选题列表</h2>
-  <p class="muted">本地 SQLite 保存候选题、审核状态和上传记录。审核通过后，再批量上传到远端 OnlineOJ 数据库。</p>
+  <p class="muted">本地 SQLite 会保存候选题、审核状态和上传记录。审核通过后，再批量上传到远端 OnlineOJ 数据库。</p>
 </section>
 
 <section class="panel">
@@ -50,9 +50,17 @@
 </section>
 
 <section class="panel">
+  <div class="action-row">
+    <form method="post" action="/candidates/bulk-delete" id="bulk-delete-form">
+      <button type="submit" class="secondary">批量删除已选候选题</button>
+    </form>
+  </div>
   <table class="data-table">
     <thead>
       <tr>
+        <th>
+          <input type="checkbox" id="select-all-candidates" onclick="document.querySelectorAll('.candidate-checkbox').forEach((item) => { item.checked = this.checked; })">
+        </th>
         <th>题目标题</th>
         <th>审核状态</th>
         <th>上传状态</th>
@@ -65,6 +73,15 @@
       {% if candidate_rows %}
         {% for row in candidate_rows %}
         <tr>
+          <td>
+            <input
+              type="checkbox"
+              class="candidate-checkbox"
+              name="candidate_ids"
+              value="{{ row.candidate.candidate_id }}"
+              form="bulk-delete-form"
+            >
+          </td>
           <td><a href="/candidates/{{ row.candidate.candidate_id }}">{{ row.candidate.title }}</a></td>
           <td>{{ format_status(row.candidate.status) }}</td>
           <td>
@@ -87,7 +104,7 @@
         {% endfor %}
       {% else %}
         <tr>
-          <td colspan="6">当前还没有候选题记录。</td>
+          <td colspan="7">当前还没有候选题记录。</td>
         </tr>
       {% endif %}
     </tbody>

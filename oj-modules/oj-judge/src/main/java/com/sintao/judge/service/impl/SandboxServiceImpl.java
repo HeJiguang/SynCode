@@ -30,6 +30,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
+import java.io.InputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -150,7 +151,7 @@ public class SandboxServiceImpl implements ISandboxService {
     }
 
     private CompileResult compileCodeByDocker() {
-        String cmdId = createExecCmd(JudgeConstants.DOCKER_JAVAC_CMD, null, containerId);
+        String cmdId = createExecCmd(DockerExecInputSpec.forCompile(JudgeConstants.DOCKER_JAVAC_CMD), containerId);
         DockerStartResultCallback resultCallback = new DockerStartResultCallback();
         CompileResult compileResult = new CompileResult();
         try {
@@ -173,15 +174,14 @@ public class SandboxServiceImpl implements ISandboxService {
         long maxMemory = 0L;
         long maxUseTime = 0L;
         for (String inputArgs : inputList) {
-            String cmdId = createExecCmd(JudgeConstants.DOCKER_JAVA_EXEC_CMD, inputArgs, containerId);
+            DockerExecInputSpec execInputSpec = DockerExecInputSpec.forRun(JudgeConstants.DOCKER_JAVA_EXEC_CMD, inputArgs);
+            String cmdId = createExecCmd(execInputSpec, containerId);
             StatsCmd statsCmd = dockerClient.statsCmd(containerId);
             StatisticsCallback statisticsCallback = statsCmd.exec(new StatisticsCallback());
             long startNanos = System.nanoTime();
             DockerStartResultCallback resultCallback = new DockerStartResultCallback();
             try {
-                dockerClient.execStartCmd(cmdId)
-                        .exec(resultCallback)
-                        .awaitCompletion(timeLimit, TimeUnit.SECONDS);
+                execStart(cmdId, execInputSpec.stdin(), resultCallback).awaitCompletion(timeLimit, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Interrupted while executing code in sandbox", e);
@@ -203,14 +203,9 @@ public class SandboxServiceImpl implements ISandboxService {
         return getSanBoxResult(inputList, outList, maxMemory, maxUseTime);
     }
 
-    private String createExecCmd(String[] javaCmdArr, String inputArgs, String containerId) {
-        String[] cmd = javaCmdArr;
-        if (inputArgs != null && !inputArgs.isBlank()) {
-            String[] inputArray = inputArgs.trim().split("\\s+");
-            cmd = appendArgs(javaCmdArr, inputArray);
-        }
+    private String createExecCmd(DockerExecInputSpec execInputSpec, String containerId) {
         ExecCreateCmdResponse cmdResponse = dockerClient.execCreateCmd(containerId)
-                .withCmd(cmd)
+                .withCmd(execInputSpec.command())
                 .withAttachStderr(true)
                 .withAttachStdin(true)
                 .withAttachStdout(true)
@@ -218,11 +213,13 @@ public class SandboxServiceImpl implements ISandboxService {
         return cmdResponse.getId();
     }
 
-    private String[] appendArgs(String[] baseArgs, String[] extraArgs) {
-        String[] merged = new String[baseArgs.length + extraArgs.length];
-        System.arraycopy(baseArgs, 0, merged, 0, baseArgs.length);
-        System.arraycopy(extraArgs, 0, merged, baseArgs.length, extraArgs.length);
-        return merged;
+    private DockerStartResultCallback execStart(String cmdId, InputStream stdin, DockerStartResultCallback resultCallback) {
+        if (stdin != null) {
+            return dockerClient.execStartCmd(cmdId)
+                    .withStdIn(stdin)
+                    .exec(resultCallback);
+        }
+        return dockerClient.execStartCmd(cmdId).exec(resultCallback);
     }
 
     private SandBoxExecuteResult getSanBoxResult(List<String> inputList, List<String> outList,

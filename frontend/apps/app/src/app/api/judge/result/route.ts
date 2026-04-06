@@ -4,6 +4,7 @@ import type { ApiEnvelope } from "@aioj/api";
 import { requestJson, unwrapData } from "@aioj/api";
 
 import { normalizeJudgeOutcome } from "../../../../lib/judge-result";
+import { buildJudgeResultParams } from "../../../../lib/judge-route-contracts";
 import { getServerAccessToken } from "../../../../lib/server-auth";
 
 type BackendJudgeResult = {
@@ -23,15 +24,14 @@ export async function GET(request: NextRequest) {
   const requestId = request.nextUrl.searchParams.get("requestId");
   const examId = request.nextUrl.searchParams.get("examId");
 
-  if (!questionId || !Number.isFinite(Number(questionId))) {
-    return NextResponse.json({ message: "questionId 必须是数字 ID。" }, { status: 400 });
-  }
   if (!requestId) {
     return NextResponse.json({ message: "requestId 不能为空。" }, { status: 400 });
   }
 
-  const params = new URLSearchParams({ questionId, requestId });
-  if (examId && Number.isFinite(Number(examId))) params.set("examId", examId);
+  const params = questionId ? buildJudgeResultParams(questionId, requestId, examId) : null;
+  if (!params) {
+    return NextResponse.json({ message: "questionId 必须是数字 ID。" }, { status: 400 });
+  }
 
   const payload = await requestJson<ApiEnvelope<BackendJudgeResult>>(
     `/friend/user/question/exe/result?${params.toString()}`,

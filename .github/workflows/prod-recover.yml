@@ -87,6 +87,11 @@ jobs:
           cd repo
           printf '%s\n' "${{ secrets.STACK_ENV_PROD }}" > "${STACK_ENV_FILE}"
           printf '%s\n' "${{ secrets.RUNTIME_ENV_PROD }}" > "${RUNTIME_ENV_FILE}"
+          {
+            echo "NACOS_ENABLED=true"
+            echo "NACOS_CONFIG_ENABLED=true"
+            echo "NACOS_DISCOVERY_ENABLED=true"
+          } >> "${RUNTIME_ENV_FILE}"
           sed -i "s#sha-REPLACE_ME#${{ steps.meta.outputs.image_tag }}#g" "${STACK_ENV_FILE}"
 
       - name: Prepare worker SSH key

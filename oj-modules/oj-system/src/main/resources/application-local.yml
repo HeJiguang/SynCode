@@ -1,0 +1,19 @@
+server:
+  port: ${SERVER_PORT:9201}
+
+jwt:
+  secret: ${JWT_SECRET:zshadioasjdkasdsadassa}
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:bitoj_dev}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai}
+    username: ${SPRING_DATASOURCE_USERNAME:${MYSQL_APP_USER:ojtest}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${MYSQL_PASSWORD:change-me-local}}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:16379}
+      password: ${REDIS_PASSWORD:change-me-local}
+  elasticsearch:
+    uris: ${SPRING_ELASTICSEARCH_URIS:http://127.0.0.1:9200}

@@ -33,4 +33,24 @@ class JudgeResultPubSubBridgeTest {
                 "req-1".equals(result.getRequestId())
                         && Integer.valueOf(JudgeAsyncStatus.SUCCESS.getValue()).equals(result.getAsyncStatus())));
     }
+
+    @Test
+    void redisMessageSupportsDoubleEncodedJsonPayload() {
+        JudgeResultSessionRegistry registry = mock(JudgeResultSessionRegistry.class);
+        JudgeResultPubSubBridge bridge = new JudgeResultPubSubBridge(registry);
+        JudgeResultPushDTO dto = new JudgeResultPushDTO();
+        dto.setRequestId("req-2");
+        dto.setUserId(1002L);
+        dto.setAsyncStatus(JudgeAsyncStatus.SUCCESS.getValue());
+        dto.setFinishTime(LocalDateTime.now());
+        Message message = mock(Message.class);
+        String payload = JSON.toJSONString(JSON.toJSONString(dto));
+        when(message.getBody()).thenReturn(payload.getBytes());
+
+        bridge.onMessage(message, null);
+
+        verify(registry).pushFinalResult(argThat(result ->
+                "req-2".equals(result.getRequestId())
+                        && Integer.valueOf(JudgeAsyncStatus.SUCCESS.getValue()).equals(result.getAsyncStatus())));
+    }
 }

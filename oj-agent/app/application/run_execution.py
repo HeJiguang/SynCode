@@ -132,12 +132,12 @@ def _task_type_for_run(run_type: RunType) -> TaskType:
 # 根据不同任务类型，补默认提示
 def _default_prompt_for_run(run_type: RunType) -> str:
     if run_type is RunType.INTERACTIVE_DIAGNOSIS:
-        return "Help me diagnose the latest failure."
+        return "请帮我诊断最近一次失败。"
     if run_type is RunType.INTERACTIVE_RECOMMENDATION:
-        return "Recommend the next practice step."
+        return "请推荐下一步练习。"
     if run_type is RunType.INTERACTIVE_REVIEW:
-        return "Review my recent practice and summarize the next step."
-    return "Help me with the current workspace problem."
+        return "请复盘我最近的练习，并总结下一步。"
+    return "请帮助我解决当前工作区里的问题。"
 
 
 def _coerce_int(raw: str | None) -> int | None:

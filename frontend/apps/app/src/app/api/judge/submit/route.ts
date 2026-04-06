@@ -9,6 +9,7 @@ import {
   unwrapData
 } from "@aioj/api";
 
+import { buildJudgeSubmitPayload } from "../../../../lib/judge-route-contracts";
 import { getServerAccessToken } from "../../../../lib/server-auth";
 
 type SubmitBody = {
@@ -30,14 +31,9 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json()) as SubmitBody;
-  const questionId = Number(body.questionId);
-  const examId = body.examId ? Number(body.examId) : undefined;
   const language = body.language;
   const code = body.code?.trim();
 
-  if (!Number.isFinite(questionId)) {
-    return NextResponse.json({ message: "questionId 必须是后端可识别的数字 ID。" }, { status: 400 });
-  }
   if (!language || !isJudgeLanguageSupported(language)) {
     return NextResponse.json({ message: "当前真实判题仅支持 Java。" }, { status: 400 });
   }
@@ -45,15 +41,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "提交代码不能为空。" }, { status: 400 });
   }
 
+  const payloadBody = buildJudgeSubmitPayload(body, programTypeFromLanguage(language), code);
+  if (!payloadBody) {
+    return NextResponse.json({ message: "questionId 必须是后端可识别的数字 ID。" }, { status: 400 });
+  }
+
   const payload = await requestJson<ApiEnvelope<AsyncSubmitResponse>>("/friend/user/question/rabbit/submit", {
     method: "POST",
     token,
-    body: JSON.stringify({
-      questionId,
-      examId: Number.isFinite(examId) ? examId : undefined,
-      programType: programTypeFromLanguage(language),
-      userCode: code
-    })
+    body: JSON.stringify(payloadBody)
   });
 
   return NextResponse.json(unwrapData(payload));

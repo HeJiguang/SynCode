@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -16,6 +17,7 @@ from app.services.discovery_service import DiscoveryService
 from app.services.execution_service import ExecutionService
 from app.services.generation_service import GenerationService
 from app.services.importer_service import ImporterService
+from app.services.llm_config_service import LLMConfigService
 from app.services.oj_reader import OJReader
 from app.services.remote_db_config_service import RemoteDatabaseConfigService
 from app.services.review_pack_service import ReviewPackService
@@ -46,7 +48,7 @@ UPLOAD_STATUS_LABELS = {
 DEDUP_DECISION_LABELS = {
     "probable_duplicate": "高度疑似重复题",
     "similar_problem": "疑似同类题",
-    "likely_distinct": "大概率不同题",
+    "likely_distinct": "大概率不是同题",
     "no-scan": "未查重",
 }
 
@@ -128,6 +130,10 @@ def save_database_settings(
         username=username,
         password=password,
     )
+    request.app.state.settings = replace(
+        request.app.state.settings,
+        oj_database_url=config_service.build_database_url(config),
+    )
     context = {
         "request": request,
         "page_title": "远端数据库配置",
@@ -155,6 +161,10 @@ def test_database_settings(
         username=username,
         password=password,
     )
+    request.app.state.settings = replace(
+        request.app.state.settings,
+        oj_database_url=config_service.build_database_url(config),
+    )
     result = config_service.test_connection(config)
     context = {
         "request": request,
@@ -165,6 +175,47 @@ def test_database_settings(
     return templates.TemplateResponse(request, "database_settings.html", context)
 
 
+@router.get("/settings/llm", response_class=HTMLResponse)
+def llm_settings_page(
+    request: Request,
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    config = LLMConfigService(session).get_active_config()
+    context = {
+        "request": request,
+        "page_title": "模型配置",
+        "config": config,
+        "saved_message": None,
+    }
+    return templates.TemplateResponse(request, "llm_settings.html", context)
+
+
+@router.post("/settings/llm/save", response_class=HTMLResponse)
+def save_llm_settings(
+    request: Request,
+    enabled: str = Form(...),
+    base_url: str = Form(""),
+    model: str = Form(""),
+    api_key: str = Form(""),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    llm_service = LLMConfigService(session)
+    config = llm_service.save_active_config(
+        enabled=enabled.lower() == "true",
+        base_url=base_url,
+        api_key=api_key,
+        model=model,
+    )
+    request.app.state.settings = llm_service.apply_to_settings(request.app.state.settings)
+    context = {
+        "request": request,
+        "page_title": "模型配置",
+        "config": config,
+        "saved_message": "模型配置已保存到本地 SQLite，后续生成候选题会自动使用这套配置。",
+    }
+    return templates.TemplateResponse(request, "llm_settings.html", context)
+
+
 @router.get("/candidates", response_class=HTMLResponse)
 def candidate_list(
     request: Request,
@@ -172,7 +223,7 @@ def candidate_list(
 ) -> HTMLResponse:
     service = CandidateService(session)
     dedup_service = DedupService(session)
-    importer = ImporterService(get_app_settings(), session=session)
+    importer = ImporterService(request.app.state.settings, session=session)
     candidates = service.list_candidates()
     candidate_rows = []
     for candidate in candidates:
@@ -200,6 +251,18 @@ def candidate_list(
         "importer": importer,
     }
     return templates.TemplateResponse(request, "candidate_list.html", context)
+
+
+@router.post("/candidates/bulk-delete")
+async def bulk_delete_candidates(
+    request: Request,
+    session: Session = Depends(get_db_session),
+) -> RedirectResponse:
+    form = await request.form()
+    raw_ids = form.getlist("candidate_ids")
+    candidate_ids = [int(item) for item in raw_ids if str(item).strip().isdigit()]
+    CandidateService(session).delete_candidates(candidate_ids)
+    return RedirectResponse(url="/candidates", status_code=303)
 
 
 @router.post("/imports/batch-upload", response_class=HTMLResponse)
@@ -303,7 +366,9 @@ async def fetch_reference_url(
     )
     service.update_candidate(
         candidate,
+        title=draft.localized_title,
         source_url=material["source_url"],
+        statement_markdown=draft.localized_statement_markdown,
         difficulty=draft.difficulty,
         algorithm_tag=draft.algorithm_tag,
         knowledge_tags=draft.knowledge_tags,
@@ -345,7 +410,9 @@ async def batch_fetch_reference_urls(
         )
         service.update_candidate(
             candidate,
+            title=draft.localized_title,
             source_url=material["source_url"],
+            statement_markdown=draft.localized_statement_markdown,
             difficulty=draft.difficulty,
             algorithm_tag=draft.algorithm_tag,
             knowledge_tags=draft.knowledge_tags,
@@ -361,6 +428,84 @@ async def batch_fetch_reference_urls(
         )
         _refresh_candidate_dedup(session, settings, candidate)
     return RedirectResponse(url="/candidates", status_code=303)
+
+
+@router.post("/discover/paste")
+def paste_problem_text(
+    source_platform: str = Form(...),
+    title: str = Form(...),
+    statement_markdown: str = Form(...),
+    session: Session = Depends(get_db_session),
+    settings=Depends(get_app_settings),
+) -> RedirectResponse:
+    service = CandidateService(session)
+    candidate = service.create_candidate(
+        title=title,
+        source_type="pasted_text",
+        source_platform=source_platform,
+        statement_markdown=statement_markdown,
+    )
+    draft = GenerationService(ai_client=AIClient(settings)).generate_from_statement(
+        title=title,
+        statement_markdown=statement_markdown,
+    )
+    service.update_candidate(
+        candidate,
+        title=draft.localized_title,
+        statement_markdown=draft.localized_statement_markdown,
+        difficulty=draft.difficulty,
+        algorithm_tag=draft.algorithm_tag,
+        knowledge_tags=draft.knowledge_tags,
+        estimated_minutes=draft.estimated_minutes,
+        time_limit_ms=draft.time_limit_ms,
+        space_limit_kb=draft.space_limit_kb,
+        question_case_json=draft.question_case_json,
+        default_code_java=draft.default_code_java,
+        main_fuc_java=draft.main_fuc_java,
+        solution_outline=draft.solution_outline,
+        solution_code_java=draft.solution_code_java,
+        status=CandidateStatus.ARTIFACTS_GENERATED,
+    )
+    _refresh_candidate_dedup(session, settings, candidate)
+    return RedirectResponse(url=f"/candidates/{candidate.candidate_id}", status_code=303)
+
+
+@router.post("/discover/similar")
+def generate_similar_problem(
+    source_platform: str = Form(...),
+    title: str = Form(...),
+    statement_markdown: str = Form(...),
+    session: Session = Depends(get_db_session),
+    settings=Depends(get_app_settings),
+) -> RedirectResponse:
+    service = CandidateService(session)
+    draft = GenerationService(ai_client=AIClient(settings)).generate_similar_problem(
+        title=title,
+        statement_markdown=statement_markdown,
+    )
+    candidate = service.create_candidate(
+        title=draft.localized_title,
+        source_type="similar_generated",
+        source_platform=source_platform,
+        statement_markdown=draft.localized_statement_markdown,
+    )
+    service.update_candidate(
+        candidate,
+        difficulty=draft.difficulty,
+        algorithm_tag=draft.algorithm_tag,
+        knowledge_tags=draft.knowledge_tags,
+        estimated_minutes=draft.estimated_minutes,
+        time_limit_ms=draft.time_limit_ms,
+        space_limit_kb=draft.space_limit_kb,
+        question_case_json=draft.question_case_json,
+        default_code_java=draft.default_code_java,
+        main_fuc_java=draft.main_fuc_java,
+        solution_outline=draft.solution_outline,
+        solution_code_java=draft.solution_code_java,
+        status=CandidateStatus.ARTIFACTS_GENERATED,
+    )
+    _refresh_candidate_dedup(session, settings, candidate)
+    return RedirectResponse(url=f"/candidates/{candidate.candidate_id}", status_code=303)
 
 
 @router.get("/candidates/{candidate_id}", response_class=HTMLResponse)
@@ -434,6 +579,55 @@ def save_candidate(
     return RedirectResponse(url=f"/candidates/{candidate_id}", status_code=303)
 
 
+@router.post("/candidates/{candidate_id}/regenerate")
+def regenerate_candidate_from_form(
+    candidate_id: int,
+    title: str = Form(...),
+    difficulty: str = Form(default=""),
+    algorithm_tag: str = Form(default=""),
+    knowledge_tags: str = Form(default=""),
+    estimated_minutes: str = Form(default=""),
+    time_limit_ms: str = Form(default=""),
+    space_limit_kb: str = Form(default=""),
+    statement_markdown: str = Form(default=""),
+    question_case_json: str = Form(default="[]"),
+    default_code_java: str = Form(default=""),
+    main_fuc_java: str = Form(default=""),
+    solution_outline: str = Form(default=""),
+    solution_code_java: str = Form(default=""),
+    session: Session = Depends(get_db_session),
+    settings=Depends(get_app_settings),
+) -> RedirectResponse:
+    service = CandidateService(session)
+    candidate = service.get_candidate(candidate_id)
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="未找到候选题。")
+
+    draft = GenerationService(ai_client=AIClient(settings)).generate_from_statement(
+        title=title,
+        statement_markdown=statement_markdown,
+    )
+    service.update_candidate(
+        candidate,
+        title=draft.localized_title,
+        statement_markdown=draft.localized_statement_markdown,
+        difficulty=draft.difficulty,
+        algorithm_tag=draft.algorithm_tag,
+        knowledge_tags=draft.knowledge_tags,
+        estimated_minutes=draft.estimated_minutes,
+        time_limit_ms=draft.time_limit_ms,
+        space_limit_kb=draft.space_limit_kb,
+        question_case_json=draft.question_case_json,
+        default_code_java=draft.default_code_java,
+        main_fuc_java=draft.main_fuc_java,
+        solution_outline=draft.solution_outline,
+        solution_code_java=draft.solution_code_java,
+        status=CandidateStatus.ARTIFACTS_GENERATED,
+    )
+    _refresh_candidate_dedup(session, settings, candidate)
+    return RedirectResponse(url=f"/candidates/{candidate_id}", status_code=303)
+
+
 @router.post("/candidates/{candidate_id}/generate")
 def generate_candidate(
     candidate_id: int,
@@ -450,6 +644,8 @@ def generate_candidate(
     )
     service.update_candidate(
         candidate,
+        title=draft.localized_title,
+        statement_markdown=draft.localized_statement_markdown,
         difficulty=draft.difficulty,
         algorithm_tag=draft.algorithm_tag,
         knowledge_tags=draft.knowledge_tags,
@@ -622,4 +818,4 @@ def _format_dedup_reason(reason: str) -> str:
             "tag": "标签相似度",
         }.get(key, key)
         segments.append(f"{label}={value}")
-    return "，".join(segments) if segments else reason
+    return "；".join(segments) if segments else reason

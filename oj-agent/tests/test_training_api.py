@@ -24,7 +24,7 @@ from app.runtime.models import (  # noqa: E402
 client = TestClient(app)
 
 
-def test_training_api_uses_runtime_engine(monkeypatch):
+def test_training_api_uses_llm_runtime(monkeypatch):
     import app.api.training as training_module  # noqa: WPS433
 
     monkeypatch.setattr(
@@ -35,15 +35,15 @@ def test_training_api_uses_runtime_engine(monkeypatch):
                 trace_id="trace-training-api-001",
                 user_id="1",
                 task_type=TaskType.TRAINING_PLAN,
-                user_message="Generate training plan.",
+                user_message="生成训练计划。",
             ),
             execution=ExecutionState(
                 run_id="run-training-api-001",
-                graph_name="supervisor_graph",
+                graph_name="llm_runtime",
                 status=RunStatus.SUCCEEDED,
-                active_node="plan_graph",
+                active_node="training_plan_llm",
             ),
-            evidence=EvidenceState(),
+            evidence=EvidenceState(route_names=["llm_only"]),
             guardrail=GuardrailState(
                 risk_level=RiskLevel.LOW,
                 completeness_ok=True,
@@ -101,3 +101,28 @@ def test_training_api_uses_runtime_engine(monkeypatch):
     payload = response.json()
     assert payload["plan_title"] == "Runtime Plan"
     assert payload["tasks"][0]["title_snapshot"] == "Two Sum"
+
+
+def test_training_api_returns_503_when_llm_runtime_unavailable(monkeypatch):
+    import app.api.training as training_module  # noqa: WPS433
+
+    monkeypatch.setattr(
+        training_module,
+        "execute_training_plan_request",
+        lambda request: (_ for _ in ()).throw(RuntimeError("未配置可用的大模型。")),
+        raising=False,
+    )
+
+    response = client.post(
+        "/api/training/plan",
+        json={
+            "trace_id": "trace-training-api-002",
+            "user_id": 1,
+            "current_level": "starter",
+            "target_direction": "algorithm_foundation",
+            "candidate_questions": [],
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "未配置可用的大模型。"

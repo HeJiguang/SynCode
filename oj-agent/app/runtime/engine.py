@@ -3,20 +3,16 @@ from typing import Callable
 
 from app.evaluation.hooks import build_chat_eval_record, build_plan_eval_record
 from app.evaluation.store import evaluation_store
-from app.graphs.supervisor_graph import build_supervisor_graph
 from app.observability.query_ledger import QueryLedgerEntry, query_ledger
 from app.observability.trace import NodeTraceEvent, RunTrace, trace_store
-from app.runtime.context import build_request_context
-from app.runtime.enums import TaskType
+from app.services.llm_runtime_service import execute_chat_with_llm, execute_training_plan_with_llm
 from app.runtime.models import RequestContext, UnifiedAgentState
 from app.schemas.training_plan_request import TrainingPlanRequest
 
 
 def invoke_request_context(request_context: RequestContext) -> UnifiedAgentState:
-    """Run the supervisor graph for one request context."""
-    graph = build_supervisor_graph()
-    result = graph.invoke({"request": request_context})
-    return result["unified_state"]
+    """Run one request through the LLM-only runtime."""
+    return execute_chat_with_llm(request_context)
 
 
 def _record_runtime_state(
@@ -25,7 +21,6 @@ def _record_runtime_state(
     output_type: str,
     eval_builder: Callable[[UnifiedAgentState], dict],
 ) -> None:
-    """Persist trace, query-ledger, and evaluation records for one runtime run."""
     trace_store.record_run(
         RunTrace(
             trace_id=state.request.trace_id,
@@ -87,7 +82,7 @@ def _record_runtime_state(
 def record_chat_state(state: UnifiedAgentState) -> None:
     _record_runtime_state(
         state,
-        output_type=state.outcome.intent or "interactive_learning",
+        output_type=state.outcome.intent or "llm_chat",
         eval_builder=build_chat_eval_record,
     )
 
@@ -104,7 +99,6 @@ def execute_request_context(
     request_context: RequestContext,
     headers: Mapping[str, str | None],
 ) -> UnifiedAgentState:
-    """Execute one request-context run through the graph-native runtime."""
     del headers
     state = invoke_request_context(request_context)
     record_chat_state(state)
@@ -112,20 +106,6 @@ def execute_request_context(
 
 
 def execute_training_plan_request(request: TrainingPlanRequest) -> UnifiedAgentState:
-    """Execute the planning graph and persist the resulting runtime records."""
-    request_context = build_request_context(
-        trace_id=request.trace_id,
-        user_id=str(request.user_id),
-        task_type=TaskType.TRAINING_PLAN,
-        user_message="Generate training plan.",
-    )
-    graph = build_supervisor_graph()
-    result = graph.invoke(
-        {
-            "request": request_context,
-            "training_request": request,
-        }
-    )
-    state = result["unified_state"]
+    state = execute_training_plan_with_llm(request)
     record_training_plan_state(state)
     return state

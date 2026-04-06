@@ -692,7 +692,7 @@ export function EditorPanel({
         </div>
       </div>
 
-      <div className="code-editor-frame flex min-h-0 flex-1 flex-col">
+      <div className="code-editor-frame flex min-h-[260px] flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-[var(--border-soft)] bg-[var(--surface-2)] px-4 py-2">
           <div className="flex items-center gap-2">
             <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
@@ -758,7 +758,7 @@ export function EditorPanel({
         ) : null}
 
         {showConsole ? (
-          <div className="border-b border-[var(--border-soft)] bg-[var(--surface-1)] p-4">
+          <div className="max-h-[46vh] shrink-0 overflow-auto border-b border-[var(--border-soft)] bg-[var(--surface-1)] p-4">
             <div className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">

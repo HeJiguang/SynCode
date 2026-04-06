@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import re
 
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
-from sqlalchemy import select
 
 from app.models.candidate import CandidateProblem, CandidateStatus, UploadStatus
+from app.models.dedup_match import DedupMatch
 
 
 class CandidateService:
@@ -55,6 +56,17 @@ class CandidateService:
         self.session.commit()
         self.session.refresh(candidate)
         return candidate
+
+    def delete_candidates(self, candidate_ids: list[int]) -> int:
+        normalized_ids = [candidate_id for candidate_id in candidate_ids if candidate_id]
+        if not normalized_ids:
+            return 0
+        self.session.execute(delete(DedupMatch).where(DedupMatch.candidate_id.in_(normalized_ids)))
+        deleted = self.session.query(CandidateProblem).filter(CandidateProblem.candidate_id.in_(normalized_ids)).delete(
+            synchronize_session=False
+        )
+        self.session.commit()
+        return int(deleted)
 
     @staticmethod
     def _slugify(value: str) -> str:

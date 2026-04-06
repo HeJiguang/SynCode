@@ -93,7 +93,7 @@ class Run(BaseModel):
     trace_id: str = Field(default_factory=lambda: f"trace_{uuid4().hex}")
     conversation_id: str | None = None
     status: RunStatus = RunStatus.ACCEPTED
-    entry_graph: str = "supervisor_graph"
+    entry_graph: str = "llm_runtime"
     active_node: str | None = None
     priority: RunPriority = RunPriority.MEDIUM
     context_ref: ContextRef = Field(default_factory=ContextRef)
@@ -110,4 +110,3 @@ class RunEvent(BaseModel):
     level: EventLevel = EventLevel.INFO
     timestamp: str = Field(default_factory=utc_now_iso)
     payload: dict[str, Any] = Field(default_factory=dict)
-

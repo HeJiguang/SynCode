@@ -24,9 +24,9 @@ def _build_state(task_type: TaskType) -> UnifiedAgentState:
         ),
         execution=ExecutionState(
             run_id="run-eval-001",
-            graph_name="supervisor_graph",
+            graph_name="llm_runtime",
             status=RunStatus.SUCCEEDED,
-            active_node="tutor_graph" if task_type is TaskType.CHAT else "plan_graph",
+            active_node="response_packaging" if task_type is TaskType.CHAT else "training_plan_llm",
         ),
         evidence=EvidenceState(
             items=[
@@ -39,7 +39,7 @@ def _build_state(task_type: TaskType) -> UnifiedAgentState:
                     recall_score=0.9,
                 )
             ],
-            route_names=["lexical"],
+            route_names=["llm_only"],
             coverage_score=1.0,
         ),
         guardrail=GuardrailState(
@@ -52,7 +52,7 @@ def _build_state(task_type: TaskType) -> UnifiedAgentState:
             answer="Answer body" if task_type is TaskType.CHAT else None,
             next_action="Trace the failing sample.",
             confidence=0.91,
-            status_events=[{"node": "tutor_graph", "message": "Completed tutor graph."}],
+            status_events=[{"node": "response_packaging", "message": "Completed model response packaging."}],
         ),
     )
 
@@ -71,5 +71,5 @@ def test_build_plan_eval_record_contains_plan_focused_summary():
 
     assert record["trace_id"] == "trace-eval-001"
     assert record["task_type"] == "training_plan"
-    assert record["graph_name"] == "supervisor_graph"
-    assert record["route_names"] == ["lexical"]
+    assert record["graph_name"] == "llm_runtime"
+    assert record["route_names"] == ["llm_only"]

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { buildAuthHeaders, resolveBackendBaseUrl } from "@aioj/api";
+import { buildAuthHeaders } from "@aioj/api";
 
+import { resolveAgentApiBaseUrl } from "../../../../../../lib/agent-base-url";
 import { getServerAccessToken } from "../../../../../../lib/server-auth";
-
 
 type RouteProps = {
   params: Promise<{ runId: string }>;
@@ -18,10 +18,10 @@ export async function GET(_request: Request, { params }: RouteProps) {
     if (value) headers.set(key, value);
   }
 
-  const upstream = await fetch(`${resolveBackendBaseUrl()}/api/runs/${encodeURIComponent(runId)}/events`, {
+  const upstream = await fetch(`${resolveAgentApiBaseUrl()}/api/runs/${encodeURIComponent(runId)}/events`, {
     method: "GET",
     headers,
-    cache: "no-store",
+    cache: "no-store"
   });
 
   if (!upstream.ok || !upstream.body) {
@@ -34,7 +34,7 @@ export async function GET(_request: Request, { params }: RouteProps) {
     headers: {
       "Content-Type": upstream.headers.get("content-type") ?? "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-    },
+      Connection: "keep-alive"
+    }
   });
 }

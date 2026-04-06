@@ -3,6 +3,7 @@ package com.sintao.judge.rabbit;
 import com.rabbitmq.client.Channel;
 import com.sintao.api.domain.dto.JudgeSubmitDTO;
 import com.sintao.common.core.enums.JudgeAsyncStatus;
+import com.sintao.common.redis.service.JudgeResultPushService;
 import com.sintao.common.redis.service.JudgeRuntimeStateService;
 import com.sintao.judge.domain.UserSubmit;
 import com.sintao.judge.mapper.UserSubmitMapper;
@@ -39,6 +40,9 @@ class JudgeConsumerTest {
 
     @Mock
     private JudgeRuntimeStateService judgeRuntimeStateService;
+
+    @Mock
+    private JudgeResultPushService judgeResultPushService;
 
     @Mock
     private Channel channel;
@@ -87,6 +91,7 @@ class JudgeConsumerTest {
         judgeConsumer.consume(dto, buildMessage(13L, 0), channel);
 
         verify(judgeRuntimeStateService).markDeadLetter("req-3", 1, "bad request");
+        verify(judgeResultPushService).publishFinalResult(any());
         verify(channel).basicAck(13L, false);
         verify(judgeRuntimeStateService).unlock("req-3");
     }

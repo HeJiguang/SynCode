@@ -3,12 +3,14 @@ package com.sintao.system.service.sysuser.impl;
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.sintao.common.core.constants.Constants;
 import com.sintao.common.core.constants.HttpConstants;
 import com.sintao.common.core.domain.LoginUser;
 import com.sintao.common.core.domain.R;
 import com.sintao.common.core.domain.vo.LoginUserVO;
 import com.sintao.common.core.enums.ResultCode;
 import com.sintao.common.core.enums.UserIdentity;
+import com.sintao.common.core.utils.ThreadLocalUtil;
 import com.sintao.common.security.exception.ServiceException;
 import com.sintao.common.security.service.TokenService;
 import com.sintao.system.domain.sysuser.SysUser;
@@ -92,6 +94,8 @@ public class SysUserServiceImpl implements ISysUserService {
         SysUser sysUser = new SysUser();
         sysUser.setUserAccount(sysUserSaveDTO.getUserAccount());
         sysUser.setPassword(BCryptUtils.encryptPassword(sysUserSaveDTO.getPassword()));
+        Long createBy = ThreadLocalUtil.get(Constants.USER_ID, Long.class);
+        sysUser.setCreateBy(createBy != null ? createBy : Constants.SYSTEM_USER_ID);
         return sysUserMapper.insert(sysUser);
     }
 

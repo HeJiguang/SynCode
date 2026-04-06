@@ -9,7 +9,7 @@ def test_in_memory_trace_store_records_run_and_node_events():
     run = RunTrace(
         trace_id="trace-001",
         run_id="run-001",
-        graph_name="supervisor_graph",
+        graph_name="llm_runtime",
         task_type="chat",
         user_id="u-1",
     )
@@ -19,14 +19,14 @@ def test_in_memory_trace_store_records_run_and_node_events():
         NodeTraceEvent(
             trace_id="trace-001",
             run_id="run-001",
-            graph_name="supervisor_graph",
-            node_name="tutor_graph",
+            graph_name="llm_runtime",
+            node_name="response_packaging",
             status="succeeded",
         )
     )
 
-    assert store.get_run("run-001").graph_name == "supervisor_graph"
-    assert store.list_node_events("run-001")[0].node_name == "tutor_graph"
+    assert store.get_run("run-001").graph_name == "llm_runtime"
+    assert store.list_node_events("run-001")[0].node_name == "response_packaging"
 
 
 def test_query_ledger_records_query_summary():
@@ -37,7 +37,7 @@ def test_query_ledger_records_query_summary():
         user_id="u-2",
         task_type="training_plan",
         request_text="Generate my next training plan.",
-        graph_path=["supervisor_graph", "plan_graph"],
+        graph_path=["llm_runtime", "training_plan_llm"],
         evidence_sources=["doc-1", "question-101"],
         output_type="plan_response",
         token_cost=123,
@@ -77,14 +77,14 @@ def test_trace_store_can_use_custom_repository():
     run = RunTrace(
         trace_id="trace-003",
         run_id="run-003",
-        graph_name="diagnose_graph",
+        graph_name="llm_runtime",
         task_type="diagnosis",
         user_id="u-3",
     )
 
     store.record_run(run)
 
-    assert repository.get_run("run-003").graph_name == "diagnose_graph"
+    assert repository.get_run("run-003").graph_name == "llm_runtime"
 
 
 def test_query_ledger_can_use_custom_repository():
@@ -109,7 +109,7 @@ def test_query_ledger_can_use_custom_repository():
         user_id="u-4",
         task_type="review",
         request_text="Summarize my recent practice.",
-        graph_path=["supervisor_graph", "review_graph"],
+        graph_path=["llm_runtime", "response_packaging"],
         evidence_sources=[],
         output_type="review_summary",
     )
@@ -126,15 +126,15 @@ def test_jsonl_trace_repository_persists_runs_and_events(tmp_path):
     run = RunTrace(
         trace_id="trace-file-001",
         run_id="run-file-001",
-        graph_name="supervisor_graph",
+        graph_name="llm_runtime",
         task_type="chat",
         user_id="u-file",
     )
     event = NodeTraceEvent(
         trace_id="trace-file-001",
         run_id="run-file-001",
-        graph_name="supervisor_graph",
-        node_name="review_graph",
+        graph_name="llm_runtime",
+        node_name="response_packaging",
         status="succeeded",
     )
 
@@ -142,7 +142,7 @@ def test_jsonl_trace_repository_persists_runs_and_events(tmp_path):
     repository.record_node_event(event)
 
     assert repository.get_run("run-file-001").task_type == "chat"
-    assert repository.list_node_events("run-file-001")[0].node_name == "review_graph"
+    assert repository.list_node_events("run-file-001")[0].node_name == "response_packaging"
     assert (tmp_path / "trace-runs.jsonl").exists()
     assert (tmp_path / "trace-node-events.jsonl").exists()
 
@@ -157,7 +157,7 @@ def test_jsonl_query_ledger_repository_persists_entries(tmp_path):
         user_id="u-file",
         task_type="review",
         request_text="Summarize my practice.",
-        graph_path=["supervisor_graph", "review_graph"],
+        graph_path=["llm_runtime", "response_packaging"],
         evidence_sources=["doc-1"],
         output_type="review_summary",
         token_cost=18,
@@ -166,7 +166,7 @@ def test_jsonl_query_ledger_repository_persists_entries(tmp_path):
 
     repository.append(entry)
 
-    assert repository.list_entries()[0].graph_path == ["supervisor_graph", "review_graph"]
+    assert repository.list_entries()[0].graph_path == ["llm_runtime", "response_packaging"]
     assert (tmp_path / "query-ledger.jsonl").exists()
 
 
@@ -180,7 +180,7 @@ def test_build_default_trace_store_can_use_file_repository(monkeypatch, tmp_path
     run = RunTrace(
         trace_id="trace-file-003",
         run_id="run-file-003",
-        graph_name="supervisor_graph",
+        graph_name="llm_runtime",
         task_type="diagnosis",
         user_id="u-file",
     )

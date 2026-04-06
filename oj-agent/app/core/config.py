@@ -39,7 +39,6 @@ class AgentSettings:
     llm_temperature: float
     llm_max_tokens: int
     llm_enabled: bool
-    llm_fallback_enabled: bool
     gateway_user_id_header: str
     rag_enabled: bool
     rag_doc_globs: tuple[str, ...]
@@ -264,7 +263,6 @@ def load_settings() -> AgentSettings:
         # 动态推断开关：如果有 API Key 且配置了模型，则自动认为大模型功能可用
         llm_enabled=bool(llm_api_key and (chat_model or training_model)),
         
-        llm_fallback_enabled=_read_bool(nacos_config, "OJ_AGENT_LLM_FALLBACK_ENABLED", ("llm", "fallback-enabled"), True),
         gateway_user_id_header=_read_str(nacos_config, "OJ_AGENT_GATEWAY_USER_ID_HEADER", ("agent", "gateway-user-id-header"), "X-User-Id") or "X-User-Id",
         rag_enabled=_read_bool(nacos_config, "OJ_AGENT_RAG_ENABLED", ("rag", "enabled"), True),
         rag_doc_globs=_read_globs(nacos_config),

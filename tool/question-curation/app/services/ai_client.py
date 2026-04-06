@@ -20,10 +20,9 @@ class AIClient:
         )
 
     def generate_candidate_draft(self, *, title: str, statement_markdown: str) -> dict | None:
-        if not self.enabled():
-            return None
-
         schema_hint = {
+            "localized_title": "两数求和",
+            "localized_statement_markdown": "给定两个整数 a 和 b，请编写函数返回它们的和。",
             "difficulty": 1,
             "algorithm_tag": "数学",
             "knowledge_tags": "基础运算, 函数实现, 输入解析",
@@ -32,42 +31,59 @@ class AIClient:
             "space_limit_kb": 262144,
             "question_case_json": '[{"input":"1 2","output":"3"}]',
             "default_code_java": "public class Solution {\n    public static int add(int a, int b) {\n        return 0;\n    }\n}",
-            "main_fuc_java": (
-                "public static void main(String[] args) throws Exception {\n"
-                "    java.io.BufferedReader reader = new java.io.BufferedReader(\n"
-                "        new java.io.InputStreamReader(System.in)\n"
-                "    );\n"
-                "    String[] parts = reader.readLine().trim().split(\"\\\\s+\");\n"
-                "    int a = Integer.parseInt(parts[0]);\n"
-                "    int b = Integer.parseInt(parts[1]);\n"
-                "    System.out.print(add(a, b));\n"
-                "}"
-            ),
-            "solution_outline": "解题思路：直接返回两个整数之和。时间复杂度 O(1)，空间复杂度 O(1)。",
+            "main_fuc_java": "public static void main(String[] args) throws Exception { }",
+            "solution_outline": "解题思路：直接返回两个整数之和。",
             "solution_code_java": "public class SolutionReference {\n    public static int add(int a, int b) {\n        return a + b;\n    }\n}",
         }
         system_prompt = (
-            "你正在为一个在线判题题库工具生成结构化候选题草稿。"
+            "你正在为一个中文在线判题题库工具生成结构化候选题草稿。"
             "必须只返回合法 JSON，不要输出任何解释。"
-            "这是一个中文为主的系统，algorithm_tag、knowledge_tags、solution_outline 应优先使用中文。"
-            "default_code_java 必须是给用户看的函数题模板：只保留 Solution 类和待实现函数，不要直接给出正确答案。"
-            "main_fuc_java 是平台内部包装代码，必须从标准输入读取数据、解析参数、调用 default_code_java 中的同名函数、输出结果。"
-            "main_fuc_java 严禁硬编码样例、严禁出现 add(1, 2) 这类固定参数调用、严禁直接构造示例数组。"
-            "question_case_json 必须是 JSON 字符串，里面的输入格式必须和 main_fuc_java 的解析逻辑一致。"
-            "solution_outline 必须是中文。"
-            "如果无法稳定推断复杂函数签名，请使用最简单且可运行的函数题模板。"
+            "localized_title、localized_statement_markdown、algorithm_tag、knowledge_tags、solution_outline 必须使用中文。"
+            "default_code_java 必须是给用户看的函数题模板，不要直接给出正确答案。"
+            "main_fuc_java 必须从标准输入读取数据并调用用户函数，严禁写死样例。"
         )
         user_prompt = (
             f"题目标题：\n{title}\n\n"
             f"题目描述：\n{statement_markdown}\n\n"
-            "请根据这道题返回一个 JSON 对象，且必须包含且只包含下面这些键：\n"
-            f"{json.dumps(schema_hint, ensure_ascii=False)}\n\n"
-            "要求：\n"
-            "1. default_code_java 和 main_fuc_java 必须完全配套。\n"
-            "2. 用户体验要像 LeetCode：用户只实现函数，不写 main。\n"
-            "3. main_fuc_java 要适配当前判题机：读取 stdin，调用函数，输出结果。\n"
-            "4. 如果题目是类似两数求和这种简单函数题，优先生成清晰的函数签名，而不是 solve(String input) 这种笼统模板。"
+            "请返回一个 JSON 对象，并且只包含这些键：\n"
+            f"{json.dumps(schema_hint, ensure_ascii=False)}"
         )
+        return self._call_json(system_prompt=system_prompt, user_prompt=user_prompt)
+
+    def generate_similar_candidate_draft(self, *, title: str, statement_markdown: str) -> dict | None:
+        schema_hint = {
+            "localized_title": "两数之和（巩固题）",
+            "localized_statement_markdown": "请生成一题与原题知识点相同、但叙事和样例不同的中文练习题。",
+            "difficulty": 1,
+            "algorithm_tag": "哈希表",
+            "knowledge_tags": "哈希表, 数组, 目标匹配",
+            "estimated_minutes": 10,
+            "time_limit_ms": 1000,
+            "space_limit_kb": 262144,
+            "question_case_json": '[{"input":"[1,8,11,15]\\n9","output":"[0,1]"}]',
+            "default_code_java": "public class Solution {\n    public static int[] twoSum(int[] nums, int target) {\n        return new int[0];\n    }\n}",
+            "main_fuc_java": "public static void main(String[] args) throws Exception { }",
+            "solution_outline": "解题思路：仍然使用哈希表。",
+            "solution_code_java": "public class SolutionReference {\n    public static int[] twoSum(int[] nums, int target) {\n        return new int[0];\n    }\n}",
+        }
+        system_prompt = (
+            "你正在为中文在线判题题库生成一题类似题。"
+            "必须只返回合法 JSON，不要输出任何解释。"
+            "新题必须与原题知识点相同或相近，但不能只是换标题。"
+            "要改变题目叙事、样例和部分细节，同时保持可判题。"
+            "localized_title、localized_statement_markdown、algorithm_tag、knowledge_tags、solution_outline 必须使用中文。"
+        )
+        user_prompt = (
+            f"原题标题：\n{title}\n\n"
+            f"原题描述：\n{statement_markdown}\n\n"
+            "请生成 1 道中文类似题，并返回一个 JSON 对象，只包含这些键：\n"
+            f"{json.dumps(schema_hint, ensure_ascii=False)}"
+        )
+        return self._call_json(system_prompt=system_prompt, user_prompt=user_prompt)
+
+    def _call_json(self, *, system_prompt: str, user_prompt: str) -> dict | None:
+        if not self.enabled():
+            return None
         response = httpx.post(
             f"{self.settings.llm_base_url.rstrip('/')}/chat/completions",
             headers={

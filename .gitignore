@@ -25,6 +25,7 @@ temp/
 docs/superpowers/
 deploy/dev/agent/
 deploy/dev/nacos/
+deploy/dev/local/local-env.ps1
 tmp-*.sql
 
 # Python caches

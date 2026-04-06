@@ -11,19 +11,20 @@ import java.time.LocalDateTime;
 @Component
 public class MyMetaObjectHandler implements MetaObjectHandler {
 
+    private Long currentUserIdOrSystem() {
+        Long userId = ThreadLocalUtil.get(Constants.USER_ID, Long.class);
+        return userId != null ? userId : Constants.SYSTEM_USER_ID;
+    }
+
     @Override
     public void insertFill(MetaObject metaObject) {
         this.strictInsertFill(metaObject, "createTime", LocalDateTime.class, LocalDateTime.now());
-        //创建�? 获取当前用户用户id  如何获取当前调用接口的用户的id呢？
-        this.strictInsertFill(metaObject, "createBy", Long.class, ThreadLocalUtil.get(Constants.USER_ID, Long.class));
+        this.strictInsertFill(metaObject, "createBy", Long.class, currentUserIdOrSystem());
     }
 
     @Override
     public void updateFill(MetaObject metaObject) {
-//        this.strictUpdateFill(metaObject, "updateTime", LocalDateTime.class, LocalDateTime.now());
         this.setFieldValByName("updateTime", LocalDateTime.now(), metaObject);
-        this.setFieldValByName("updateBy", ThreadLocalUtil.get(Constants.USER_ID, Long.class), metaObject);
-//        this.strictUpdateFill(metaObject, "updateBy", Long.class, ThreadLocalUtil.get(Constants.USER_ID, Long.class));
+        this.setFieldValByName("updateBy", currentUserIdOrSystem(), metaObject);
     }
 }
-

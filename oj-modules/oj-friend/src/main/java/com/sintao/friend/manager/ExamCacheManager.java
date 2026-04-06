@@ -103,11 +103,18 @@ public class ExamCacheManager {
     }
 
     public Long getFirstQuestion(Long examId) {
-        return redisService.indexForList(getExamQuestionListKey(examId), 0, Long.class);
+        Long questionId = redisService.indexForList(getExamQuestionListKey(examId), 0, Long.class);
+        if (questionId == null) {
+            throw new ServiceException(ResultCode.EXAM_NOT_HAS_QUESTION);
+        }
+        return questionId;
     }
 
     public Long preQuestion(Long examId, Long questionId) {
         Long index = redisService.indexOfForList(getExamQuestionListKey(examId), questionId);
+        if (index == null) {
+            throw new ServiceException(ResultCode.FAILED_NOT_EXISTS);
+        }
         if (index == 0) {
             throw new ServiceException(ResultCode.FAILED_FIRST_QUESTION);
         }
@@ -116,6 +123,9 @@ public class ExamCacheManager {
 
     public Long nextQuestion(Long examId, Long questionId) {
         Long index = redisService.indexOfForList(getExamQuestionListKey(examId), questionId);
+        if (index == null) {
+            throw new ServiceException(ResultCode.FAILED_NOT_EXISTS);
+        }
         long lastIndex = getExamQuestionListSize(examId) - 1;
         if (index == lastIndex) {
             throw new ServiceException(ResultCode.FAILED_LAST_QUESTION);

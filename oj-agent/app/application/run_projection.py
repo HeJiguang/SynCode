@@ -42,12 +42,12 @@ def build_failure_artifact(run_id: str, *, message: str) -> Artifact:
     return Artifact(
         run_id=run_id,
         artifact_type=ArtifactType.ANSWER_CARD,
-        title="Run failed",
-        summary="The runtime could not finish this request.",
+        title="运行失败",
+        summary="本次请求未能执行完成。",
         body={
             "intent": "run_failed",
             "answer": message,
-            "nextAction": "Retry the request after checking the latest workspace context.",
+            "nextAction": "检查大模型配置和当前上下文后重试；如仍失败，请重新发起一次请求。",
         },
         render_hint=RenderHint.TIMELINE_CARD,
     )
@@ -120,13 +120,13 @@ def register_runtime_write_intents(
 
 def _artifact_profile_for_intent(intent: str | None) -> tuple[ArtifactType, RenderHint, str]:
     profiles: Mapping[str, tuple[ArtifactType, RenderHint, str]] = {
-        "analyze_failure": (ArtifactType.DIAGNOSIS_REPORT, RenderHint.DIAGNOSIS, "Diagnosis summary"),
-        "recommend_question": (ArtifactType.RECOMMENDATION_PACK, RenderHint.RECOMMENDATION, "Practice recommendation"),
-        "review_summary": (ArtifactType.REVIEW_SUMMARY, RenderHint.MARKDOWN, "Practice review"),
-        "profile_update": (ArtifactType.PROFILE_DELTA, RenderHint.PROFILE_DELTA, "Profile update"),
-        "training_plan": (ArtifactType.TRAINING_PLAN, RenderHint.PLAN, "Training plan"),
+        "analyze_failure": (ArtifactType.DIAGNOSIS_REPORT, RenderHint.DIAGNOSIS, "诊断总结"),
+        "recommend_question": (ArtifactType.RECOMMENDATION_PACK, RenderHint.RECOMMENDATION, "练习建议"),
+        "review_summary": (ArtifactType.REVIEW_SUMMARY, RenderHint.MARKDOWN, "复盘总结"),
+        "profile_update": (ArtifactType.PROFILE_DELTA, RenderHint.PROFILE_DELTA, "画像更新"),
+        "training_plan": (ArtifactType.TRAINING_PLAN, RenderHint.PLAN, "训练计划"),
     }
-    return profiles.get(intent or "", (ArtifactType.ANSWER_CARD, RenderHint.MARKDOWN, "Assistant answer"))
+    return profiles.get(intent or "", (ArtifactType.ANSWER_CARD, RenderHint.MARKDOWN, "智能体回答"))
 
 
 def _summary_for_state(answer: str, next_action: str, response_payload: dict[str, object]) -> str:
@@ -138,7 +138,7 @@ def _summary_for_state(answer: str, next_action: str, response_payload: dict[str
         return first_line[:180]
     if next_action:
         return next_action[:180]
-    return "The runtime completed without a detailed summary."
+    return "本次运行已完成。"
 
 
 def _to_stored_write_intent(

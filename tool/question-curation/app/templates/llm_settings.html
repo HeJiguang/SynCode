@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="panel">
+  <h2>大模型配置</h2>
+  <p class="muted">这里保存的是题目生成器使用的大模型接口配置。配置会保存在本地 SQLite 工作库中，之后生成候选题会自动使用这里保存的配置。</p>
+</section>
+
+<section class="panel">
+  <form class="stack-form" method="post" action="/settings/llm/save">
+    <div class="two-column">
+      <label>
+        <span>是否启用 AI 生成</span>
+        <select name="enabled">
+          <option value="true" {% if config and config.enabled %}selected{% endif %}>启用</option>
+          <option value="false" {% if not config or not config.enabled %}selected{% endif %}>关闭</option>
+        </select>
+      </label>
+      <label>
+        <span>接口地址</span>
+        <input type="text" name="base_url" value="{{ config.base_url if config else '' }}" placeholder="https://api.deepseek.com">
+      </label>
+      <label>
+        <span>模型名称</span>
+        <input type="text" name="model" value="{{ config.model if config else '' }}" placeholder="deepseek-chat">
+      </label>
+      <label>
+        <span>API Key</span>
+        <input type="password" name="api_key" value="{{ config.api_key if config else '' }}">
+      </label>
+    </div>
+    <div class="action-row">
+      <button type="submit">保存模型配置</button>
+    </div>
+  </form>
+  {% if saved_message %}
+    <p class="muted">{{ saved_message }}</p>
+  {% endif %}
+</section>
+{% endblock %}

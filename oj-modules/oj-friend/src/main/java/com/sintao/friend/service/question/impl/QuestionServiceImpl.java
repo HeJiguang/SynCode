@@ -8,6 +8,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.github.pagehelper.PageHelper;
 import com.sintao.common.core.constants.Constants;
 import com.sintao.common.core.domain.TableDataInfo;
+import com.sintao.common.core.enums.ResultCode;
+import com.sintao.common.security.exception.ServiceException;
 import com.sintao.friend.domain.question.Question;
 import com.sintao.friend.domain.question.QuestionCase;
 import com.sintao.friend.domain.question.dto.QuestionQueryDTO;
@@ -26,6 +28,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.elasticsearch.NoSuchIndexException;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -50,7 +53,7 @@ public class QuestionServiceImpl implements IQuestionService {
 
     @Override
     public TableDataInfo list(QuestionQueryDTO questionQueryDTO) {
-        long count = questionRepository.count();
+        long count = countIndexedQuestions();
         if (count <= 0) {
             refreshQuestion();
         }
@@ -93,7 +96,7 @@ public class QuestionServiceImpl implements IQuestionService {
 
     @Override
     public QuestionDetailVO detail(Long questionId) {
-        QuestionES questionES = questionRepository.findById(questionId).orElse(null);
+        QuestionES questionES = findIndexedQuestion(questionId);
         QuestionDetailVO questionDetailVO = new QuestionDetailVO();
         if (questionES != null) {
             BeanUtil.copyProperties(questionES, questionDetailVO);
@@ -116,7 +119,7 @@ public class QuestionServiceImpl implements IQuestionService {
         if (listSize == null || listSize <= 0) {
             questionCacheManager.refreshCache();
         }
-        return questionCacheManager.preQuestion(questionId).toString();
+        return navigateQuestion(() -> questionCacheManager.preQuestion(questionId));
     }
 
     @Override
@@ -125,7 +128,7 @@ public class QuestionServiceImpl implements IQuestionService {
         if (listSize == null || listSize <= 0) {
             questionCacheManager.refreshCache();
         }
-        return questionCacheManager.nextQuestion(questionId).toString();
+        return navigateQuestion(() -> questionCacheManager.nextQuestion(questionId));
     }
 
     private void refreshQuestion() {
@@ -135,6 +138,36 @@ public class QuestionServiceImpl implements IQuestionService {
         }
         List<QuestionES> questionESList = BeanUtil.copyToList(questionList, QuestionES.class);
         questionRepository.saveAll(questionESList);
+    }
+
+    private long countIndexedQuestions() {
+        try {
+            return questionRepository.count();
+        } catch (NoSuchIndexException ex) {
+            log.info("question index missing, will rebuild from database");
+            return 0L;
+        }
+    }
+
+    private QuestionES findIndexedQuestion(Long questionId) {
+        try {
+            return questionRepository.findById(questionId).orElse(null);
+        } catch (NoSuchIndexException ex) {
+            log.info("question index missing while reading detail, will rebuild from database, questionId={}", questionId);
+            return null;
+        }
+    }
+
+    private String navigateQuestion(java.util.function.Supplier<Object> navigation) {
+        try {
+            return navigation.get().toString();
+        } catch (ServiceException exception) {
+            if (exception.getResultCode() != ResultCode.FAILED_NOT_EXISTS) {
+                throw exception;
+            }
+            questionCacheManager.refreshCache();
+            return navigation.get().toString();
+        }
     }
 
     private List<QuestionVO> assembleQuestionVOList(List<Long> hotQuestionIdList) {

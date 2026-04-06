@@ -2,12 +2,12 @@
 
 {% block content %}
 <section class="panel">
-  <h2>题目来源导入</h2>
-  <p class="muted">以题目链接导入为主流程，搜索只作为补充参考，不再是主要入口。</p>
+  <h2>题目来源与题目加工</h2>
+  <p class="muted">这里支持三类主流程：导入并补全原题、粘贴题面并补全、基于原题生成类似题。搜索只作为补充参考。</p>
 </section>
 
 <section class="panel">
-  <h3>导入单题链接</h3>
+  <h3>导入单题链接并补全</h3>
   <form class="stack-form" method="post" action="/discover/fetch">
     <label>
       <span>来源平台</span>
@@ -17,7 +17,55 @@
       <span>题目链接</span>
       <input type="url" name="source_url" placeholder="https://..." required>
     </label>
-    <button type="submit">抓取并创建候选题</button>
+    <button type="submit">抓取并补全这道题</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h3>直接粘贴题面并补全</h3>
+  <form class="stack-form" method="post" action="/discover/paste">
+    <label>
+      <span>来源平台</span>
+      <input type="text" name="source_platform" value="pasted" required>
+    </label>
+    <label>
+      <span>题目标题</span>
+      <input type="text" name="title" placeholder="例如：两数之和" required>
+    </label>
+    <label>
+      <span>题目信息</span>
+      <textarea
+        name="statement_markdown"
+        rows="12"
+        placeholder="把你复制过来的题面、输入输出说明、示例输入输出直接粘贴到这里"
+        required
+      ></textarea>
+    </label>
+    <button type="submit">解析并补全这道题</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h3>基于原题生成类似题</h3>
+  <form class="stack-form" method="post" action="/discover/similar">
+    <label>
+      <span>来源平台</span>
+      <input type="text" name="source_platform" value="generated" required>
+    </label>
+    <label>
+      <span>原题标题</span>
+      <input type="text" name="title" placeholder="例如：两数之和" required>
+    </label>
+    <label>
+      <span>原题题面</span>
+      <textarea
+        name="statement_markdown"
+        rows="12"
+        placeholder="粘贴一题原题的题面和样例，系统会基于这道题生成一题同知识点的类似题"
+        required
+      ></textarea>
+    </label>
+    <button type="submit">生成类似题</button>
   </form>
 </section>
 
@@ -70,7 +118,7 @@
       {% endfor %}
     </div>
   {% else %}
-    <p class="muted">当前还没有搜索结果。搜索只是辅助入口，主流程仍然是直接导入题目链接。</p>
+    <p class="muted">当前还没有搜索结果。搜索只是辅助入口，主流程仍然是导入原题、粘贴题面补全、或基于原题生成类似题。</p>
   {% endif %}
 </section>
 {% endblock %}

@@ -13,6 +13,7 @@ import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.Collection;
 import java.util.Objects;
@@ -50,6 +51,17 @@ public class GlobalExceptionHandler {
     public R<Void> handleBindException(BindException e) {
         log.error(e.getMessage());
         String message = join(e.getAllErrors(), DefaultMessageSourceResolvable::getDefaultMessage, ", ");
+        return R.fail(ResultCode.FAILED_PARAMS_VALIDATE.getCode(), message);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public R<Void> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException e,
+                                                             HttpServletRequest request) {
+        String requestURI = request.getRequestURI();
+        String parameterName = e.getName();
+        Object invalidValue = e.getValue();
+        String message = String.format("参数 '%s' 的值 '%s' 无效", parameterName, invalidValue);
+        log.warn("请求地址 '{}'，参数类型转换失败，parameter={}, value={}", requestURI, parameterName, invalidValue);
         return R.fail(ResultCode.FAILED_PARAMS_VALIDATE.getCode(), message);
     }
 

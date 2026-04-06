@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 import type { AiRunCreateResponse } from "@aioj/api";
 import { requestJson } from "@aioj/api";
 
+import { resolveAgentApiBaseUrl } from "../../../../lib/agent-base-url";
 import { getServerAccessToken } from "../../../../lib/server-auth";
-
 
 export async function POST(request: Request) {
   const token = await getServerAccessToken();
@@ -17,7 +17,8 @@ export async function POST(request: Request) {
   const payload = await requestJson<AiRunCreateResponse>("/api/runs", {
     method: "POST",
     token,
-    body: JSON.stringify(body),
+    baseUrl: resolveAgentApiBaseUrl(),
+    body: JSON.stringify(body)
   });
 
   return NextResponse.json(payload);

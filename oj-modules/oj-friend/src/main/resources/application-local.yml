@@ -1,9 +1,38 @@
+server:
+  port: ${SERVER_PORT:9202}
+
+jwt:
+  secret: ${JWT_SECRET:zshadioasjdkasdsadassa}
+
 spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:bitoj_dev}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai}
+    username: ${SPRING_DATASOURCE_USERNAME:${MYSQL_APP_USER:ojtest}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${MYSQL_PASSWORD:change-me-local}}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:16379}
+      password: ${REDIS_PASSWORD:change-me-local}
   rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_DEFAULT_USER:admin}
+    password: ${RABBITMQ_DEFAULT_PASS:change-me-local}
     publisher-confirm-type: correlated
     publisher-returns: true
     template:
       mandatory: true
+  cloud:
+    discovery:
+      client:
+        simple:
+          instances:
+            oj-judge:
+              - uri: ${OJ_JUDGE_BASE_URL:http://127.0.0.1:9204}
+            oj-agent:
+              - uri: ${AGENT_PUBLIC_BASE_URL:http://127.0.0.1:8015}
 
 mail:
   host: smtp.qq.com
@@ -23,12 +52,12 @@ mail:
 training:
   agent:
     service-id: ${AGENT_SERVICE_NAME:oj-agent}
-    base-url: ${AGENT_PUBLIC_BASE_URL:}
+    base-url: ${AGENT_PUBLIC_BASE_URL:http://127.0.0.1:8015}
     plan-path: /api/training/plan
     candidate-limit: 40
     client:
       connect-timeout-ms: 1000
-      request-timeout-ms: 5000
+      request-timeout-ms: 30000
       max-attempts: 3
       retry-backoff-ms: 200
       circuit-failure-threshold: 5

@@ -5,7 +5,7 @@
   <h2>{{ candidate.title }}</h2>
   <p class="muted">当前状态：{{ format_status(candidate.status) }}</p>
   <form method="post" action="/candidates/{{ candidate.candidate_id }}/generate">
-    <button type="submit">生成题目草稿</button>
+    <button type="submit">按当前已保存内容生成题目草稿</button>
   </form>
   <form class="stack-form" method="post" action="/candidates/{{ candidate.candidate_id }}/save">
     <label>
@@ -62,7 +62,10 @@
       <span>标准解草稿（Java）</span>
       <textarea name="solution_code_java" rows="10">{{ candidate.solution_code_java or '' }}</textarea>
     </label>
-    <button type="submit">保存候选题</button>
+    <div class="action-row">
+      <button type="submit">保存候选题</button>
+      <button type="submit" formaction="/candidates/{{ candidate.candidate_id }}/regenerate">用当前题目描述重新生成</button>
+    </div>
   </form>
 </section>
 
