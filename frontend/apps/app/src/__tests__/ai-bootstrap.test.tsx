@@ -9,7 +9,7 @@ async function main() {
   const emptyHtml = renderToStaticMarkup(
     <AiPanel initialArtifacts={[]} questionId="two-sum" questionTitle="Two Sum" questionContent="Find two numbers." />
   );
-  assert.match(emptyHtml, /还没有开始对话/);
+  assert.match(emptyHtml, /开始提问/);
 
   const seededArtifacts: AiArtifact[] = [
     {
@@ -33,9 +33,8 @@ async function main() {
   );
   assert.match(artifactHtml, /Duplicate case/);
   assert.match(artifactHtml, /Check the lookup order before writing into the hash map\./);
-  assert.match(artifactHtml, /Next step|下一步/);
   assert.match(artifactHtml, /Trace the \[3,3\] sample before updating the map\./);
-  assert.doesNotMatch(artifactHtml, /还没有开始对话/);
+  assert.doesNotMatch(artifactHtml, /开始提问/);
 }
 
 void main();

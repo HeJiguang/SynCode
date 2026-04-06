@@ -21,8 +21,8 @@ export function Tag({ children, className, tone = "default" }: TagProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-[var(--radius-pill)] border px-2.5 py-1 text-[11px] font-medium tracking-[0.08em] uppercase",
-        "transition-colors duration-300 ease-out",
+        "inline-flex items-center whitespace-nowrap rounded-[var(--radius-pill)] border px-2.5 py-1 text-[11px] font-medium tracking-[0.12em] uppercase",
+        "transition-colors duration-200 ease-out",
         toneClasses[tone],
         className
       )}

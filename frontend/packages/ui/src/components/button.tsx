@@ -17,11 +17,11 @@ const sizeClasses = {
 
 const variantClasses = {
   primary:
-    "bg-[var(--cta-bg)] text-[var(--cta-fg)] shadow-[0_10px_28px_rgba(32,192,138,0.24)] hover:bg-[var(--cta-hover)] hover:shadow-[0_14px_36px_rgba(32,192,138,0.28)]",
+    "border border-[var(--border-focus)] bg-[var(--accent)] text-white shadow-none hover:border-[var(--accent-strong)] hover:bg-[var(--accent-strong)]",
   secondary:
-    "border border-[var(--border-soft)] bg-[var(--cta-secondary-bg)] text-[var(--text-primary)] backdrop-blur-md hover:border-[var(--border-strong)] hover:bg-[var(--cta-secondary-hover)]",
+    "border border-[var(--border-strong)] bg-[var(--cta-secondary-bg)] text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--cta-secondary-hover)]",
   ghost:
-    "text-[var(--text-secondary)] hover:bg-[var(--cta-secondary-bg)] hover:text-[var(--text-primary)]"
+    "text-[var(--text-secondary)] hover:bg-[var(--surface-2)] hover:text-[var(--text-primary)]"
 };
 
 export function Button({
@@ -35,10 +35,10 @@ export function Button({
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-[var(--radius-sm)] font-medium",
-        "transition-all duration-300 ease-out",
+        "inline-flex items-center justify-center gap-2 rounded-[8px] font-medium",
+        "transition-colors duration-200 ease-out",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-0",
-        "active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0",
+        "active:translate-y-px disabled:cursor-not-allowed disabled:border-[rgba(120,136,182,0.28)] disabled:bg-[rgba(120,136,182,0.2)] disabled:text-[color:color-mix(in_srgb,var(--text-primary)_68%,transparent)] disabled:shadow-none disabled:active:translate-y-0",
         sizeClasses[size],
         variantClasses[variant],
         className

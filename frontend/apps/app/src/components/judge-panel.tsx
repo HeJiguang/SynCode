@@ -6,7 +6,7 @@ import type { SubmissionRecord } from "@aioj/api";
 
 import { buildPendingSubmission, type JudgeResultDetail } from "../lib/judge-result";
 import { appApiPath } from "../lib/paths";
-import { Panel, Tag } from "@aioj/ui";
+import { Tag } from "@aioj/ui";
 
 type JudgePanelProps = {
   questionId: string;
@@ -107,8 +107,8 @@ export function JudgePanel({ questionId, examId, submissions }: JudgePanelProps)
   const displayMessage = liveResult?.message ?? latest.notes;
 
   return (
-    <Panel hoverable className="flex h-full flex-col p-0">
-      <div className="shrink-0 border-b border-[var(--border-soft)] px-5 py-4">
+    <div className="flex h-full flex-col bg-[var(--surface-1)]">
+      <div className="shrink-0 border-b border-[var(--border-soft)] bg-[var(--surface-1)] px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="kicker">Judge Result</p>
@@ -141,25 +141,25 @@ export function JudgePanel({ questionId, examId, submissions }: JudgePanelProps)
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="rounded-[var(--radius-sm)] border border-[var(--border-soft)] bg-[var(--surface-1)] px-3 py-2">
+            <div className="rounded-[10px] border border-[var(--border-soft)] bg-[var(--surface-1)] px-3 py-2">
               <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--text-muted)]">运行时间</p>
               <p className="mt-1 font-mono text-sm tabular-nums text-[var(--text-primary)]">{latest.runtime}</p>
             </div>
-            <div className="rounded-[var(--radius-sm)] border border-[var(--border-soft)] bg-[var(--surface-1)] px-3 py-2">
+            <div className="rounded-[10px] border border-[var(--border-soft)] bg-[var(--surface-1)] px-3 py-2">
               <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--text-muted)]">内存占用</p>
               <p className="mt-1 font-mono text-sm tabular-nums text-[var(--text-primary)]">{latest.memory}</p>
             </div>
           </div>
 
           {displayMessage ? (
-            <div className="mt-3 rounded-[var(--radius-sm)] border border-[var(--border-soft)] bg-[var(--surface-1)] px-3 py-3">
+            <div className="mt-3 rounded-[10px] border border-[var(--border-soft)] bg-[var(--surface-1)] px-3 py-3">
               <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--text-muted)]">结果说明</p>
               <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">{displayMessage}</p>
             </div>
           ) : null}
 
           {liveResult?.failLine ? (
-            <div className="mt-3 flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--danger)]/25 bg-[var(--danger-bg)] px-3 py-2">
+            <div className="mt-3 flex items-center gap-2 rounded-[10px] border border-[var(--danger)]/25 bg-[var(--danger-bg)] px-3 py-2">
               <span className="text-[11px] text-[var(--danger)]">第 {liveResult.failLine} 行附近存在错误或异常。</span>
             </div>
           ) : null}
@@ -184,6 +184,6 @@ export function JudgePanel({ questionId, examId, submissions }: JudgePanelProps)
           )}
         </div>
       </div>
-    </Panel>
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { frontendPreviewMode } from "@aioj/config";
 import { Button, Input, Panel, Tag } from "@aioj/ui";
 
 import { adminApiPath, adminPublicPath } from "../../lib/paths";
@@ -48,6 +49,11 @@ export default function AdminLoginPage() {
         </Panel>
         <Panel className="p-8">
           <h2 className="text-2xl font-semibold">管理员登录</h2>
+          {frontendPreviewMode ? (
+            <div className="mt-4 rounded-[18px] border border-[var(--border-soft)] bg-[var(--surface-2)] px-4 py-3 text-sm leading-7 text-[var(--text-secondary)]">
+              当前本地已开启前端预览模式。你可以跳过管理员登录，直接进入后台界面预览和改样式。
+            </div>
+          ) : null}
           <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
             <Input placeholder="请输入管理员账号" value={userAccount} onChange={(event) => setUserAccount(event.target.value)} />
             <Input placeholder="请输入密码" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
@@ -55,6 +61,13 @@ export default function AdminLoginPage() {
             <Button className="w-full" size="lg" type="submit" disabled={submitting}>
               {submitting ? "登录中..." : "登录后台"}
             </Button>
+            {frontendPreviewMode ? (
+              <a href={adminPublicPath("/")} className="block">
+                <Button className="w-full" size="lg" type="button" variant="secondary">
+                  直接进入预览后台
+                </Button>
+              </a>
+            ) : null}
           </form>
         </Panel>
       </div>

@@ -2,8 +2,7 @@
 
 import * as React from "react";
 import { startTransition, useCallback, useEffect, useRef, useState } from "react";
-import Editor, { type OnMount } from "@monaco-editor/react";
-import type { editor as MonacoEditor, Position as MonacoPosition } from "monaco-editor";
+import dynamic from "next/dynamic";
 import {
   type CodeLanguage,
   type ExampleCase,
@@ -11,11 +10,16 @@ import {
   isJudgeLanguageSupported,
   resolveJudgeWebSocketUrl
 } from "@aioj/api";
+import { frontendPreviewMode } from "@aioj/config";
 import { CheckCircle2, Loader2, Play, SendHorizontal, Terminal } from "lucide-react";
 
 import { normalizeJudgeOutcome, type JudgeResultDetail } from "../lib/judge-result";
 import { appApiPath } from "../lib/paths";
-import { Button, Panel, Tag, Textarea } from "@aioj/ui";
+import { Button, Tag, Textarea } from "@aioj/ui";
+
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false
+});
 
 type EditorPanelProps = {
   initialCode: Record<CodeLanguage, string>;
@@ -150,9 +154,10 @@ export function EditorPanel({
   const [judgeStage, setJudgeStage] = useState<JudgeStage | null>(null);
   const [customInput, setCustomInput] = useState("");
   const [runResult, setRunResult] = useState<RunResult | null>(null);
+  const [lightTheme, setLightTheme] = useState(false);
 
-  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
-  const monacoRef = useRef<Parameters<OnMount>[1] | null>(null);
+  const editorRef = useRef<any>(null);
+  const monacoRef = useRef<any>(null);
   const ghostProviderRef = useRef<{ dispose: () => void } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const editCountRef = useRef(0);
@@ -163,6 +168,27 @@ export function EditorPanel({
     return () => {
       if (editTimerRef.current) clearTimeout(editTimerRef.current);
       if (wsRef.current) wsRef.current.close();
+    };
+  }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: light)");
+
+    const syncTheme = () => {
+      const root = document.documentElement;
+      const isLight = root.classList.contains("light") || (!root.classList.contains("dark") && media.matches);
+      setLightTheme(isLight);
+    };
+
+    syncTheme();
+    media.addEventListener("change", syncTheme);
+
+    const observer = new MutationObserver(syncTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+
+    return () => {
+      media.removeEventListener("change", syncTheme);
+      observer.disconnect();
     };
   }, []);
 
@@ -220,13 +246,13 @@ export function EditorPanel({
     monaco.editor.setModelMarkers(model, "syncode-judge", []);
   }, []);
 
-  const registerGhostText = useCallback((monaco: Parameters<OnMount>[1], nextLanguage: CodeLanguage) => {
+  const registerGhostText = useCallback((monaco: any, nextLanguage: CodeLanguage) => {
     ghostProviderRef.current?.dispose();
     ghostProviderRef.current = null;
 
     const snippets = ghostSnippets[nextLanguage] ?? {};
     ghostProviderRef.current = monaco.languages.registerInlineCompletionsProvider(monacoLanguages[nextLanguage], {
-      provideInlineCompletions(model: MonacoEditor.ITextModel, position: MonacoPosition) {
+      provideInlineCompletions(model: any, position: any) {
         const textBefore = model.getValueInRange({
           startLineNumber: position.lineNumber,
           startColumn: 1,
@@ -305,8 +331,8 @@ export function EditorPanel({
     return () => window.removeEventListener("syncode:insert-code", handler);
   }, [handleInsertCode]);
 
-  const handleEditorMount: OnMount = useCallback(
-    (editor, monaco) => {
+  const handleEditorMount = useCallback(
+    (editor: any, monaco: any) => {
       editorRef.current = editor;
       monacoRef.current = monaco;
 
@@ -317,7 +343,7 @@ export function EditorPanel({
         label: "AI 解释这段逻辑",
         contextMenuGroupId: "syncode",
         contextMenuOrder: 1,
-        run(instance) {
+        run(instance: any) {
           const selection = instance.getSelection();
           if (!selection) return;
 
@@ -336,7 +362,7 @@ export function EditorPanel({
         label: "AI 帮我定位问题",
         contextMenuGroupId: "syncode",
         contextMenuOrder: 2,
-        run(instance) {
+        run(instance: any) {
           const selection = instance.getSelection();
           if (!selection) return;
 
@@ -355,7 +381,7 @@ export function EditorPanel({
         label: "AI 优化复杂度",
         contextMenuGroupId: "syncode",
         contextMenuOrder: 3,
-        run(instance) {
+        run(instance: any) {
           const selection = instance.getSelection();
           if (!selection) return;
 
@@ -425,6 +451,19 @@ export function EditorPanel({
     setRunResult(null);
     setShowConsole(true);
 
+    if (frontendPreviewMode) {
+      setJudgeStage({ label: "当前是前端预览模式，运行代码功能已禁用。", done: true, error: false });
+      setRunResult({
+        runStatus: "PREVIEW",
+        exeMessage: "这里只保留编辑器与结果面板的界面预览，不会真正调用后端运行代码。",
+        useMemory: null,
+        useTime: null,
+        caseResults: []
+      });
+      window.setTimeout(() => setJudgeStage(null), 2200);
+      return;
+    }
+
     if (!questionId || !Number.isFinite(Number(questionId))) {
       setJudgeStage({ label: "当前题目没有可运行的后端 questionId。", done: true, error: true });
       return;
@@ -478,6 +517,14 @@ export function EditorPanel({
 
   const handleSubmit = useCallback(async () => {
     clearEditorErrors();
+
+    if (frontendPreviewMode) {
+      const message = "当前是前端预览模式，提交评测功能已禁用。";
+      setJudgeStage({ label: message, done: true, error: false });
+      emitJudgeResult({ questionId, status: "Pending", message });
+      window.setTimeout(() => setJudgeStage(null), 2200);
+      return;
+    }
 
     if (!questionId || !Number.isFinite(Number(questionId))) {
       setJudgeStage({ label: "当前题目没有可提交的后端 questionId。", done: true, error: true });
@@ -621,8 +668,8 @@ export function EditorPanel({
   const submitEnabled = isJudgeLanguageSupported(language);
 
   return (
-    <Panel hoverable className="flex h-full flex-col p-0">
-      <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-5 pt-4">
+    <div className="flex h-full flex-col bg-[var(--surface-1)]">
+      <div className="flex items-center justify-between border-b border-[var(--border-soft)] bg-[var(--surface-1)] px-4 pt-3">
         <div className="space-y-0.5 pb-4">
           <p className="kicker">Editor</p>
           <h3 className="text-base font-semibold text-[var(--text-primary)]">代码编辑区</h3>
@@ -645,22 +692,22 @@ export function EditorPanel({
         </div>
       </div>
 
-      <div className="code-editor-frame m-4 mt-4 flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-white/6 px-4 py-2">
+      <div className="code-editor-frame flex min-h-0 flex-1 flex-col">
+        <div className="flex items-center justify-between border-b border-[var(--border-soft)] bg-[var(--surface-2)] px-4 py-2">
           <div className="flex items-center gap-2">
             <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
-            <span className="text-xs text-zinc-400">Monaco 已启用多语言高亮</span>
+            <span className="text-xs text-[var(--text-secondary)]">Monaco 已启用多语言高亮</span>
           </div>
-          <span className="text-xs text-zinc-500">{submitEnabled ? "当前真实运行与判题支持 Java" : "当前语言仅支持编辑与 AI 辅助"}</span>
+          <span className="text-xs text-[var(--text-muted)]">{submitEnabled ? "当前真实运行与判题支持 Java" : "当前语言仅支持编辑与 AI 辅助"}</span>
         </div>
 
         {!mounted ? (
-          <pre className="m-0 flex-1 overflow-auto p-5 text-sm leading-7 text-zinc-300">{activeCode}</pre>
+          <pre className="m-0 flex-1 overflow-auto bg-[var(--surface-1)] p-5 text-sm leading-7 text-[var(--text-secondary)]">{activeCode}</pre>
         ) : (
-          <Editor
+          <MonacoEditor
             height="100%"
             language={monacoLanguages[language]}
-            loading={<pre className="m-0 flex-1 overflow-auto p-5 text-sm leading-7 text-zinc-300">{activeCode}</pre>}
+            loading={<pre className="m-0 flex-1 overflow-auto bg-[var(--surface-1)] p-5 text-sm leading-7 text-[var(--text-secondary)]">{activeCode}</pre>}
             options={{
               fontFamily: "JetBrains Mono, IBM Plex Mono, monospace",
               fontSize: 13,
@@ -673,7 +720,7 @@ export function EditorPanel({
               inlineSuggest: { enabled: true },
               quickSuggestions: false
             }}
-            theme="vs-dark"
+            theme={lightTheme ? "vs" : "vs-dark"}
             value={activeCode}
             onMount={handleEditorMount}
             onChange={(value) => {
@@ -711,7 +758,7 @@ export function EditorPanel({
         ) : null}
 
         {showConsole ? (
-          <div className="border-b border-[var(--border-soft)] bg-black/10 p-4">
+          <div className="border-b border-[var(--border-soft)] bg-[var(--surface-1)] p-4">
             <div className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -720,7 +767,7 @@ export function EditorPanel({
                 </div>
                 <div className="space-y-3">
                   {examples.map((item, index) => (
-                    <div key={`${item.input}-${index}`} className="rounded-[16px] border border-[var(--border-soft)] bg-[var(--surface-2)] p-3">
+                    <div key={`${item.input}-${index}`} className="rounded-[10px] border border-[var(--border-soft)] bg-[var(--surface-2)] p-3">
                       <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">Input</p>
                       <pre className="mt-2 whitespace-pre-wrap font-mono text-xs leading-6 text-[var(--text-primary)]">{item.input}</pre>
                       <p className="mt-3 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">Expected</p>
@@ -743,7 +790,7 @@ export function EditorPanel({
             </div>
 
             {runResult ? (
-              <div className="mt-4 rounded-[18px] border border-[var(--border-soft)] bg-[var(--surface-2)] p-4">
+              <div className="mt-4 rounded-[10px] border border-[var(--border-soft)] bg-[var(--surface-2)] p-4">
                 <div className="flex flex-wrap items-center gap-3">
                   <Tag tone={runResult.runStatus === "SUCCEED" ? "success" : "warning"}>{runResult.runStatus ?? "UNKNOWN"}</Tag>
                   <span className="text-xs text-[var(--text-muted)]">时间 {runResult.useTime ?? "--"} ms</span>
@@ -754,7 +801,7 @@ export function EditorPanel({
                 ) : null}
                 <div className="mt-4 space-y-3">
                   {runResult.caseResults?.map((item, index) => (
-                    <div key={`${item.input}-${index}`} className="rounded-[16px] border border-[var(--border-soft)] bg-black/10 p-4">
+                    <div key={`${item.input}-${index}`} className="rounded-[10px] border border-[var(--border-soft)] bg-[var(--surface-1)] p-4">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-xs font-semibold text-[var(--text-primary)]">Case {index + 1}</p>
                         <Tag tone={item.custom ? "default" : item.passed ? "success" : "warning"}>
@@ -791,21 +838,21 @@ export function EditorPanel({
           <div className="flex items-center gap-3">
             <Button variant="secondary" size="sm" id="btn-run-code" className="h-8 px-4 font-medium" onClick={handleRun}>
               <Play size={13} className="mr-1.5 text-[var(--text-secondary)]" />
-              运行代码
+              {frontendPreviewMode ? "预览运行区" : "运行代码"}
             </Button>
             <Button
               size="sm"
               id="btn-submit-code"
-              className="h-8 bg-[var(--accent)] px-5 font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-8 px-5 font-semibold"
               onClick={handleSubmit}
-              disabled={!submitEnabled}
+              disabled={!submitEnabled && !frontendPreviewMode}
             >
               <SendHorizontal size={13} className="mr-1.5 opacity-90" />
-              提交评测
+              {frontendPreviewMode ? "预览提交区" : "提交评测"}
             </Button>
           </div>
         </div>
       </div>
-    </Panel>
+    </div>
   );
 }

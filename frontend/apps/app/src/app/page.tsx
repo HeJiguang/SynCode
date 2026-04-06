@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Activity, Flame, Sparkles } from "lucide-react";
+import { ArrowRight, BookOpenText, Flame, Route, Trophy } from "lucide-react";
 import {
   getHotProblemList,
   getProblemList,
@@ -11,9 +11,6 @@ import {
 
 import { AnnouncementCenter } from "../components/announcement-center";
 import { AppShell } from "../components/app-shell";
-import { DashboardKpiCard } from "../components/dashboard/dashboard-kpi-card";
-import { DashboardModule } from "../components/dashboard/dashboard-module";
-import { DashboardTaskList } from "../components/dashboard/dashboard-task-list";
 import { HotProblemsPanel } from "../components/hot-problems-panel";
 import { appPublicPath } from "../lib/paths";
 import { getServerAccessToken } from "../lib/server-auth";
@@ -42,11 +39,11 @@ export default async function DashboardPage() {
 
   let training = token
     ? {
-        title: "当前暂无训练计划",
-        direction: "待设置训练方向",
+        title: "暂无训练计划",
+        direction: "待设置",
         level: "待评估",
         streakDays: 0,
-        weeklyGoal: "登录后生成个性化训练计划",
+        weeklyGoal: "登录后生成训练计划",
         completionRate: 0,
         strengths: [],
         weaknesses: [],
@@ -86,14 +83,19 @@ export default async function DashboardPage() {
         getSubmissionHistory(nextWorkspaceQuestionId, token)
       ]);
     } catch {
-      privateDataError = "个人数据暂时不可用。当前先展示公开内容，请稍后刷新。";
+      privateDataError = "个人数据暂时不可用，请稍后刷新。";
     }
   }
 
   const nextWorkspaceQuestionId = hotProblems[0]?.questionId ?? problems[0]?.questionId ?? "1000";
   const latestSubmission = submissions[0];
-  const currentFocus = training.tasks[0]?.focus || training.direction || "待设置训练方向";
   const currentTask = training.tasks[0];
+  const featuredTopics = [
+    { label: "哈希表", count: 42, href: "/problems" },
+    { label: "双指针", count: 26, href: "/problems" },
+    { label: "二叉树", count: 31, href: "/problems" },
+    { label: "动态规划", count: 18, href: "/training" }
+  ];
 
   return (
     <AppShell
@@ -102,55 +104,78 @@ export default async function DashboardPage() {
         <>
           <AnnouncementCenter messages={messages.slice(0, 3)} />
           <HotProblemsPanel problems={hotProblems.slice(0, 4)} />
-          <Panel className="p-5">
-            <p className="kicker">Profile</p>
-            <h3 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">{profile.nickName || "未设置昵称"}</h3>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
-              {profile.headline || "补全学校、专业与个人介绍后，你的训练档案会更完整。"}
-            </p>
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <div className="rounded-[var(--radius-sm)] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-3 py-3">
-                <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--text-faint)]">已解题</p>
-                <p className="mt-2 font-mono text-xl font-semibold text-[var(--text-primary)]">{profile.solvedCount}</p>
+          <Panel className="syncode-rail-panel p-5">
+            <h3 className="text-base font-semibold text-[var(--text-primary)]">{profile.nickName || "未设置昵称"}</h3>
+            {profile.headline ? <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{profile.headline}</p> : null}
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-[18px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-3 py-3">
+                <p className="text-xs text-[var(--text-muted)]">已解题</p>
+                <p className="mt-1 font-mono text-xl font-semibold text-[var(--text-primary)]">{profile.solvedCount}</p>
               </div>
-              <div className="rounded-[var(--radius-sm)] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-3 py-3">
-                <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--text-faint)]">提交数</p>
-                <p className="mt-2 font-mono text-xl font-semibold text-[var(--text-primary)]">{profile.submissionCount}</p>
+              <div className="rounded-[18px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-3 py-3">
+                <p className="text-xs text-[var(--text-muted)]">提交</p>
+                <p className="mt-1 font-mono text-xl font-semibold text-[var(--text-primary)]">{profile.submissionCount}</p>
               </div>
             </div>
           </Panel>
         </>
       }
     >
-      <Panel tone="accent" className="hero-grid overflow-hidden p-7 md:p-8">
-        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="kicker">Today</p>
-            <h1 className="section-title mt-3">{getGreeting(profile.nickName || "开发者")}</h1>
-            <p className="mt-4 max-w-2xl text-[15px] leading-8 text-[var(--text-secondary)]">
-              这里聚合了训练计划、最近提交、热门题目和系统公告。首页的目标不是堆满信息，而是把你下一步最值得做的动作放在最前面。
-            </p>
-            <div className="mt-6 flex flex-wrap gap-2.5">
-              <Tag tone="accent">当前焦点 {currentFocus}</Tag>
-              <Tag>{training.level}</Tag>
-              <Tag>连续学习 {profile.streakDays} 天</Tag>
+      <div className="syncode-page-stack">
+      <Panel tone="strong" className="syncode-page-hero p-5 md:p-6">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
+          <div>
+            <p className="text-sm text-[var(--text-secondary)]">{getGreeting(profile.nickName || "同学")}</p>
+            <h1 className="mt-2 text-4xl font-semibold tracking-[-0.05em] text-[var(--text-primary)] md:text-5xl">开始刷题</h1>
+            <div className="mt-6 flex flex-wrap gap-2">
+              <a href={appPublicPath("/problems")}>
+                <Button size="lg">
+                  <BookOpenText size={16} />
+                  开始刷题
+                </Button>
+              </a>
+              <a href={appPublicPath("/training")}>
+                <Button size="lg" variant="secondary">
+                  <Route size={16} />
+                  训练
+                </Button>
+              </a>
+            </div>
+
+            <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {featuredTopics.map((topic) => (
+                <a
+                  key={topic.label}
+                  href={appPublicPath(topic.href)}
+                  className="rounded-[18px] border border-[var(--border-soft)] bg-[var(--surface-3)] px-4 py-4 transition-colors hover:bg-[var(--surface-1)]"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{topic.label}</p>
+                    <span className="font-mono text-xs text-[var(--text-muted)]">{topic.count}</span>
+                  </div>
+                </a>
+              ))}
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3 lg:w-[560px]">
-            <div className="rounded-[var(--radius-card)] border border-[var(--border-soft)] bg-[var(--surface-1)] p-4">
-              <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--text-faint)]">本周目标</p>
-              <p className="mt-2 text-sm leading-6 text-[var(--text-primary)]">{training.weeklyGoal}</p>
+          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+            <div className="rounded-[20px] border border-[var(--border-soft)] bg-[var(--surface-3)] p-4">
+              <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+                <Flame size={15} />
+                <span className="text-sm">连续学习</span>
+              </div>
+              <p className="mt-3 font-mono text-2xl font-semibold text-[var(--text-primary)]">{profile.streakDays} 天</p>
             </div>
-            <div className="rounded-[var(--radius-card)] border border-[var(--border-soft)] bg-[var(--surface-1)] p-4">
-              <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--text-faint)]">当前计划</p>
-              <p className="mt-2 text-sm font-medium text-[var(--text-primary)]">{training.title}</p>
+            <div className="rounded-[20px] border border-[var(--border-soft)] bg-[var(--surface-3)] p-4">
+              <p className="text-sm text-[var(--text-secondary)]">进度</p>
+              <p className="mt-3 font-mono text-2xl font-semibold text-[var(--text-primary)]">{training.completionRate}%</p>
             </div>
-            <div className="rounded-[var(--radius-card)] border border-[var(--border-soft)] bg-[var(--surface-1)] p-4">
-              <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--text-faint)]">下一步</p>
-              <a href={appPublicPath(`/workspace/${nextWorkspaceQuestionId}`)} className="mt-2 inline-flex">
-                <Button size="sm">进入工作区</Button>
-              </a>
+            <div className="rounded-[20px] border border-[var(--border-soft)] bg-[var(--surface-3)] p-4">
+              <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+                <Trophy size={15} />
+                <span className="text-sm">最近提交</span>
+              </div>
+              <p className="mt-3 text-sm font-semibold text-[var(--text-primary)]">{latestSubmission?.status ?? "暂无"}</p>
             </div>
           </div>
         </div>
@@ -162,78 +187,72 @@ export default async function DashboardPage() {
         </Panel>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <DashboardKpiCard
-          label="连续学习"
-          value={`${profile.streakDays} 天`}
-          detail="保持节奏比一次刷很多题更重要。"
-          icon={<Flame size={16} />}
-        />
-        <DashboardKpiCard
-          label="计划进度"
-          value={`${training.completionRate}%`}
-          detail={training.title}
-          icon={<Sparkles size={16} />}
-        />
-        <DashboardKpiCard
-          label="最近提交"
-          value={latestSubmission?.status ?? "暂无"}
-          detail={latestSubmission ? `${latestSubmission.language} · ${latestSubmission.submittedAt}` : "登录后查看个人提交记录。"}
-          icon={<Activity size={16} />}
-        />
-      </div>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+        <Panel className="syncode-page-section p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">当前任务</h2>
+            {currentTask ? <Tag tone={resolvePlanTone(currentTask.status)}>{currentTask.status}</Tag> : null}
+          </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
-        <div className="space-y-6">
-          <DashboardModule
-            eyebrow="Primary Work"
-            title="当前训练主线"
-            description="把最重要的计划、任务和入口放在同一个工作面板里，降低切换成本。"
-            badge={training.direction}
-            tone="strong"
-            footer={
-              <div className="flex flex-wrap items-center gap-3">
-                <Tag tone={resolvePlanTone(currentTask?.status ?? "待开始")}>{currentTask?.status ?? "待开始"}</Tag>
-                <span className="text-sm text-[var(--text-muted)]">
-                  {currentTask ? `当前任务：${currentTask.title}` : "当前还没有激活中的训练任务。"}
-                </span>
-              </div>
-            }
-          >
-            <DashboardTaskList tasks={training.tasks} />
-          </DashboardModule>
-
-          <DashboardModule
-            eyebrow="Summary"
-            title="训练总结"
-            description="保留少量但关键的自我反馈，让首页承担方向确认，而不是信息堆叠。"
-          >
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-[var(--radius-card)] border border-[var(--border-soft)] bg-[var(--surface-muted)] p-5">
-                <p className="kicker">优势方向</p>
-                <div className="mt-4 space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
-                  {training.strengths.length > 0 ? training.strengths.map((item) => <p key={item}>{item}</p>) : <p>暂时还没有总结数据。</p>}
-                </div>
-              </div>
-              <div className="rounded-[var(--radius-card)] border border-[var(--border-soft)] bg-[var(--surface-muted)] p-5">
-                <p className="kicker">待补强项</p>
-                <div className="mt-4 space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
-                  {training.weaknesses.length > 0 ? training.weaknesses.map((item) => <p key={item}>{item}</p>) : <p>暂时还没有补强建议。</p>}
-                </div>
+          {currentTask ? (
+            <div className="mt-4 rounded-[20px] border border-[var(--border-soft)] bg-[var(--surface-3)] p-4">
+              <p className="text-base font-semibold text-[var(--text-primary)]">{currentTask.title}</p>
+              <p className="mt-2 text-sm text-[var(--text-secondary)]">{currentTask.focus}</p>
+              <div className="mt-4">
+                <a href={appPublicPath(`/workspace/${nextWorkspaceQuestionId}`)} className="inline-flex">
+                  <Button size="sm" variant="secondary">去做题</Button>
+                </a>
               </div>
             </div>
-          </DashboardModule>
-        </div>
+          ) : (
+            <div className="mt-4 rounded-[20px] border border-dashed border-[var(--border-soft)] px-4 py-8 text-sm text-[var(--text-muted)]">
+              暂无任务。
+            </div>
+          )}
 
-        <div className="space-y-6">
-          <DashboardModule
-            eyebrow="Problem Flow"
-            title="热门题入口"
-            description="保留高频动作，但降低视觉权重，让它成为辅区而不是主角。"
-          >
-            <HotProblemsPanel problems={hotProblems} />
-          </DashboardModule>
-        </div>
+          <div className="syncode-dashboard-focus-list mt-5 divide-y divide-[var(--border-soft)] overflow-hidden rounded-[16px] border border-[var(--border-soft)]">
+            {training.tasks.length > 0 ? (
+              training.tasks.map((task) => (
+                <div key={task.taskId} className="flex items-center justify-between gap-3 px-4 py-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{task.title}</p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">{task.focus}</p>
+                  </div>
+                  <Tag tone={resolvePlanTone(task.status)}>{task.status}</Tag>
+                </div>
+              ))
+            ) : (
+              <div className="px-4 py-8 text-sm text-[var(--text-muted)]">暂无任务。</div>
+            )}
+          </div>
+        </Panel>
+
+        <Panel className="syncode-page-section p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">本周</h2>
+            <a href={appPublicPath("/problems")} className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+              题库
+              <ArrowRight size={14} />
+            </a>
+          </div>
+          <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">{training.weeklyGoal}</p>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="rounded-[20px] border border-[var(--border-soft)] bg-[var(--surface-muted)] p-4">
+              <p className="text-sm font-medium text-[var(--text-primary)]">擅长</p>
+              <div className="mt-3 space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
+                {training.strengths.length > 0 ? training.strengths.map((item) => <p key={item}>{item}</p>) : <p>暂无数据。</p>}
+              </div>
+            </div>
+            <div className="rounded-[20px] border border-[var(--border-soft)] bg-[var(--surface-muted)] p-4">
+              <p className="text-sm font-medium text-[var(--text-primary)]">待补强</p>
+              <div className="mt-3 space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
+                {training.weaknesses.length > 0 ? training.weaknesses.map((item) => <p key={item}>{item}</p>) : <p>暂无数据。</p>}
+              </div>
+            </div>
+          </div>
+        </Panel>
+      </div>
       </div>
     </AppShell>
   );

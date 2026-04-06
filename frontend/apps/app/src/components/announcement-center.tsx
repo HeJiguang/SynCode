@@ -10,8 +10,8 @@ type AnnouncementCenterProps = {
 
 export function AnnouncementCenter({ messages }: AnnouncementCenterProps) {
   return (
-    <Panel hoverable className="flex flex-col p-0">
-      <div className="flex items-center justify-between border-b border-[var(--border-soft)] p-6">
+    <Panel hoverable className="syncode-rail-panel flex flex-col p-0">
+      <div className="flex items-center justify-between border-b border-[var(--border-soft)] p-5">
         <div>
           <p className="kicker">Announcement Center</p>
           <h3 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">系统公告</h3>
@@ -20,7 +20,7 @@ export function AnnouncementCenter({ messages }: AnnouncementCenterProps) {
       </div>
       <div className="flex-1 divide-y divide-[var(--border-soft)]">
         {messages.map((msg) => (
-          <div key={msg.textId} className="group p-6 transition-all duration-300 ease-out hover:bg-[var(--surface-1)]">
+          <div key={msg.textId} className="group p-5 transition-all duration-300 ease-out hover:bg-[var(--surface-1)]">
             <div className="flex items-center gap-3">
               <Tag tone={getMessageCategoryTone(msg.category)}>{getMessageCategoryLabel(msg.category)}</Tag>
               <span className="font-mono text-[13px] tabular-nums text-[var(--text-muted)]">{msg.publishedAt}</span>

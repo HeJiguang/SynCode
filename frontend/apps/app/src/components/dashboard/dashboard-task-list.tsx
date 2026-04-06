@@ -17,7 +17,7 @@ export function DashboardTaskList({ tasks }: DashboardTaskListProps) {
   if (tasks.length === 0) {
     return (
       <div className="rounded-[var(--radius-card)] border border-dashed border-[var(--border-soft)] bg-[var(--surface-muted)] px-5 py-8 text-sm leading-6 text-[var(--text-muted)]">
-        当前还没有可展示的训练任务。生成第一份计划后，这里会展示你本周最重要的训练动作。
+        暂无任务。
       </div>
     );
   }

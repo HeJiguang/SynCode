@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 
+import { frontendPreviewMode } from "@aioj/config";
 import { Button } from "@aioj/ui";
 import { adminApiPath } from "../lib/paths";
 
@@ -17,6 +18,9 @@ export function AdminUserStatusToggle({ userId, status }: AdminUserStatusToggleP
   const nextStatus = status === "正常" ? 1 : 0;
 
   async function handleClick() {
+    if (frontendPreviewMode) {
+      return;
+    }
     setLoading(true);
     try {
       await fetch(adminApiPath("/users/status"), {
@@ -31,8 +35,8 @@ export function AdminUserStatusToggle({ userId, status }: AdminUserStatusToggleP
   }
 
   return (
-    <Button type="button" variant="ghost" size="sm" disabled={loading} onClick={handleClick}>
-      {status === "正常" ? "冻结" : "恢复"}
+    <Button type="button" variant="ghost" size="sm" disabled={loading || frontendPreviewMode} onClick={handleClick}>
+      {frontendPreviewMode ? "预览模式" : status === "正常" ? "冻结" : "恢复"}
     </Button>
   );
 }

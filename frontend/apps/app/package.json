@@ -5,7 +5,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "tsx src/__tests__/smoke.test.tsx && tsx src/__tests__/training-actions.test.tsx && tsx src/__tests__/ai-bootstrap.test.tsx && tsx src/__tests__/exam-judge.test.tsx && tsx src/__tests__/paths.test.ts && tsx src/__tests__/api-route-error.test.ts"
+    "test": "tsx src/__tests__/smoke.test.tsx && tsx src/__tests__/training-actions.test.tsx && tsx src/__tests__/ai-bootstrap.test.tsx && tsx src/__tests__/exam-judge.test.tsx && tsx src/__tests__/theme-contrast.test.tsx && tsx src/__tests__/paths.test.ts && tsx src/__tests__/api-route-error.test.ts && tsx src/__tests__/workspace-visual-shell.test.tsx"
   },
   "dependencies": {
     "@aioj/api": "*",

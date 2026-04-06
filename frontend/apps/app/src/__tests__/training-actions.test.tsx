@@ -14,6 +14,7 @@ function main() {
 
   assert.match(emptyHtml, /data-testid="training-generate"/);
   assert.doesNotMatch(emptyHtml, /training-task-finish-/);
+  assert.doesNotMatch(emptyHtml, /Actions/);
 
   const activeHtml = renderToStaticMarkup(
     <TrainingActions
@@ -46,7 +47,11 @@ function main() {
   assert.match(activeHtml, /data-testid="training-task-finish-task-1"/);
   assert.match(activeHtml, /href="\/app\/workspace\/1001"/);
   assert.match(activeHtml, /href="\/app\/exams\/2001"/);
+  assert.match(activeHtml, /去做题/);
+  assert.match(activeHtml, /border-\[var\(--border-strong\)\]/);
+  assert.match(activeHtml, /bg-\[var\(--surface-2\)\]/);
   assert.doesNotMatch(activeHtml, /training-task-finish-task-2/);
+  assert.doesNotMatch(activeHtml, /璁粌鍔ㄤ綔/);
 }
 
 main();

@@ -1,5 +1,7 @@
 export const productName = "SynCode";
-export const productTagline = "AI 辅助编程训练平台";
+export const productTagline = "编程训练与题库平台";
+export const frontendPreviewMode = process.env.NEXT_PUBLIC_SYNCODE_PREVIEW_MODE === "1";
+export const frontendPreviewLabel = "Preview Mode";
 
 export const githubUrl = "https://github.com/HeJiguang/SynCode";
 

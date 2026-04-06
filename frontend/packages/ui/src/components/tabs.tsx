@@ -19,13 +19,13 @@ export function Tabs({ tabs, defaultTab, className = "" }: TabsProps) {
   return (
     <div className={`flex flex-col h-full ${className}`}>
       {/* Tab List */}
-      <div className="flex items-center gap-6 border-b border-[var(--border-soft)] px-5">
+      <div className="flex items-center gap-5 border-b border-[var(--border-soft)] bg-[var(--surface-1)] px-4">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTab;
           return (
             <button
               key={tab.id}
-              className={`relative py-3.5 text-sm font-semibold transition-colors
+              className={`relative py-3 text-sm font-semibold transition-colors
                 ${isActive ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}
               `}
               onClick={() => setActiveTab(tab.id)}

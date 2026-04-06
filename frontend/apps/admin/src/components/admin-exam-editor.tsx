@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { LoaderCircle, Plus } from "lucide-react";
 
+import { frontendPreviewMode } from "@aioj/config";
 import type { AdminExamDetail } from "../lib/admin-api";
 import { adminApiPath, adminInternalPath } from "../lib/paths";
 import { Button, Input, Panel, Tag } from "@aioj/ui";
@@ -35,6 +36,10 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (frontendPreviewMode) {
+      setError("当前是前端预览模式，考试改动不会提交到后端。");
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -63,6 +68,10 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
 
   async function handleDelete() {
     if (!exam?.examId || !window.confirm("确认删除这场考试吗？")) return;
+    if (frontendPreviewMode) {
+      setError("当前是前端预览模式，删除操作已禁用。");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -84,6 +93,10 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
 
   async function handlePublish(publish: boolean) {
     if (!exam?.examId) return;
+    if (frontendPreviewMode) {
+      setError(`当前是前端预览模式，${publish ? "发布" : "撤回"}操作不会提交到后端。`);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -118,6 +131,11 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
       return;
     }
 
+    if (frontendPreviewMode) {
+      setError("当前是前端预览模式，题目关联操作不会提交到后端。");
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     try {
@@ -141,6 +159,10 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
 
   async function handleRemoveQuestion(questionId: string) {
     if (!exam?.examId) return;
+    if (frontendPreviewMode) {
+      setError(`当前是前端预览模式，题目 ${questionId} 的移除操作已禁用。`);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -190,15 +212,15 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit" disabled={submitting}>
               {submitting ? <LoaderCircle size={14} className="animate-spin" /> : null}
-              保存考试
+              {frontendPreviewMode ? "预览模式下不可保存" : "保存考试"}
             </Button>
             {exam ? (
               <>
                 <Button type="button" variant="secondary" disabled={submitting} onClick={() => handlePublish(exam.status !== 1)}>
-                  {exam.status === 1 ? "撤回发布" : "发布考试"}
+                  {frontendPreviewMode ? "预览模式下不可发布" : exam.status === 1 ? "撤回发布" : "发布考试"}
                 </Button>
                 <Button type="button" variant="secondary" disabled={submitting} onClick={handleDelete}>
-                  删除考试
+                  {frontendPreviewMode ? "预览模式下不可删除" : "删除考试"}
                 </Button>
               </>
             ) : null}
@@ -221,7 +243,7 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
               />
               <Button type="button" onClick={handleAddQuestions} disabled={submitting}>
                 <Plus size={14} />
-                添加
+                {frontendPreviewMode ? "预览" : "添加"}
               </Button>
             </div>
           </div>
@@ -237,7 +259,7 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
                     </p>
                   </div>
                   <Button type="button" variant="ghost" onClick={() => handleRemoveQuestion(question.questionId)} disabled={submitting}>
-                    移除
+                    {frontendPreviewMode ? "预览" : "移除"}
                   </Button>
                 </div>
               ))

@@ -10,8 +10,8 @@ async function main() {
     await ExamWorkspacePage({ params: Promise.resolve({ examId: "exam-checkpoint-02" }) })
   );
 
-  assert.match(examHtml, /Heat 83/);
-  assert.doesNotMatch(examHtml, /Heat 98/);
+  assert.match(examHtml, /热度 83/);
+  assert.doesNotMatch(examHtml, /热度 98/);
   assert.match(examHtml, /1 \/ 2/);
 
   const history = mapJudgeHistoryRow(

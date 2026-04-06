@@ -12,17 +12,17 @@ type PanelProps = HTMLAttributes<HTMLDivElement> & {
 const toneClasses = {
   default: "bg-[var(--surface-1)]",
   strong: "bg-[var(--surface-2)]",
-  accent: "bg-[linear-gradient(180deg,rgba(18,24,44,0.95),rgba(12,17,31,0.92))]"
+  accent: "bg-[var(--panel-accent-bg)]"
 };
 
 export function Panel({ children, className, hoverable = false, tone = "default", ...props }: PanelProps) {
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-soft)] backdrop-blur-xl",
+        "relative overflow-hidden rounded-[12px] border border-[var(--border-soft)]",
         toneClasses[tone],
-        "shadow-[var(--shadow-panel)] transition-all duration-300 ease-out",
-        hoverable && "hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface-3)]",
+        "shadow-none transition-colors duration-200 ease-out",
+        hoverable && "hover:border-[var(--border-strong)] hover:bg-[var(--surface-3)]",
         className
       )}
       {...props}

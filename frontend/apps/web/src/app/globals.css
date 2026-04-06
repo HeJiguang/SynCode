@@ -11,179 +11,147 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(circle at 10% 14%, rgba(74, 214, 187, 0.12), transparent 22%),
-    radial-gradient(circle at 76% 10%, rgba(127, 146, 255, 0.13), transparent 26%),
-    radial-gradient(circle at 88% 78%, rgba(255, 194, 107, 0.08), transparent 18%),
-    linear-gradient(180deg, rgba(8, 12, 24, 0.88) 0%, rgba(6, 8, 22, 1) 62%),
-    url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.045'/%3E%3C/svg%3E");
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.028), transparent 22%),
+    radial-gradient(circle at 78% 12%, rgba(34, 197, 94, 0.055), transparent 20%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.01), transparent 22%);
 }
 
 :root.light body::before {
   background:
-    radial-gradient(circle at 12% 14%, rgba(26, 151, 108, 0.08), transparent 18%),
-    radial-gradient(circle at 80% 20%, rgba(83, 111, 255, 0.1), transparent 24%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(246, 248, 252, 1) 100%);
+    radial-gradient(circle at top left, rgba(17, 24, 39, 0.035), transparent 18%),
+    radial-gradient(circle at 78% 12%, rgba(21, 128, 61, 0.08), transparent 20%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.26), transparent 24%);
 }
 
 @media (prefers-color-scheme: light) {
   :root:not(.dark) body::before {
     background:
-      radial-gradient(circle at 12% 14%, rgba(26, 151, 108, 0.08), transparent 18%),
-      radial-gradient(circle at 80% 20%, rgba(83, 111, 255, 0.1), transparent 24%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(246, 248, 252, 1) 100%);
+      radial-gradient(circle at top left, rgba(17, 24, 39, 0.035), transparent 18%),
+      radial-gradient(circle at 78% 12%, rgba(21, 128, 61, 0.08), transparent 20%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.26), transparent 24%);
   }
 }
 
-.home-page {
+.syncode-home-canvas {
   position: relative;
+  overflow: hidden;
 }
 
-.home-page::after {
+.syncode-home-canvas::before {
   content: "";
   position: absolute;
-  inset: 0 0 auto;
-  height: 560px;
+  inset: 7rem auto auto 54%;
+  width: 42rem;
+  height: 42rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(34, 197, 94, 0.1), transparent 64%);
+  filter: blur(24px);
   pointer-events: none;
+  opacity: 0.72;
+  transform: translateX(-8%);
+}
+
+.syncode-home-canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.18), transparent 28%, transparent 72%, rgba(0, 0, 0, 0.14));
+  opacity: 0.3;
+}
+
+.syncode-home-masthead {
   background:
-    radial-gradient(circle at 20% 12%, rgba(70, 216, 162, 0.12), transparent 26%),
-    radial-gradient(circle at 72% 0%, rgba(83, 111, 255, 0.14), transparent 24%);
-  opacity: 0.9;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.008)),
+    var(--surface-overlay);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.16);
 }
 
-.home-nav {
-  background:
-    linear-gradient(180deg, rgba(14, 20, 37, 0.72), rgba(10, 14, 28, 0.62));
-  box-shadow:
-    0 16px 44px rgba(4, 9, 20, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.home-brand-mark {
-  box-shadow:
-    0 12px 30px rgba(255, 255, 255, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-}
-
-.home-tag {
-  box-shadow: 0 0 0 1px rgba(70, 216, 162, 0.08);
-}
-
-.home-stat {
+.syncode-home-hero {
+  align-items: stretch;
   position: relative;
-  padding-right: 0.5rem;
 }
 
-.home-stat::after {
+.syncode-home-brandline {
+  opacity: 0.86;
+}
+
+.syncode-home-metric-row {
+  position: relative;
+}
+
+.syncode-home-workbench {
+  box-shadow: var(--shadow-panel);
+  position: relative;
+  overflow: hidden;
+}
+
+.syncode-home-workbench::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.15), transparent 65%);
+}
+
+.syncode-home-workbench-wrap {
+  position: relative;
+}
+
+.syncode-home-workbench-glow {
+  position: absolute;
+  inset: 4% -2% auto auto;
+  width: 16rem;
+  height: 16rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(34, 197, 94, 0.12), transparent 68%);
+  filter: blur(22px);
+  pointer-events: none;
+}
+
+.syncode-home-workbench-head,
+.syncode-home-workbench-foot > div {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.syncode-home-proof {
+  position: relative;
+}
+
+.syncode-home-metric {
+  position: relative;
+  padding-bottom: 0.25rem;
+}
+
+.syncode-home-metric::after {
   content: "";
   position: absolute;
   left: 0;
-  top: calc(100% + 0.4rem);
-  width: 44px;
-  height: 2px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(70, 216, 162, 0.9), rgba(70, 216, 162, 0));
-  opacity: 0.65;
-}
-
-.home-accent-panel {
-  background:
-    linear-gradient(180deg, rgba(17, 24, 46, 0.96), rgba(10, 15, 31, 0.9));
-}
-
-.home-accent-card {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-}
-
-.home-code-block {
-  position: relative;
-  overflow: hidden;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 18px 40px rgba(4, 9, 20, 0.24);
-}
-
-.home-code-block::after {
-  content: "";
-  position: absolute;
-  inset: auto 0 0;
+  top: calc(100% + 0.45rem);
+  width: 36px;
   height: 1px;
-  background: linear-gradient(90deg, rgba(69, 216, 163, 0), rgba(69, 216, 163, 0.42), rgba(69, 216, 163, 0));
+  background: linear-gradient(90deg, rgba(34, 197, 94, 0.65), rgba(34, 197, 94, 0));
 }
 
-.home-suggestion {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 12px 30px rgba(14, 24, 20, 0.18);
+.syncode-home-signal-grid,
+.syncode-home-proof-grid,
+.syncode-home-proof-card {
+  position: relative;
 }
 
-.home-icon-shell,
-.home-feature-icon {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+.syncode-home-signal-card,
+.syncode-home-proof-card {
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.12);
 }
 
-.home-feature-row {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.015));
-}
-
-.home-preview-panel {
-  background:
-    linear-gradient(180deg, rgba(16, 22, 42, 0.98), rgba(8, 12, 25, 0.94));
-}
-
-.home-chat-shell {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 22px 50px rgba(2, 6, 17, 0.24);
-}
-
-.home-chat-bubble {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.home-chat-bubble-muted {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-}
-
-.home-timeline-item {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.02));
-}
-
-:root.light .home-page::after {
-  opacity: 0.38;
-}
-
-:root.light .home-nav,
-:root.light .home-feature-row,
-:root.light .home-timeline-item,
-:root.light .home-preview-panel,
-:root.light .home-accent-panel {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(247, 249, 255, 0.94));
-}
-
-:root.light .home-code-block,
-:root.light .home-chat-shell {
-  background: #0f172a;
-}
-
-@media (prefers-color-scheme: light) {
-  :root:not(.dark) .home-page::after {
-    opacity: 0.38;
-  }
-
-  :root:not(.dark) .home-nav,
-  :root:not(.dark) .home-feature-row,
-  :root:not(.dark) .home-timeline-item,
-  :root:not(.dark) .home-preview-panel,
-  :root:not(.dark) .home-accent-panel {
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(247, 249, 255, 0.94));
-  }
-
-  :root:not(.dark) .home-code-block,
-  :root:not(.dark) .home-chat-shell {
-    background: #0f172a;
-  }
+.syncode-home-bottom-cta {
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.12);
 }

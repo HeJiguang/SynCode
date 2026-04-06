@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { LoaderCircle } from "lucide-react";
 
+import { frontendPreviewMode } from "@aioj/config";
 import type { AdminNoticeDetail } from "../lib/admin-api";
 import { adminApiPath, adminInternalPath } from "../lib/paths";
 import { Button, Input, Panel, Textarea } from "@aioj/ui";
@@ -35,6 +36,12 @@ export function AdminNoticeEditor({ notice }: AdminNoticeEditorProps) {
     setMessage(null);
     setError(null);
 
+    if (frontendPreviewMode) {
+      setSubmitting(false);
+      setMessage("当前是前端预览模式，公告改动不会提交到后端。");
+      return;
+    }
+
     try {
       const response = await fetch(adminApiPath("/notices"), {
         method: notice ? "PUT" : "POST",
@@ -59,6 +66,10 @@ export function AdminNoticeEditor({ notice }: AdminNoticeEditorProps) {
 
   async function handleDelete() {
     if (!notice?.noticeId || !window.confirm("确认删除这条公告吗？")) return;
+    if (frontendPreviewMode) {
+      setError("当前是前端预览模式，删除操作已禁用。");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -128,11 +139,11 @@ export function AdminNoticeEditor({ notice }: AdminNoticeEditorProps) {
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" disabled={submitting}>
             {submitting ? <LoaderCircle size={14} className="animate-spin" /> : null}
-            保存公告
+            {frontendPreviewMode ? "预览模式下不可保存" : "保存公告"}
           </Button>
           {notice ? (
             <Button type="button" variant="secondary" disabled={submitting} onClick={handleDelete}>
-              删除公告
+              {frontendPreviewMode ? "预览模式下不可删除" : "删除公告"}
             </Button>
           ) : null}
         </div>

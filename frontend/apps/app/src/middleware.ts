@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { frontendPreviewMode } from "@aioj/config";
 
 const ACCESS_TOKEN_KEY = "syncode_access_token";
 
@@ -6,6 +7,10 @@ const ACCESS_TOKEN_KEY = "syncode_access_token";
 const PUBLIC_PATHS = ["/login", "/api/auth/send-code", "/api/auth/login"];
 
 export function middleware(request: NextRequest) {
+  if (frontendPreviewMode) {
+    return NextResponse.next();
+  }
+
   const { pathname } = request.nextUrl;
 
   // 放行公开路径（静态资源、Next.js 内部路径自动被 matcher 过滤）

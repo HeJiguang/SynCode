@@ -16,32 +16,32 @@ export default async function AdminDashboardPage() {
   return (
     <AdminShell
       adminName={admin.nickName}
-      title="Admin Overview"
-      description="Track the current system totals and keep the core operator entry points stable, explicit, and reviewable."
+      title="后台总览"
+      description="汇总当前系统规模，并保持核心运营入口清晰、稳定、可复核。"
     >
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard detail="Total managed problems from backend pagination totals" label="Problems" value={String(summary.questionCount)} />
-        <StatCard detail="Total exams from backend pagination totals" label="Exams" value={String(summary.examCount)} />
-        <StatCard detail="Total notices from backend pagination totals" label="Notices" value={String(summary.noticeCount)} />
-        <StatCard detail="Total users from backend pagination totals" label="Users" value={String(summary.userCount)} />
+        <StatCard detail="按后端分页统计汇总的题目总数" label="题目数" value={String(summary.questionCount)} />
+        <StatCard detail="按后端分页统计汇总的考试总数" label="考试数" value={String(summary.examCount)} />
+        <StatCard detail="按后端分页统计汇总的公告总数" label="公告数" value={String(summary.noticeCount)} />
+        <StatCard detail="按后端分页统计汇总的用户总数" label="用户数" value={String(summary.userCount)} />
       </div>
       <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
         <Panel className="p-5" tone="strong">
-          <p className="kicker">Operations</p>
-          <h3 className="mt-2 text-xl font-semibold">Current focus</h3>
+          <p className="kicker">当前重点</p>
+          <h3 className="mt-2 text-xl font-semibold">运营焦点</h3>
           <div className="mt-5 space-y-3 text-sm leading-7 text-[var(--text-secondary)]">
-            <p>The user app already routes through real login, real problem detail, real code run, and async judge flows.</p>
-            <p>The admin app now exposes question, exam, notice, and user maintenance against live backend contracts.</p>
-            <p>The dashboard totals are read from backend pagination metadata instead of inferring counts from the current page rows.</p>
+            <p>用户端已经接入真实登录、真实题目详情、真实代码运行和异步判题链路。</p>
+            <p>后台当前已经接入题目、考试、公告和用户四类核心维护能力，并直连真实后端契约。</p>
+            <p>总览卡片直接读取后端分页元数据，不再从当前页行数据推算数量。</p>
           </div>
         </Panel>
         <Panel className="p-5">
-          <p className="kicker">Next Steps</p>
-          <h3 className="mt-2 text-xl font-semibold">Pre-release checks</h3>
+          <p className="kicker">上线前检查</p>
+          <h3 className="mt-2 text-xl font-semibold">待确认事项</h3>
           <div className="mt-5 space-y-3 text-sm leading-7 text-[var(--text-secondary)]">
-            <p>Validate notice add, edit, publish, pin, and rollback actions against real persisted state.</p>
-            <p>Review problem editor payloads, sample JSON, starter code, and function signatures end to end.</p>
-            <p>Confirm exam time, linked questions, publish flow, and rollback behavior still respect business constraints.</p>
+            <p>核验公告新增、编辑、发布、置顶与撤回动作，确认真实持久化状态一致。</p>
+            <p>串联检查题目编辑器的请求载荷、示例 JSON、默认代码和函数签名是否完整可用。</p>
+            <p>确认考试时间、关联题目、发布流程和回滚行为仍然符合业务约束。</p>
           </div>
         </Panel>
       </div>

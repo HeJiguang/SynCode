@@ -1,4 +1,17 @@
 import { normalizeDifficulty, requestJson, type ApiEnvelope, type TableEnvelope, unwrapData, unwrapTable } from "@aioj/api";
+import { frontendPreviewMode } from "@aioj/config";
+
+import {
+  previewAdminDashboardSummary,
+  previewAdminExamDetails,
+  previewAdminExamRows,
+  previewAdminNoticeDetails,
+  previewAdminNoticeRows,
+  previewAdminProfile,
+  previewAdminQuestionDetails,
+  previewAdminQuestionRows,
+  previewAdminUserRows
+} from "./admin-preview";
 
 type AdminInfo = {
   nickName?: string | null;
@@ -138,6 +151,10 @@ export type AdminDashboardSummary = {
   userCount: number;
 };
 
+function usePreviewAdminData(token?: string | null) {
+  return frontendPreviewMode || !token;
+}
+
 function normalizeExamPublishStatus(status?: number | string | null) {
   return status === 1 || status === "1" ? "已发布" : "草稿";
 }
@@ -146,7 +163,10 @@ function normalizeNoticeStatus(status?: number | null) {
   return status === 1 ? "已发布" : "草稿";
 }
 
-export async function getAdminProfile(token: string) {
+export async function getAdminProfile(token?: string | null) {
+  if (usePreviewAdminData(token)) {
+    return previewAdminProfile;
+  }
   const payload = await requestJson<ApiEnvelope<AdminInfo>>("/system/sysUser/info", { token });
   const data = unwrapData(payload);
   return {
@@ -154,7 +174,10 @@ export async function getAdminProfile(token: string) {
   };
 }
 
-export async function getAdminDashboardSummary(token: string): Promise<AdminDashboardSummary> {
+export async function getAdminDashboardSummary(token?: string | null): Promise<AdminDashboardSummary> {
+  if (usePreviewAdminData(token)) {
+    return previewAdminDashboardSummary;
+  }
   const [questionPayload, examPayload, userPayload, noticePayload] = await Promise.all([
     requestJson<TableEnvelope<BackendQuestionRow>>("/system/question/list?pageNum=1&pageSize=1", { token }),
     requestJson<TableEnvelope<BackendExamRow>>("/system/exam/list?pageNum=1&pageSize=1", { token }),
@@ -170,7 +193,10 @@ export async function getAdminDashboardSummary(token: string): Promise<AdminDash
   };
 }
 
-export async function getAdminQuestionRows(token: string) {
+export async function getAdminQuestionRows(token?: string | null) {
+  if (usePreviewAdminData(token)) {
+    return previewAdminQuestionRows.map((item) => ({ ...item }));
+  }
   const payload = await requestJson<TableEnvelope<BackendQuestionRow>>("/system/question/list?pageNum=1&pageSize=50", { token });
   return unwrapTable(payload).rows.map((item) => ({
     questionId: item.questionId ? String(item.questionId) : "--",
@@ -181,7 +207,11 @@ export async function getAdminQuestionRows(token: string) {
   }));
 }
 
-export async function getAdminQuestionDetail(token: string, questionId: string) {
+export async function getAdminQuestionDetail(token: string | null | undefined, questionId: string) {
+  if (usePreviewAdminData(token)) {
+    const previewQuestion = previewAdminQuestionDetails[questionId as keyof typeof previewAdminQuestionDetails] ?? previewAdminQuestionDetails["101"];
+    return { ...previewQuestion };
+  }
   const payload = await requestJson<ApiEnvelope<BackendQuestionDetail>>(`/system/question/detail?questionId=${encodeURIComponent(questionId)}`, { token });
   const data = unwrapData(payload);
   return {
@@ -201,7 +231,16 @@ export async function getAdminQuestionDetail(token: string, questionId: string) 
   } satisfies AdminQuestionDetail;
 }
 
-export async function getAdminExamRows(token: string) {
+export async function getAdminExamRows(token?: string | null) {
+  if (usePreviewAdminData(token)) {
+    return previewAdminExamRows.map((item) => ({
+      examId: item.examId,
+      title: item.title,
+      status: item.status,
+      startTime: item.startTime,
+      participantCount: item.participantCount
+    }));
+  }
   const payload = await requestJson<TableEnvelope<BackendExamRow>>("/system/exam/list?pageNum=1&pageSize=50", { token });
   return unwrapTable(payload).rows.map((item) => ({
     examId: item.examId ? String(item.examId) : "--",
@@ -212,7 +251,14 @@ export async function getAdminExamRows(token: string) {
   }));
 }
 
-export async function getAdminExamDetail(token: string, examId: string) {
+export async function getAdminExamDetail(token: string | null | undefined, examId: string) {
+  if (usePreviewAdminData(token)) {
+    const previewExam = previewAdminExamDetails[examId as keyof typeof previewAdminExamDetails] ?? previewAdminExamDetails["2001"];
+    return {
+      ...previewExam,
+      examQuestionList: previewExam.examQuestionList.map((item) => ({ ...item }))
+    };
+  }
   const payload = await requestJson<ApiEnvelope<BackendExamDetail>>(`/system/exam/detail?examId=${encodeURIComponent(examId)}`, { token });
   const data = unwrapData(payload);
   return {
@@ -229,7 +275,10 @@ export async function getAdminExamDetail(token: string, examId: string) {
   } satisfies AdminExamDetail;
 }
 
-export async function getAdminUserRows(token: string) {
+export async function getAdminUserRows(token?: string | null) {
+  if (usePreviewAdminData(token)) {
+    return previewAdminUserRows.map((item) => ({ ...item }));
+  }
   const payload = await requestJson<TableEnvelope<BackendUserRow>>("/system/user/list?pageNum=1&pageSize=50", { token });
   return unwrapTable(payload).rows.map((item) => ({
     userId: item.userId ? String(item.userId) : "--",
@@ -240,7 +289,10 @@ export async function getAdminUserRows(token: string) {
   }));
 }
 
-export async function getAdminNoticeRows(token: string): Promise<AdminNoticeRow[]> {
+export async function getAdminNoticeRows(token?: string | null): Promise<AdminNoticeRow[]> {
+  if (usePreviewAdminData(token)) {
+    return previewAdminNoticeRows.map((item) => ({ ...item }));
+  }
   const payload = await requestJson<TableEnvelope<BackendNoticeRow>>("/system/notice/list?pageNum=1&pageSize=50", { token });
   return unwrapTable(payload).rows.map((item) => ({
     noticeId: item.noticeId ? String(item.noticeId) : "--",
@@ -254,7 +306,11 @@ export async function getAdminNoticeRows(token: string): Promise<AdminNoticeRow[
   }));
 }
 
-export async function getAdminNoticeDetail(token: string, noticeId: string) {
+export async function getAdminNoticeDetail(token: string | null | undefined, noticeId: string) {
+  if (usePreviewAdminData(token)) {
+    const previewNotice = previewAdminNoticeDetails[noticeId as keyof typeof previewAdminNoticeDetails] ?? previewAdminNoticeDetails["3001"];
+    return { ...previewNotice };
+  }
   const payload = await requestJson<ApiEnvelope<BackendNoticeDetail>>(`/system/notice/detail?noticeId=${encodeURIComponent(noticeId)}`, { token });
   const data = unwrapData(payload);
   return {

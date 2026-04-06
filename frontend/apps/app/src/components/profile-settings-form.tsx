@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useMemo, useState, useTransition } from "react";
 import type { UserProfile } from "@aioj/api";
+import { frontendPreviewMode } from "@aioj/config";
 import { Camera, LoaderCircle } from "lucide-react";
 
 import { appApiPath } from "../lib/paths";
@@ -43,6 +44,11 @@ export function ProfileSettingsForm({ profile }: ProfileSettingsFormProps) {
     setMessage(null);
     setError(null);
 
+    if (frontendPreviewMode) {
+      setMessage("当前是前端预览模式，资料改动不会提交到后端。");
+      return;
+    }
+
     startSaving(async () => {
       const response = await fetch(appApiPath("/user/profile"), {
         method: "PUT",
@@ -67,6 +73,10 @@ export function ProfileSettingsForm({ profile }: ProfileSettingsFormProps) {
 
     setMessage(null);
     setError(null);
+    if (frontendPreviewMode) {
+      setMessage("当前是前端预览模式，头像上传已关闭。");
+      return;
+    }
     startUploading(async () => {
       const formData = new FormData();
       formData.append("file", file);
@@ -96,12 +106,12 @@ export function ProfileSettingsForm({ profile }: ProfileSettingsFormProps) {
           </div>
           <div className="space-y-2">
             <div>
-              <p className="kicker">Profile</p>
+              <p className="kicker">资料</p>
               <h3 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">个人资料</h3>
             </div>
             <label className="inline-flex cursor-pointer items-center gap-2 rounded-[14px] border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--text-primary)] transition hover:border-[var(--border-strong)]">
               {isUploading ? <LoaderCircle size={14} className="animate-spin" /> : <Camera size={14} />}
-              上传头像
+              {frontendPreviewMode ? "预览模式下不可上传" : "上传头像"}
               <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
             </label>
           </div>
@@ -158,9 +168,8 @@ export function ProfileSettingsForm({ profile }: ProfileSettingsFormProps) {
         <div className="flex items-center gap-3">
           <Button type="submit" disabled={isSaving || isUploading}>
             {isSaving ? <LoaderCircle size={14} className="animate-spin" /> : null}
-            保存资料
+            {frontendPreviewMode ? "预览模式下不可保存" : "保存资料"}
           </Button>
-          <p className="text-sm text-[var(--text-muted)]">建议补充完整头像与简介，方便训练计划和个人主页展示更准确。</p>
         </div>
       </form>
     </Panel>

@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { LoaderCircle } from "lucide-react";
 
+import { frontendPreviewMode } from "@aioj/config";
 import type { AdminQuestionDetail } from "../lib/admin-api";
 import { adminApiPath, adminInternalPath } from "../lib/paths";
 import { Button, Input, Panel, Textarea } from "@aioj/ui";
@@ -43,6 +44,10 @@ export function AdminQuestionEditor({ question }: AdminQuestionEditorProps) {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (frontendPreviewMode) {
+      setError("当前是前端预览模式，题目改动不会提交到后端。");
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -74,6 +79,10 @@ export function AdminQuestionEditor({ question }: AdminQuestionEditorProps) {
 
   async function handleDelete() {
     if (!question?.questionId || !window.confirm("确认删除这道题目吗？")) return;
+    if (frontendPreviewMode) {
+      setError("当前是前端预览模式，删除操作已禁用。");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -160,11 +169,11 @@ export function AdminQuestionEditor({ question }: AdminQuestionEditorProps) {
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" disabled={submitting}>
             {submitting ? <LoaderCircle size={14} className="animate-spin" /> : null}
-            保存题目
+            {frontendPreviewMode ? "预览模式下不可保存" : "保存题目"}
           </Button>
           {question ? (
             <Button type="button" variant="secondary" disabled={submitting} onClick={handleDelete}>
-              删除题目
+              {frontendPreviewMode ? "预览模式下不可删除" : "删除题目"}
             </Button>
           ) : null}
         </div>

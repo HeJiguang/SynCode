@@ -5,6 +5,9 @@ const ADMIN_URL = process.env.ADMIN_URL || "http://localhost:4002";
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@aioj/api", "@aioj/config", "@aioj/tokens", "@aioj/ui"],
+  experimental: {
+    devtoolSegmentExplorer: false
+  },
   async rewrites() {
     return [
       {

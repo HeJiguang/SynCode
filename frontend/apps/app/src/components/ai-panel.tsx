@@ -3,11 +3,12 @@
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AiArtifact, AiRunCreateResponse, AiRunEvent, CodeLanguage } from "@aioj/api";
+import { frontendPreviewMode } from "@aioj/config";
 import { Check, Code2, Copy, Send, Sparkles, X } from "lucide-react";
 
 import type { JudgeResultDetail } from "../lib/judge-result";
 import { appApiPath } from "../lib/paths";
-import { Button, Panel } from "@aioj/ui";
+import { Button } from "@aioj/ui";
 
 
 type AiPanelProps = {
@@ -39,9 +40,9 @@ type TimelineEntry =
   | { id: string; kind: "artifact"; artifact: AiArtifact };
 
 const QUICK_ACTIONS: Array<{ label: string; runType: RunType }> = [
-  { label: "给我一个解题提示", runType: "interactive_tutor" },
-  { label: "分析我最近一次提交", runType: "interactive_diagnosis" },
-  { label: "推荐下一步训练重点", runType: "interactive_recommendation" }
+  { label: "解题提示", runType: "interactive_tutor" },
+  { label: "分析提交", runType: "interactive_diagnosis" },
+  { label: "接下来练什么", runType: "interactive_recommendation" }
 ];
 
 function parseBlocks(text: string): Block[] {
@@ -178,10 +179,9 @@ function CodeBlock({ lang, content }: { lang: string; content: string }) {
 
 function PromptBubble({ content }: { content: string }) {
   return (
-    <div className="-mx-5 flex justify-end px-5 py-4">
-      <div className="max-w-[88%] rounded-[var(--radius-md)] bg-[var(--surface-2)] px-4 py-3 text-sm leading-6 text-[var(--text-primary)]">
-        {content}
-      </div>
+    <div className="-mx-4 border-b border-[var(--border-soft)] bg-[var(--surface-1)] px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Query</p>
+      <p className="mt-2 text-sm leading-6 text-[var(--text-primary)]">{content}</p>
     </div>
   );
 }
@@ -229,8 +229,7 @@ function ArtifactCard({ artifact }: { artifact: AiArtifact }) {
 
       {nextAction ? (
         <div className="mt-4 rounded-[var(--radius-sm)] border border-[var(--border-soft)] bg-[var(--surface-1)] px-3 py-2">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">下一步建议</p>
-          <p className="mt-1 text-sm leading-6 text-[var(--text-primary)]">{nextAction}</p>
+          <p className="text-sm leading-6 text-[var(--text-primary)]">{nextAction}</p>
         </div>
       ) : null}
     </div>
@@ -291,6 +290,25 @@ export function AiPanel({
 
   const executeRun = useCallback(
     async (userMessage: string, runType: RunType) => {
+      if (frontendPreviewMode) {
+        const previewArtifact = buildErrorArtifact(
+          `当前是前端预览模式，AI 面板不会真正调用后端。你刚才的请求是「${userMessage}」，现在只保留界面和交互走查。`
+        );
+        previewArtifact.title = "Preview Response";
+        previewArtifact.summary = `预览模式下已拦截 ${runType} 请求。`;
+        previewArtifact.body.nextAction = "如果要联调真实 AI 能力，请关闭前端预览模式并接通本地后端。";
+        setRunStatus("PREVIEW");
+        setEntries((current) => mergeArtifacts(current, [previewArtifact]));
+        setLatestEvents([]);
+        return {
+          runId: "preview-run",
+          status: "PREVIEW",
+          entryGraph: runType,
+          eventsUrl: "",
+          artifactsUrl: ""
+        } satisfies AiRunCreateResponse;
+      }
+
       const response = await fetch(appApiPath("/ai/runs"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -383,29 +401,25 @@ export function AiPanel({
   }, [questionId, submitPrompt]);
 
   return (
-    <Panel hoverable className="flex h-full flex-col p-0">
-      <div className="shrink-0 border-b border-[var(--border-soft)] px-5 py-4">
+    <div className="flex h-full flex-col bg-[var(--surface-1)]">
+      <div className="shrink-0 border-b border-[var(--border-soft)] bg-[var(--surface-1)] px-4 py-3">
         <div>
-          <p className="kicker">辅助面板</p>
-          <h3 className="mt-0.5 text-base font-semibold text-[var(--text-primary)]">AI 辅助</h3>
+          <p className="kicker">提问</p>
+          <h3 className="mt-0.5 text-base font-semibold text-[var(--text-primary)]">助手</h3>
         </div>
         <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
           <span className={`inline-block h-1.5 w-1.5 rounded-full ${running ? "animate-pulse bg-[var(--accent)]" : "bg-green-500"}`} />
-          {running ? "正在处理..." : runStatus}
+          {running ? "处理中" : null}
         </div>
       </div>
 
       {stallTip ? (
-        <div className="mx-4 mt-3 flex shrink-0 items-start gap-3 rounded-[var(--radius-sm)] border border-[var(--accent)]/25 bg-[var(--accent-bg)] px-4 py-3">
+        <div className="mx-4 mt-3 flex shrink-0 items-start gap-3 rounded-[10px] border border-[var(--accent)]/25 bg-[var(--accent-bg)] px-4 py-3">
           <Sparkles size={14} className="mt-0.5 shrink-0 text-[var(--accent)]" />
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-[var(--text-primary)]">你在这个步骤停留得有点久了。</p>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--text-secondary)]">
-              先发起一次提示型问答更合适，如果还卡住，再继续做完整诊断。
-            </p>
             <button
               type="button"
-              className="mt-2 text-[11px] font-semibold text-[var(--accent)] hover:underline"
+              className="text-[11px] font-semibold text-[var(--accent)] hover:underline"
               onClick={() => {
                 setStallTip(false);
                 void submitPrompt("先给我一点提示，不要直接给完整答案。", "interactive_tutor");
@@ -425,7 +439,7 @@ export function AiPanel({
       ) : null}
 
       {recentEvents.length > 0 ? (
-        <div className="mx-4 mt-3 shrink-0 rounded-[var(--radius-sm)] border border-[var(--border-soft)] bg-[var(--surface-2)] px-4 py-3">
+        <div className="mx-4 mt-3 shrink-0 rounded-[10px] border border-[var(--border-soft)] bg-[var(--surface-2)] px-4 py-3">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">本轮进度</p>
           <div className="mt-2 space-y-1.5">
             {recentEvents.map((event) => (
@@ -438,13 +452,10 @@ export function AiPanel({
         </div>
       ) : null}
 
-      <div ref={scrollRef} className="flex-1 divide-y divide-[var(--border-soft)] overflow-auto px-5">
+      <div ref={scrollRef} className="flex-1 divide-y divide-[var(--border-soft)] overflow-auto px-4">
         {entries.length === 0 && !running ? (
           <div data-testid="ai-empty-state" className="py-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">还没有开始对话</p>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-              可以直接提问，或者用下方快捷操作获取提示、诊断和下一步建议。
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">开始提问</p>
           </div>
         ) : null}
 
@@ -457,14 +468,14 @@ export function AiPanel({
         )}
       </div>
 
-      <div className="shrink-0 border-t border-[var(--border-soft)] px-4 pb-2 pt-3">
+      <div className="shrink-0 border-t border-[var(--border-soft)] bg-[var(--surface-1)] px-4 pb-2 pt-3">
         <div className="mb-3 flex flex-wrap gap-1.5">
           {QUICK_ACTIONS.map((item) => (
             <Button
               key={item.label}
               size="sm"
               variant="secondary"
-              className="h-7 text-[11px]"
+              className="h-7 rounded-[8px] text-[11px]"
               onClick={() => void submitPrompt(item.label, item.runType)}
               disabled={running}
             >
@@ -485,7 +496,7 @@ export function AiPanel({
             }}
             placeholder="输入你当前卡住的问题。回车发送，Shift + 回车换行。"
             rows={2}
-            className="flex-1 resize-none rounded-[var(--radius-sm)] border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 py-2 text-[13px] leading-relaxed text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-colors focus:border-[var(--accent)]/50 focus:outline-none"
+            className="flex-1 resize-none rounded-[8px] border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 py-2 text-[13px] leading-relaxed text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-colors focus:border-[var(--accent)]/50 focus:outline-none"
           />
           <Button
             size="sm"
@@ -497,6 +508,6 @@ export function AiPanel({
           </Button>
         </div>
       </div>
-    </Panel>
+    </div>
   );
 }
