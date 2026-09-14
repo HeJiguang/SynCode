@@ -14,6 +14,17 @@ This directory is the source of truth for database changes made after the Phase 
 
 The migration runner, credentials, and CI workflow will be added with the first Phase 1 schema migration. Migration credentials must only have the permissions needed for schema evolution and must be stored in environment secrets.
 
+The runner is now defined in `pom.xml`. Set `SYNCODE_DB_URL`, `SYNCODE_DB_USER`, and `SYNCODE_DB_PASSWORD`, then use:
+
+```bash
+mvn -f deploy/migrations/pom.xml flyway:info
+mvn -f deploy/migrations/pom.xml flyway:baseline
+mvn -f deploy/migrations/pom.xml flyway:migrate
+mvn -f deploy/migrations/pom.xml flyway:validate
+```
+
+Run `baseline` only for a verified legacy database and only after `mysql/preflight/legacy_schema_preflight.sql` returns no violations. A new database receives the legacy bootstrap fixture first, then the same explicit baseline.
+
 ## Directory layout
 
 ```text
