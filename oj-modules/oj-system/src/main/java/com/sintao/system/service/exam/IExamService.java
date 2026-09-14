@@ -4,7 +4,9 @@ import com.sintao.system.domain.exam.dto.ExamAddDTO;
 import com.sintao.system.domain.exam.dto.ExamEditDTO;
 import com.sintao.system.domain.exam.dto.ExamQueryDTO;
 import com.sintao.system.domain.exam.dto.ExamQuestAddDTO;
+import com.sintao.system.domain.exam.dto.ExamQuestionsReplaceDTO;
 import com.sintao.system.domain.exam.vo.ExamDetailVO;
+import com.sintao.system.domain.exam.vo.ExamPublicationVO;
 import com.sintao.system.domain.exam.vo.ExamVO;
 
 import java.util.List;
@@ -17,6 +19,8 @@ public interface IExamService {
 
     boolean questionAdd(ExamQuestAddDTO examQuestAddDTO);
 
+    boolean replaceQuestions(Long examId, ExamQuestionsReplaceDTO request);
+
     int questionDelete(Long examId, Long questionId);
 
     ExamDetailVO detail(Long examId);
@@ -26,6 +30,8 @@ public interface IExamService {
     int delete(Long examId);
 
     int publish(Long examId);
+
+    ExamPublicationVO publish(Long examId, String idempotencyKey, String requestId);
 
     int cancelPublish(Long examId);
 }

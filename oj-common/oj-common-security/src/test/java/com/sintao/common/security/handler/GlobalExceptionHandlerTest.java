@@ -2,15 +2,18 @@ package com.sintao.common.security.handler;
 
 import com.sintao.common.core.domain.R;
 import com.sintao.common.core.enums.ResultCode;
+import com.sintao.common.security.exception.ServiceException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class GlobalExceptionHandlerTest {
 
@@ -33,6 +36,21 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(ResultCode.FAILED_PARAMS_VALIDATE.getCode(), response.getCode());
         assertEquals("参数 'questionId' 的值 'merge-intervals' 无效", response.getMsg());
+    }
+
+    @Test
+    void trustedExamExceptionShouldPreserveHttpStatusAndDetails() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/exam/1/publish");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        ServiceException exception = new ServiceException(
+                ResultCode.EXAM_PUBLISH_VALIDATION_FAILED,
+                java.util.Map.of("violations", java.util.List.of("questions")));
+
+        R<?> result = handler.handleServiceException(exception, request, response);
+
+        assertEquals(422, response.getStatus());
+        assertEquals(ResultCode.EXAM_PUBLISH_VALIDATION_FAILED.getCode(), result.getCode());
+        assertNotNull(result.getDetails());
     }
 
     private static final class QuestionEndpoint {

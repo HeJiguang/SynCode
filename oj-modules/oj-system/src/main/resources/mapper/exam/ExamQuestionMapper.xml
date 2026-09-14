@@ -8,7 +8,11 @@
         SELECT
             tq.question_id,
             tq.title,
-            tq.difficulty
+            tq.difficulty,
+            teq.question_order,
+            teq.score,
+            teq.required_flag AS required,
+            teq.question_type
         FROM
            tb_exam_question teq
         join

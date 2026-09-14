@@ -8,8 +8,13 @@
         SELECT
             te.exam_id,
             te.title,
+            te.description,
             te.start_time,
+            te.latest_start_time,
             te.end_time,
+            te.duration_minutes,
+            te.current_version_id,
+            te.version_no,
             te.create_time,
             ts.nick_name as create_name,
             te.status
@@ -32,5 +37,12 @@
         </where>
         ORDER BY
             te.create_time DESC
+    </select>
+
+    <select id="selectByIdForUpdate" resultType="com.sintao.system.domain.exam.Exam">
+        SELECT *
+        FROM tb_exam
+        WHERE exam_id = #{examId}
+        FOR UPDATE
     </select>
 </mapper>

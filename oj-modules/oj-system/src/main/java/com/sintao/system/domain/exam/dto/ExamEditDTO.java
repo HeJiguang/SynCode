@@ -8,5 +8,7 @@ import lombok.Setter;
 public class ExamEditDTO extends ExamAddDTO {
 
     private Long examId;
+
+    private Integer expectedRowVersion;
 }
 

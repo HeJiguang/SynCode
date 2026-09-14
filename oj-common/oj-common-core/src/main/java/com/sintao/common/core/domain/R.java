@@ -1,12 +1,15 @@
 package com.sintao.common.core.domain;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.sintao.common.core.enums.ResultCode;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class R<T> {
 
     private int code;
     private String msg;
     private T data;
+    private Object details;
 
     public static <T> R<T> ok() {
         return assembleResult(null, ResultCode.SUCCESS);
@@ -26,6 +29,12 @@ public class R<T> {
 
     public static <T> R<T> fail(ResultCode resultCode) {
         return assembleResult(null, resultCode);
+    }
+
+    public static <T> R<T> fail(ResultCode resultCode, Object details) {
+        R<T> result = assembleResult(null, resultCode);
+        result.setDetails(details);
+        return result;
     }
 
     private static <T> R<T> assembleResult(T data, ResultCode resultCode) {
@@ -66,5 +75,13 @@ public class R<T> {
 
     public void setData(T data) {
         this.data = data;
+    }
+
+    public Object getDetails() {
+        return details;
+    }
+
+    public void setDetails(Object details) {
+        this.details = details;
     }
 }
