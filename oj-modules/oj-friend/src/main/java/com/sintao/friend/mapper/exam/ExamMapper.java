@@ -11,5 +11,7 @@ public interface ExamMapper extends BaseMapper<Exam> {
 
     List<ExamVO> selectExamList(ExamQueryDTO examQueryDTO);
 
+    Exam selectByIdForUpdate(Long examId);
+
 }
 

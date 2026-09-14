@@ -24,6 +24,16 @@ public class UserExam extends BaseEntity {
 	@JsonSerialize(using = ToStringSerializer.class)
 	private Long userId;
 
+	private Integer authorizationStatus;
+
+	private String authorizationSource;
+
+	private Long revokedBy;
+
+	private java.time.LocalDateTime revokedTime;
+
+	private String revokeReason;
+
 	private Integer score;
 
 	private Integer examRank;
