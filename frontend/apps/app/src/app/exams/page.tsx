@@ -8,9 +8,8 @@ import { appPublicPath } from "../../lib/paths";
 import { getServerAccessToken } from "../../lib/server-auth";
 import { Panel, Tag } from "@aioj/ui";
 
-const UPCOMING_STATUS = "鏈紑濮?" as const;
-const ACTIVE_STATUS = "杩涜涓?" as const;
-const FINISHED_STATUS = "宸茬粨鏉?" as const;
+const ACTIVE_STATUS = "进行中" as const;
+const FINISHED_STATUS = "已结束" as const;
 
 function getExamTone(status: string) {
   if (status === ACTIVE_STATUS) return "warning" as const;

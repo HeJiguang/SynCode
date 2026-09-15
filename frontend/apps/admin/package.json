@@ -5,7 +5,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "tsx src/__tests__/smoke.test.tsx && tsx src/__tests__/paths.test.ts && tsx src/__tests__/dashboard-contract.test.ts"
+    "test": "tsx src/__tests__/smoke.test.tsx && tsx src/__tests__/paths.test.ts && tsx src/__tests__/dashboard-contract.test.ts && tsx src/__tests__/trusted-exam-contract.test.ts"
   },
   "dependencies": {
     "@aioj/api": "*",

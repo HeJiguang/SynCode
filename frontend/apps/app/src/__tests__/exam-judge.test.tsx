@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -10,9 +11,14 @@ async function main() {
     await ExamWorkspacePage({ params: Promise.resolve({ examId: "exam-checkpoint-02" }) })
   );
 
-  assert.match(examHtml, /热度 83/);
-  assert.doesNotMatch(examHtml, /热度 98/);
-  assert.match(examHtml, /1 \/ 2/);
+  assert.match(examHtml, /loader-circle/);
+  const workspaceSource = readFileSync(new URL("../components/trusted-exam-workspace.tsx", import.meta.url), "utf8");
+  assert.match(workspaceSource, /attempts\/current/);
+  assert.match(workspaceSource, /expectedVersion/);
+  assert.match(workspaceSource, /integrity-events/);
+  assert.match(workspaceSource, /submitKind/);
+  assert.match(workspaceSource, /服务端计时/);
+  assert.match(workspaceSource, /交卷后答案将被冻结/);
 
   const history = mapJudgeHistoryRow(
     {

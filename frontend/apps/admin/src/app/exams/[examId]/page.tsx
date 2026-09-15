@@ -2,6 +2,7 @@ import * as React from "react";
 
 import { AdminShell } from "../../../components/admin-shell";
 import { AdminExamEditor } from "../../../components/admin-exam-editor";
+import { AdminExamOperations } from "../../../components/admin-exam-operations";
 import { getAdminExamDetail, getAdminProfile } from "../../../lib/admin-api";
 import { requireAdminAccessToken } from "../../../lib/server-auth";
 
@@ -21,6 +22,7 @@ export default async function AdminExamDetailPage({ params }: AdminExamDetailPag
       description="维护考试时间、题目绑定和发布状态。"
     >
       <AdminExamEditor exam={exam} />
+      <AdminExamOperations examId={examId} />
     </AdminShell>
   );
 }
