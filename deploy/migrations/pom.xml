@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.sintao</groupId>
+    <artifactId>syncode-database-migrations</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <properties>
+        <flyway.version>10.15.2</flyway.version>
+        <mysql.version>8.3.0</mysql.version>
+        <flyway.url>${env.SYNCODE_DB_URL}</flyway.url>
+        <flyway.user>${env.SYNCODE_DB_USER}</flyway.user>
+        <flyway.password>${env.SYNCODE_DB_PASSWORD}</flyway.password>
+        <flyway.locations>filesystem:${project.basedir}/mysql/versioned</flyway.locations>
+        <flyway.baselineVersion>2026091300</flyway.baselineVersion>
+        <flyway.baselineDescription>trusted_exam_baseline</flyway.baselineDescription>
+        <flyway.validateMigrationNaming>true</flyway.validateMigrationNaming>
+        <flyway.cleanDisabled>true</flyway.cleanDisabled>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-maven-plugin</artifactId>
+                <version>${flyway.version}</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.flywaydb</groupId>
+                        <artifactId>flyway-mysql</artifactId>
+                        <version>${flyway.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>com.mysql</groupId>
+                        <artifactId>mysql-connector-j</artifactId>
+                        <version>${mysql.version}</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+        </plugins>
+    </build>
+</project>

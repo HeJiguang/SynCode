@@ -20,8 +20,9 @@ const ACTIVE_EXAM_STATUS: ExamSummary["status"] = examDetails["exam-checkpoint-0
 const FINISHED_EXAM_STATUS: ExamSummary["status"] = examDetails["exam-review-03"].status;
 
 function normalizeExamStatus(status?: string | number | null): ExamSummary["status"] {
-  if (status === 1 || status === "1" || status === ACTIVE_EXAM_STATUS) return ACTIVE_EXAM_STATUS;
-  if (status === 2 || status === "2" || status === FINISHED_EXAM_STATUS) return FINISHED_EXAM_STATUS;
+  if (status === 2 || status === "2" || status === ACTIVE_EXAM_STATUS) return ACTIVE_EXAM_STATUS;
+  if (status === 3 || status === "3" || status === 4 || status === "4"
+      || status === 5 || status === "5" || status === FINISHED_EXAM_STATUS) return FINISHED_EXAM_STATUS;
   return UPCOMING_EXAM_STATUS;
 }
 

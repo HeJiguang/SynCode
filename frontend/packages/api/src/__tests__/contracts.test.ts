@@ -154,6 +154,28 @@ async function main() {
     }
   );
 
+  await withPatchedEnv(
+    {
+      NEXT_PUBLIC_BACKEND_BASE_URL: undefined,
+      SYNCODE_BACKEND_BASE_URL: undefined
+    },
+    async () => {
+      await withWindowValue(
+        { location: { origin: "https://test.syncode.example" } },
+        async () => {
+          assert.equal(
+            api.resolveBackendBaseUrl(),
+            "https://test.syncode.example"
+          );
+          assert.equal(
+            api.resolveJudgeWebSocketUrl(),
+            "wss://test.syncode.example/friend/ws/judge/result"
+          );
+        }
+      );
+    }
+  );
+
   await withRejectingFetch(new Error("network down"), async () => {
     await assert.rejects(
       () => api.getProblemDetail("two-sum", "user-token"),

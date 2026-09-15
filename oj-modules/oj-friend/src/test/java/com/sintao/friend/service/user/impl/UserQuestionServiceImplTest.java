@@ -14,7 +14,7 @@ import com.sintao.friend.mapper.question.QuestionMapper;
 import com.sintao.friend.mapper.user.UserSubmitMapper;
 import com.sintao.friend.rabbit.JudgeProducer;
 import com.sintao.api.RemoteJudgeService;
-import com.sintao.friend.elasticsearch.QuestionRepository;
+import com.sintao.friend.elasticsearch.FriendQuestionRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,7 +40,7 @@ import static org.mockito.Mockito.when;
 class UserQuestionServiceImplTest {
 
     @Mock
-    private QuestionRepository questionRepository;
+    private FriendQuestionRepository questionRepository;
 
     @Mock
     private QuestionMapper questionMapper;

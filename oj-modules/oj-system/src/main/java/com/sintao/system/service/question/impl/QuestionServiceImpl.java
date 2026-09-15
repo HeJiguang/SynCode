@@ -15,7 +15,7 @@ import com.sintao.system.domain.question.dto.QuestionQueryDTO;
 import com.sintao.system.domain.question.es.QuestionES;
 import com.sintao.system.domain.question.vo.QuestionDetailVO;
 import com.sintao.system.domain.question.vo.QuestionVO;
-import com.sintao.system.elasticsearch.QuestionRepository;
+import com.sintao.system.elasticsearch.SystemQuestionRepository;
 import com.sintao.system.manager.QuestionCacheManager;
 import com.sintao.system.mapper.question.QuestionMapper;
 import com.sintao.system.service.question.IQuestionService;
@@ -36,7 +36,7 @@ public class QuestionServiceImpl implements IQuestionService {
     private QuestionMapper questionMapper;
 
     @Autowired
-    private QuestionRepository questionRepository;
+    private SystemQuestionRepository questionRepository;
 
     @Autowired
     private QuestionCacheManager questionCacheManager;

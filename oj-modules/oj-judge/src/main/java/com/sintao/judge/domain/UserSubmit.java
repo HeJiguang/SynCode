@@ -30,6 +30,16 @@ public class UserSubmit extends BaseEntity {
 
 	private Long examId;   //唯一确定竞赛      1       2          3   4    null
 
+	private Long attemptId;
+
+	private Long versionQuestionId;
+
+	private Long answerId;
+
+	private Integer answerVersion;
+
+	private String submitKind;
+
 	private Integer programType;
 
 	private String userCode;

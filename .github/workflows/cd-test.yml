@@ -1,0 +1,126 @@
+name: cd-test
+
+on:
+  workflow_run:
+    workflows:
+      - ci
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Optional successful CI run id for main
+        required: false
+        type: string
+
+concurrency:
+  group: cd-test
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy And Smoke Test
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+      }}
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - syncode-test
+    environment: test
+    env:
+      STACK_NAME: onlineoj-test
+      STACK_FILE: deploy/prod/swarm/stack-compact.yml
+      STACK_ENV_FILE: deploy/prod/env/stack.env
+      RUNTIME_ENV_FILE: deploy/prod/env/runtime.env
+      DEPLOYMENT_MODE: compact
+      SYNCODE_DB_URL: ${{ secrets.SYNCODE_DB_URL_TEST }}
+      SYNCODE_DB_USER: ${{ secrets.SYNCODE_DB_USER_TEST }}
+      SYNCODE_DB_PASSWORD: ${{ secrets.SYNCODE_DB_PASSWORD_TEST }}
+      TEST_BASE_URL: ${{ secrets.TEST_BASE_URL }}
+      TEST_ADMIN_ACCOUNT: ${{ secrets.TEST_ADMIN_ACCOUNT }}
+      TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+      TEST_CANDIDATE_EMAIL: ${{ secrets.TEST_CANDIDATE_EMAIL }}
+      TEST_CANDIDATE_CODE: ${{ secrets.TEST_CANDIDATE_CODE }}
+      TEST_QUESTION_ID: ${{ secrets.TEST_QUESTION_ID }}
+    steps:
+      - name: Resolve successful CI run
+        id: source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          source_run_id="${{ github.event.inputs.source_run_id }}"
+          if [[ -z "${source_run_id}" && "${{ github.event_name }}" == "workflow_run" ]]; then
+            source_run_id="${{ github.event.workflow_run.id }}"
+          fi
+          if [[ -z "${source_run_id}" ]]; then
+            source_run_id="$(gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?branch=main&status=success&per_page=1" --jq '.workflow_runs[0].id')"
+          fi
+          read -r source_sha source_branch source_conclusion <<< "$(
+            gh api "repos/${{ github.repository }}/actions/runs/${source_run_id}" \
+              --jq '[.head_sha, .head_branch, .conclusion] | @tsv'
+          )"
+          if [[ "${source_conclusion}" != "success" ]]; then
+            echo "CI run ${source_run_id} is not successful" >&2
+            exit 1
+          fi
+          if [[ "${{ github.event_name }}" != "workflow_dispatch" && "${source_branch}" != "main" ]]; then
+            echo "automatic test deployment only accepts main builds" >&2
+            exit 1
+          fi
+          echo "run_id=${source_run_id}" >> "$GITHUB_OUTPUT"
+          echo "sha=${source_sha}" >> "$GITHUB_OUTPUT"
+          echo "artifact=deploy-source-${source_sha}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=sha-${source_sha::12}" >> "$GITHUB_OUTPUT"
+
+      - name: Download tested source bundle
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          rm -rf source-bundle repo
+          mkdir -p source-bundle repo
+          gh run download "${{ steps.source.outputs.run_id }}" --repo "${{ github.repository }}" \
+            --name "${{ steps.source.outputs.artifact }}" --dir source-bundle
+          tar xzf source-bundle/deploy-source.tar.gz -C repo
+
+      - name: Prepare isolated test configuration
+        shell: bash
+        working-directory: repo
+        run: |
+          printf '%s\n' "${{ secrets.STACK_ENV_TEST }}" > "${STACK_ENV_FILE}"
+          printf '%s\n' "${{ secrets.RUNTIME_ENV_TEST }}" > "${RUNTIME_ENV_FILE}"
+          sed -i "s#sha-REPLACE_ME#${{ steps.source.outputs.image_tag }}#g" "${STACK_ENV_FILE}"
+
+      - name: Migrate test database
+        shell: bash
+        working-directory: repo
+        run: |
+          mvn --batch-mode -f deploy/migrations/pom.xml flyway:migrate
+          mvn --batch-mode -f deploy/migrations/pom.xml flyway:validate
+
+      - name: Build and deploy test stack
+        shell: bash
+        working-directory: repo
+        run: |
+          chmod +x deploy/prod/scripts/*.sh deploy/test/scripts/*.sh
+          BUILD_LOCAL_IMAGES=true STACK_ENV_FILE="${STACK_ENV_FILE}" RUNTIME_ENV_FILE="${RUNTIME_ENV_FILE}" \
+            deploy/prod/scripts/deploy.sh
+
+      - name: Smoke test deployed revision
+        shell: bash
+        working-directory: repo
+        run: deploy/test/scripts/smoke.sh
+
+      - name: Trusted exam end-to-end acceptance
+        shell: bash
+        working-directory: repo
+        run: deploy/test/scripts/trusted-exam-e2e.sh

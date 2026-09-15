@@ -14,21 +14,86 @@ concurrency:
 
 jobs:
   java:
-    name: Java Compile
+    name: Java Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
           cache: maven
 
-      - name: Compile reactor
-        run: mvn -q -DskipTests compile
+      - name: Test reactor
+        run: mvn --batch-mode test -DskipTests=false
+
+  database-migrations:
+    name: MySQL Migration Verification
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: bitoj_dev
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --host=127.0.0.1 --user=root --password=root"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      MYSQL_PWD: root
+      SYNCODE_DB_URL: jdbc:mysql://127.0.0.1:3306/bitoj_dev?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+      SYNCODE_DB_USER: root
+      SYNCODE_DB_PASSWORD: root
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Install MySQL client
+        run: sudo apt-get update && sudo apt-get install --yes mysql-client
+
+      - name: Initialize legacy schema
+        run: mysql --host=127.0.0.1 --user=root < deploy/dev/sql/init-complete.sql
+
+      - name: Verify legacy preflight
+        run: |
+          violations="$(mysql --batch --skip-column-names --host=127.0.0.1 --user=root bitoj_dev < deploy/migrations/mysql/preflight/legacy_schema_preflight.sql)"
+          if [[ -n "${violations}" ]]; then
+            echo "Legacy preflight returned violations:" >&2
+            echo "${violations}" >&2
+            exit 1
+          fi
+
+      - name: Baseline, migrate twice, and validate
+        run: |
+          mvn --batch-mode -f deploy/migrations/pom.xml flyway:baseline
+          mvn --batch-mode -f deploy/migrations/pom.xml flyway:migrate
+          mvn --batch-mode -f deploy/migrations/pom.xml flyway:migrate
+          mvn --batch-mode -f deploy/migrations/pom.xml flyway:validate
+
+      - name: Verify migrated schema
+        run: |
+          output="$(mysql --batch --skip-column-names --host=127.0.0.1 --user=root bitoj_dev < deploy/migrations/mysql/verification/verify_V2026091401__trusted_exam_core_schema.sql)"
+          violations="$(printf '%s\n' "${output}" | sed '$d')"
+          if [[ -n "${violations}" ]]; then
+            echo "Migration verification returned violations:" >&2
+            echo "${violations}" >&2
+            exit 1
+          fi
+          printf '%s\n' "${output}" | tail -n 1
 
   oj-agent:
     name: Python Agent Tests
@@ -38,10 +103,10 @@ jobs:
         working-directory: oj-agent
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -63,10 +128,10 @@ jobs:
         working-directory: frontend
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
@@ -105,9 +170,25 @@ jobs:
       - java
       - oj-agent
       - frontend
+      - database-migrations
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
+      - name: Validate deploy definitions
+        shell: bash
+        run: |
+          cp deploy/prod/env/runtime.env.example deploy/prod/env/runtime.env
+          for env_file in deploy/prod/env/stack.env.example deploy/test/env/infra.env.example; do
+            while IFS= read -r line || [[ -n "${line}" ]]; do
+              [[ -z "${line}" || "${line}" =~ ^[[:space:]]*# ]] && continue
+              export "${line}"
+            done < "${env_file}"
+          done
+          docker stack config --compose-file deploy/prod/swarm/stack.yml > /dev/null
+          docker stack config --compose-file deploy/prod/swarm/stack-compact.yml > /dev/null
+          docker stack config --compose-file deploy/test/swarm/infra.yml > /dev/null
+          bash -n deploy/prod/scripts/build-images.sh deploy/prod/scripts/deploy.sh deploy/test/scripts/*.sh
 
       - name: Create source bundle
         run: |
@@ -119,7 +200,7 @@ jobs:
             .
 
       - name: Upload source bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: deploy-source-${{ github.sha }}
           path: ${{ runner.temp }}/deploy-source.tar.gz

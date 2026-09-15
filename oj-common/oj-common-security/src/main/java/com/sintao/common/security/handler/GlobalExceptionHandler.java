@@ -6,6 +6,7 @@ import com.sintao.common.core.domain.R;
 import com.sintao.common.core.enums.ResultCode;
 import com.sintao.common.security.exception.ServiceException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
@@ -40,11 +41,30 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ServiceException.class)
-    public R<?> handleServiceException(ServiceException e, HttpServletRequest request) {
+    public R<?> handleServiceException(ServiceException e, HttpServletRequest request,
+                                       HttpServletResponse response) {
         String requestURI = request.getRequestURI();
         ResultCode resultCode = e.getResultCode();
         log.error("请求地址 '{}'，发生业务异常：{}", requestURI, resultCode.getMsg(), e);
-        return R.fail(resultCode);
+        response.setStatus(httpStatus(resultCode));
+        return R.fail(resultCode, e.getDetails());
+    }
+
+    private int httpStatus(ResultCode resultCode) {
+        return switch (resultCode) {
+            case EXAM_CANDIDATE_NOT_AUTHORIZED, EXAM_RESULT_NOT_RELEASED -> 403;
+            case EXAM_ATTEMPT_NOT_FOUND, EXAM_ANSWER_NOT_FOUND, EXAM_QUESTION_NOT_IN_VERSION,
+                    FAILED_NOT_EXISTS, EXAM_NOT_EXISTS -> 404;
+            case EXAM_CANCELLED, EXAM_ADMISSION_CLOSED, EXAM_ATTEMPT_EXPIRED -> 410;
+            case EXAM_PUBLISH_VALIDATION_FAILED, EXAM_INTEGRITY_EVENT_REJECTED -> 422;
+            case EXAM_SUBMISSION_LIMIT_REACHED -> 429;
+            case EXAM_FINALIZATION_PENDING -> 202;
+            case EXAM_STATE_CONFLICT, EXAM_NOT_PUBLISHED, EXAM_ACCESS_TOO_EARLY,
+                    EXAM_ATTEMPT_TERMINAL, EXAM_ANSWER_VERSION_CONFLICT,
+                    EXAM_IDEMPOTENCY_CONFLICT, EXAM_GRADE_NOT_READY,
+                    EXAM_COMMAND_IN_PROGRESS, EXAM_SESSION_CONFLICT -> 409;
+            default -> 400;
+        };
     }
 
     @ExceptionHandler(BindException.class)

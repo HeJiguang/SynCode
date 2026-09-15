@@ -7,6 +7,10 @@ on:
         description: Optional override for the runner name
         required: false
         type: string
+      runner_labels:
+        description: Optional comma-separated labels (defaults to production labels)
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -17,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Resolve metadata
         id: meta
@@ -27,8 +31,12 @@ jobs:
           if [[ -z "${runner_name}" ]]; then
             runner_name="syncode-prod-101-96-200-76"
           fi
+          runner_labels="${{ github.event.inputs.runner_labels }}"
+          if [[ -z "${runner_labels}" ]]; then
+            runner_labels="syncode-prod,onlineoj-prod"
+          fi
           echo "runner_name=${runner_name}" >> "$GITHUB_OUTPUT"
-          echo "runner_labels=syncode-prod,onlineoj-prod" >> "$GITHUB_OUTPUT"
+          echo "runner_labels=${runner_labels}" >> "$GITHUB_OUTPUT"
 
       - name: Resolve runner package
         id: runner

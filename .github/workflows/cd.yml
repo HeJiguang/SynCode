@@ -25,6 +25,9 @@ env:
   STACK_ENV_FILE: deploy/prod/env/stack.env
   RUNTIME_ENV_FILE: deploy/prod/env/runtime.env
   RUNNER_WORKER_SSH_KEY_FILE: /opt/syncode-runner/.ssh/onlineoj_worker_ci
+  SYNCODE_DB_URL: ${{ secrets.SYNCODE_DB_URL_PROD }}
+  SYNCODE_DB_USER: ${{ secrets.SYNCODE_DB_USER_PROD }}
+  SYNCODE_DB_PASSWORD: ${{ secrets.SYNCODE_DB_PASSWORD_PROD }}
 
 jobs:
   release:
@@ -46,7 +49,14 @@ jobs:
             source_run_id="$(gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?branch=main&status=success&per_page=1" --jq '.workflow_runs[0].id')"
           fi
 
-          source_sha="$(gh api "repos/${{ github.repository }}/actions/runs/${source_run_id}" --jq '.head_sha')"
+          read -r source_sha source_branch source_conclusion <<< "$(
+            gh api "repos/${{ github.repository }}/actions/runs/${source_run_id}" \
+              --jq '[.head_sha, .head_branch, .conclusion] | @tsv'
+          )"
+          if [[ "${source_branch}" != "main" || "${source_conclusion}" != "success" ]]; then
+            echo "CI run ${source_run_id} is not a successful main build" >&2
+            exit 1
+          fi
 
           if [[ -n "${{ github.event.inputs.image_tag }}" ]]; then
             image_tag="${{ github.event.inputs.image_tag }}"
@@ -104,6 +114,13 @@ jobs:
             exit 1
           fi
           chmod 600 repo/.cd-tmp/worker_id_ed25519
+
+      - name: Migrate and validate production database
+        shell: bash
+        run: |
+          cd repo
+          mvn --batch-mode -f deploy/migrations/pom.xml flyway:migrate
+          mvn --batch-mode -f deploy/migrations/pom.xml flyway:validate
 
       - name: Verify manager toolchain
         shell: bash

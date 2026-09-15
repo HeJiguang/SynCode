@@ -32,4 +32,11 @@
         ORDER BY
             te.create_time DESC
     </select>
+
+    <select id="selectByIdForUpdate" resultType="com.sintao.friend.domain.exam.Exam">
+        SELECT *
+        FROM tb_exam
+        WHERE exam_id = #{examId}
+        FOR UPDATE
+    </select>
 </mapper>

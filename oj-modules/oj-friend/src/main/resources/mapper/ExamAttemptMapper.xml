@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sintao.friend.mapper.exam.ExamAttemptMapper">
+    <select id="selectByIdForUpdate" resultType="com.sintao.friend.domain.exam.ExamAttempt">
+        SELECT *
+        FROM tb_exam_attempt
+        WHERE attempt_id = #{attemptId}
+        FOR UPDATE
+    </select>
+</mapper>

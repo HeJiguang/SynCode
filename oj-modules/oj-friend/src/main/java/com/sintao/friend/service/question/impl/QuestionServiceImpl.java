@@ -17,7 +17,7 @@ import com.sintao.friend.domain.question.es.QuestionES;
 import com.sintao.friend.domain.question.vo.QuestionCaseVO;
 import com.sintao.friend.domain.question.vo.QuestionDetailVO;
 import com.sintao.friend.domain.question.vo.QuestionVO;
-import com.sintao.friend.elasticsearch.QuestionRepository;
+import com.sintao.friend.elasticsearch.FriendQuestionRepository;
 import com.sintao.friend.manager.QuestionCacheManager;
 import com.sintao.friend.mapper.question.QuestionMapper;
 import com.sintao.friend.mapper.user.UserSubmitMapper;
@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
 public class QuestionServiceImpl implements IQuestionService {
 
     @Autowired
-    private QuestionRepository questionRepository;
+    private FriendQuestionRepository questionRepository;
 
     @Autowired
     private QuestionMapper questionMapper;

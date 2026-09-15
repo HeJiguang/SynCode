@@ -15,13 +15,14 @@ export async function PUT(request: Request) {
   }
 
   const path = body.publish
-    ? `/system/exam/publish?examId=${encodeURIComponent(body.examId)}`
-    : `/system/exam/cancelPublish?examId=${encodeURIComponent(body.examId)}`;
+    ? `/system/exam/${encodeURIComponent(body.examId)}/publish`
+    : `/system/exam/${encodeURIComponent(body.examId)}/withdraw`;
 
   try {
     await requestJson<ApiEnvelope<null>>(path, {
-      method: "PUT",
-      token
+      method: "POST",
+      token,
+      headers: body.publish ? { "Idempotency-Key": `publish-${crypto.randomUUID()}` } : undefined
     }).then(unwrapData);
   } catch (error) {
     return NextResponse.json(

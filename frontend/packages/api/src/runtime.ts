@@ -9,7 +9,7 @@ export function resolveBackendBaseUrl(
       DEFAULT_BACKEND_BASE_URL
     : process.env.NEXT_PUBLIC_BACKEND_BASE_URL ??
       process.env.SYNCODE_BACKEND_BASE_URL ??
-      DEFAULT_BACKEND_BASE_URL
+      window.location.origin
 ) {
   return baseUrl.replace(/\/+$/, "");
 }

@@ -7,7 +7,7 @@ import com.sintao.friend.domain.question.Question;
 import com.sintao.friend.domain.question.dto.QuestionQueryDTO;
 import com.sintao.friend.domain.question.es.QuestionES;
 import com.sintao.friend.domain.question.vo.QuestionDetailVO;
-import com.sintao.friend.elasticsearch.QuestionRepository;
+import com.sintao.friend.elasticsearch.FriendQuestionRepository;
 import com.sintao.friend.manager.QuestionCacheManager;
 import com.sintao.friend.mapper.question.QuestionMapper;
 import com.sintao.friend.mapper.user.UserSubmitMapper;
@@ -33,7 +33,7 @@ import static org.mockito.Mockito.when;
 class QuestionServiceImplTest {
 
     @Mock
-    private QuestionRepository questionRepository;
+    private FriendQuestionRepository questionRepository;
 
     @Mock
     private QuestionMapper questionMapper;

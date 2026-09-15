@@ -39,6 +39,13 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="OJ Agent", version="0.1.0", lifespan=lifespan)
+
+
+@app.get("/health", include_in_schema=False)
+def health() -> dict[str, str]:
+    return {"status": "UP"}
+
+
 app.include_router(training_router)
 app.include_router(runs_router)
 app.include_router(inbox_router)

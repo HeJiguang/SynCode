@@ -42,3 +42,16 @@ export async function DELETE(request: Request) {
 
   return NextResponse.json({ ok: true });
 }
+
+export async function PUT(request: Request) {
+  const token = await getAdminAccessToken();
+  if (!token) return NextResponse.json({ message: "管理员未登录。" }, { status: 401 });
+  const body = (await request.json()) as { examId?: string; questions?: unknown[] };
+  if (!body.examId) return NextResponse.json({ message: "examId 不能为空。" }, { status: 400 });
+  await requestJson<ApiEnvelope<null>>(`/system/exam/${encodeURIComponent(body.examId)}/questions`, {
+    method: "PUT",
+    token,
+    body: JSON.stringify({ questions: body.questions ?? [] })
+  }).then(unwrapData);
+  return NextResponse.json({ ok: true });
+}

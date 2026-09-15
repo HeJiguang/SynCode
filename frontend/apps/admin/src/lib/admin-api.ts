@@ -53,11 +53,23 @@ type BackendExamDetail = {
   title?: string | null;
   startTime?: string | null;
   endTime?: string | null;
+  latestStartTime?: string | null;
+  description?: string | null;
+  durationMinutes?: number | null;
+  timezone?: string | null;
+  maxFormalSubmissions?: number | null;
+  resultReleasePolicy?: string | null;
+  resultReleaseTime?: string | null;
+  rowVersion?: number | null;
+  versionNo?: number | null;
   status?: number | null;
   examQuestionList?: Array<{
     questionId?: string | number | null;
     title?: string | null;
     difficulty?: number | null;
+    questionOrder?: number | null;
+    score?: number | null;
+    required?: boolean | null;
   }> | null;
 };
 
@@ -114,11 +126,23 @@ export type AdminExamDetail = {
   title: string;
   startTime: string;
   endTime: string;
+  latestStartTime: string;
+  description: string;
+  durationMinutes: number;
+  timezone: string;
+  maxFormalSubmissions: number;
+  resultReleasePolicy: string;
+  resultReleaseTime: string;
+  rowVersion: number;
+  versionNo: number;
   status: number;
   examQuestionList: Array<{
     questionId: string;
     title: string;
     difficulty: ReturnType<typeof normalizeDifficulty>;
+    questionOrder: number;
+    score: number;
+    required: boolean;
   }>;
 };
 
@@ -256,7 +280,21 @@ export async function getAdminExamDetail(token: string | null | undefined, examI
     const previewExam = previewAdminExamDetails[examId as keyof typeof previewAdminExamDetails] ?? previewAdminExamDetails["2001"];
     return {
       ...previewExam,
-      examQuestionList: previewExam.examQuestionList.map((item) => ({ ...item }))
+      description: "请独立完成考试，提交前确认所有题目均已保存。",
+      latestStartTime: previewExam.startTime,
+      durationMinutes: 90,
+      timezone: "Asia/Shanghai",
+      maxFormalSubmissions: 10,
+      resultReleasePolicy: "MANUAL",
+      resultReleaseTime: "",
+      rowVersion: 0,
+      versionNo: previewExam.status === 1 ? 1 : 0,
+      examQuestionList: previewExam.examQuestionList.map((item, index) => ({
+        ...item,
+        questionOrder: index + 1,
+        score: 100,
+        required: true
+      }))
     };
   }
   const payload = await requestJson<ApiEnvelope<BackendExamDetail>>(`/system/exam/detail?examId=${encodeURIComponent(examId)}`, { token });
@@ -266,11 +304,23 @@ export async function getAdminExamDetail(token: string | null | undefined, examI
     title: data.title ?? "",
     startTime: data.startTime ?? "",
     endTime: data.endTime ?? "",
+    latestStartTime: data.latestStartTime ?? "",
+    description: data.description ?? "",
+    durationMinutes: Number(data.durationMinutes ?? 120),
+    timezone: data.timezone ?? "Asia/Shanghai",
+    maxFormalSubmissions: Number(data.maxFormalSubmissions ?? 10),
+    resultReleasePolicy: data.resultReleasePolicy ?? "MANUAL",
+    resultReleaseTime: data.resultReleaseTime ?? "",
+    rowVersion: Number(data.rowVersion ?? 0),
+    versionNo: Number(data.versionNo ?? 0),
     status: Number(data.status ?? 0),
     examQuestionList: (data.examQuestionList ?? []).map((item) => ({
       questionId: item.questionId ? String(item.questionId) : "--",
       title: item.title ?? "未命名题目",
-      difficulty: normalizeDifficulty(item.difficulty)
+      difficulty: normalizeDifficulty(item.difficulty),
+      questionOrder: Number(item.questionOrder ?? 1),
+      score: Number(item.score ?? 100),
+      required: item.required !== false
     }))
   } satisfies AdminExamDetail;
 }

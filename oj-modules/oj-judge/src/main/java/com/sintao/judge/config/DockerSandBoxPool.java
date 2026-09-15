@@ -20,6 +20,7 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -34,6 +35,7 @@ public class DockerSandBoxPool {
     private final Long memoryLimit;
     private final Long memorySwapLimit;
     private final Long cpuLimit;
+    private final Long pidsLimit;
     private final int poolSize;
     private final String containerNamePrefix;
     private final BlockingQueue<String> containerQueue;
@@ -45,6 +47,7 @@ public class DockerSandBoxPool {
                              Long memoryLimit,
                              Long memorySwapLimit,
                              Long cpuLimit,
+                             Long pidsLimit,
                              int poolSize,
                              String containerNamePrefix) {
         this.dockerClient = dockerClient;
@@ -53,6 +56,7 @@ public class DockerSandBoxPool {
         this.memoryLimit = memoryLimit;
         this.memorySwapLimit = memorySwapLimit;
         this.cpuLimit = cpuLimit;
+        this.pidsLimit = pidsLimit;
         this.poolSize = poolSize;
         this.containerNamePrefix = containerNamePrefix;
         this.containerQueue = new ArrayBlockingQueue<>(poolSize);
@@ -95,6 +99,10 @@ public class DockerSandBoxPool {
         return baseCodeDir() + File.separator + containerName;
     }
 
+    public void restartContainer(String containerId) {
+        dockerClient.restartContainerCmd(containerId).withTimeout(1).exec();
+    }
+
     private void createContainer(String containerName) {
         List<Container> containerList = dockerClient.listContainersCmd().withShowAll(true).exec();
         if (!CollectionUtil.isEmpty(containerList)) {
@@ -102,7 +110,7 @@ public class DockerSandBoxPool {
             for (Container container : containerList) {
                 String[] containerNames = container.getNames();
                 if (containerNames != null && containerNames.length > 0 && dockerContainerName.equals(containerNames[0])) {
-                    if ("running".equals(container.getState())) {
+                    if ("running".equals(container.getState()) && hasExpectedIsolation(container.getId())) {
                         containerQueue.offer(container.getId());
                         containerNameMap.put(container.getId(), containerName);
                         return;
@@ -127,6 +135,17 @@ public class DockerSandBoxPool {
         dockerClient.startContainerCmd(containerId).exec();
         containerQueue.offer(containerId);
         containerNameMap.put(containerId, containerName);
+    }
+
+    private boolean hasExpectedIsolation(String containerId) {
+        HostConfig hostConfig = dockerClient.inspectContainerCmd(containerId).exec().getHostConfig();
+        return hostConfig != null
+                && Objects.equals(memoryLimit, hostConfig.getMemory())
+                && Objects.equals(memorySwapLimit, hostConfig.getMemorySwap())
+                && Objects.equals(cpuLimit * 1_000_000_000L, hostConfig.getNanoCPUs())
+                && Objects.equals(pidsLimit, hostConfig.getPidsLimit())
+                && Objects.equals("none", hostConfig.getNetworkMode())
+                && Boolean.TRUE.equals(hostConfig.getReadonlyRootfs());
     }
 
     private void ensureContainerRunning(String containerId) {
@@ -160,7 +179,8 @@ public class DockerSandBoxPool {
         hostConfig.setBinds(new Bind(userCodeDir, new Volume(volumeDir)));
         hostConfig.withMemory(memoryLimit);
         hostConfig.withMemorySwap(memorySwapLimit);
-        hostConfig.withCpuCount(cpuLimit);
+        hostConfig.withNanoCPUs(cpuLimit * 1_000_000_000L);
+        hostConfig.withPidsLimit(pidsLimit);
         hostConfig.withNetworkMode("none");
         hostConfig.withReadonlyRootfs(true);
         return hostConfig;

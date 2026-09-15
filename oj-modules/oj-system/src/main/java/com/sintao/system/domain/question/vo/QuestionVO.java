@@ -21,6 +21,14 @@ public class QuestionVO {
 
     private Integer difficulty;
 
+    private Integer questionOrder;
+
+    private Integer score;
+
+    private Boolean required;
+
+    private String questionType;
+
     private String createName;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

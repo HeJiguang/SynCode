@@ -19,9 +19,37 @@ public class Exam extends BaseEntity {
 
     private String title;
 
+    private String description;
+
     private LocalDateTime startTime;
 
+    private LocalDateTime latestStartTime;
+
     private LocalDateTime endTime;
+
+    private Integer durationMinutes;
+
+    private String timezone;
+
+    private Integer maxFormalSubmissions;
+
+    private String resultReleasePolicy;
+
+    private LocalDateTime resultReleaseTime;
+
+    private Long currentVersionId;
+
+    private Integer versionNo;
+
+    private Integer rowVersion;
+
+    private LocalDateTime publishedTime;
+
+    private LocalDateTime finishedTime;
+
+    private LocalDateTime resultReleasedTime;
+
+    private String cancelReason;
 
     private Integer status;
 }

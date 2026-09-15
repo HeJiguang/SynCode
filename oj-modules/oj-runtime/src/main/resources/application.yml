@@ -1,0 +1,80 @@
+# Compact runtime defaults apply to both local and deployed profiles.
+server:
+  port: ${SERVER_PORT:19090}
+
+jwt:
+  secret: ${JWT_SECRET:zshadioasjdkasdsadassa}
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:bitoj_dev}?useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai}
+    username: ${SPRING_DATASOURCE_USERNAME:${MYSQL_APP_USER:ojtest}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${MYSQL_PASSWORD:change-me-local}}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:change-me-local}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_DEFAULT_USER:ojtest}
+    password: ${RABBITMQ_DEFAULT_PASS:change-me-local}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+  elasticsearch:
+    uris: ${SPRING_ELASTICSEARCH_URIS:http://127.0.0.1:9200}
+  cloud:
+    discovery:
+      client:
+        simple:
+          instances:
+            oj-judge:
+              - uri: ${OJ_JUDGE_BASE_URL:http://127.0.0.1:9204}
+            oj-agent:
+              - uri: ${AGENT_PUBLIC_BASE_URL:http://127.0.0.1:8015}
+
+file:
+  max-time: ${FILE_UPLOAD_DAILY_LIMIT:20}
+  test: ${FILE_UPLOAD_TEST_MODE:false}
+  oss:
+    endpoint: ${FILE_OSS_ENDPOINT:https://oss-cn-hangzhou.aliyuncs.com}
+    region: ${FILE_OSS_REGION:cn-hangzhou}
+    accessKeyId: ${FILE_OSS_ACCESS_KEY_ID:disabled}
+    accessKeySecret: ${FILE_OSS_ACCESS_KEY_SECRET:disabled}
+    bucketName: ${FILE_OSS_BUCKET_NAME:disabled}
+    pathPrefix: ${FILE_OSS_PATH_PREFIX:syncode/}
+    downloadUrl: ${FILE_OSS_DOWNLOAD_URL:}
+
+security:
+  ignore:
+    whites:
+      - /actuator/health
+      - /system/sysUser/login
+      - /friend/user/sendCode
+      - /friend/user/code/login
+      - /friend/question/semiLogin/**
+      - /friend/exam/semiLogin/**
+      - /friend/message/semiLogin/**
+
+syncode:
+  friend:
+    web-socket-path: /friend/ws/judge/result
+  runtime:
+    reconciliation-delay-ms: ${EXAM_RECONCILIATION_DELAY_MS:15000}
+
+xxl:
+  job:
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never

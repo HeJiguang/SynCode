@@ -20,4 +20,10 @@ public class ExamQuestion extends BaseEntity {
     private Long questionId;
 
     private Integer questionOrder;
+
+    private Integer score;
+
+    private Integer requiredFlag;
+
+    private String questionType;
 }

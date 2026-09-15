@@ -15,6 +15,16 @@ public class JudgeSubmitDTO {
 
     private Long examId;
 
+    private Long attemptId;
+
+    private Long versionQuestionId;
+
+    private Long answerId;
+
+    private Integer answerVersion;
+
+    private String submitKind;
+
     private Integer programType;
 
     private Long questionId;

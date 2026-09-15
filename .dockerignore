@@ -21,6 +21,8 @@ frontend/apps/*/out
 !oj-modules/oj-friend/target/*.jar
 !oj-modules/oj-job/target/
 !oj-modules/oj-job/target/*.jar
+!oj-modules/oj-runtime/target/
+!oj-modules/oj-runtime/target/*.jar
 !oj-modules/oj-judge/target/
 !oj-modules/oj-judge/target/*.jar
 oj-agent/tmp_pytest_config
