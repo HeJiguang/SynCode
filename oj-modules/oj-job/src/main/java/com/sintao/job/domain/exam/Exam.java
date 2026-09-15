@@ -13,16 +13,15 @@ import java.time.LocalDateTime;
 @Setter
 @TableName("tb_exam")
 public class Exam extends BaseEntity {
-
-    @TableId(value = "EXAM_ID", type = IdType.ASSIGN_ID)
+    @TableId(value = "exam_id", type = IdType.ASSIGN_ID)
     private Long examId;
-
     private String title;
-
     private LocalDateTime startTime;
-
     private LocalDateTime endTime;
-
+    private String resultReleasePolicy;
+    private LocalDateTime resultReleaseTime;
+    private Integer rowVersion;
+    private LocalDateTime finishedTime;
+    private LocalDateTime resultReleasedTime;
     private Integer status;
 }
-

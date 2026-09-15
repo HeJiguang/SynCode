@@ -26,18 +26,25 @@ import com.sintao.friend.domain.exam.ExamAttempt;
 import com.sintao.friend.domain.exam.ExamAuditEvent;
 import com.sintao.friend.domain.exam.ExamCommand;
 import com.sintao.friend.domain.exam.ExamGrade;
+import com.sintao.friend.domain.exam.ExamGradeItem;
+import com.sintao.friend.domain.exam.IntegrityEvent;
 import com.sintao.friend.domain.exam.ExamVersion;
 import com.sintao.friend.domain.exam.ExamVersionQuestion;
 import com.sintao.friend.domain.exam.dto.ExamSubmissionDTO;
 import com.sintao.friend.domain.exam.dto.HeartbeatDTO;
 import com.sintao.friend.domain.exam.dto.SaveAnswerDTO;
 import com.sintao.friend.domain.exam.dto.StartExamDTO;
+import com.sintao.friend.domain.exam.dto.IntegrityEventBatchDTO;
+import com.sintao.friend.domain.exam.dto.IntegrityEventDTO;
 import com.sintao.friend.domain.exam.vo.ExamAccessVO;
 import com.sintao.friend.domain.exam.vo.ExamAnswerVO;
 import com.sintao.friend.domain.exam.vo.ExamAttemptVO;
 import com.sintao.friend.domain.exam.vo.ExamFinalizeVO;
 import com.sintao.friend.domain.exam.vo.ExamSubmissionVO;
 import com.sintao.friend.domain.exam.vo.HeartbeatVO;
+import com.sintao.friend.domain.exam.vo.ExamGradeItemVO;
+import com.sintao.friend.domain.exam.vo.ExamResultVO;
+import com.sintao.friend.domain.exam.vo.IntegrityBatchResultVO;
 import com.sintao.friend.domain.exam.vo.TrustedExamQuestionVO;
 import com.sintao.friend.domain.user.User;
 import com.sintao.friend.domain.user.UserExam;
@@ -47,6 +54,8 @@ import com.sintao.friend.mapper.exam.ExamAttemptMapper;
 import com.sintao.friend.mapper.exam.ExamAuditEventMapper;
 import com.sintao.friend.mapper.exam.ExamCommandMapper;
 import com.sintao.friend.mapper.exam.ExamGradeMapper;
+import com.sintao.friend.mapper.exam.ExamGradeItemMapper;
+import com.sintao.friend.mapper.exam.IntegrityEventMapper;
 import com.sintao.friend.mapper.exam.ExamMapper;
 import com.sintao.friend.mapper.exam.ExamVersionMapper;
 import com.sintao.friend.mapper.exam.ExamVersionQuestionMapper;
@@ -78,6 +87,10 @@ import java.util.Set;
 public class TrustedExamServiceImpl implements ITrustedExamService {
 
     private static final Set<String> SUBMIT_KINDS = Set.of("RUN", "FORMAL");
+    private static final Set<String> INTEGRITY_EVENT_TYPES = Set.of(
+            "FOCUS_LOST", "FULLSCREEN_EXIT", "PASTE", "COPY", "SESSION_CHANGE");
+    private static final Set<String> INTEGRITY_METADATA_KEYS = Set.of(
+            "durationMs", "visibilityState", "source", "target", "fullscreen");
     private static final int MAX_ANSWER_LENGTH = 262_144;
 
     private final ExamMapper examMapper;
@@ -88,6 +101,8 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
     private final ExamCommandMapper commandMapper;
     private final ExamAuditEventMapper auditMapper;
     private final ExamGradeMapper gradeMapper;
+    private final ExamGradeItemMapper gradeItemMapper;
+    private final IntegrityEventMapper integrityEventMapper;
     private final UserExamMapper userExamMapper;
     private final UserMapper userMapper;
     private final UserSubmitMapper userSubmitMapper;
@@ -105,6 +120,8 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
                                   ExamCommandMapper commandMapper,
                                   ExamAuditEventMapper auditMapper,
                                   ExamGradeMapper gradeMapper,
+                                  ExamGradeItemMapper gradeItemMapper,
+                                  IntegrityEventMapper integrityEventMapper,
                                   UserExamMapper userExamMapper,
                                   UserMapper userMapper,
                                   UserSubmitMapper userSubmitMapper,
@@ -121,6 +138,8 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
         this.commandMapper = commandMapper;
         this.auditMapper = auditMapper;
         this.gradeMapper = gradeMapper;
+        this.gradeItemMapper = gradeItemMapper;
+        this.integrityEventMapper = integrityEventMapper;
         this.userExamMapper = userExamMapper;
         this.userMapper = userMapper;
         this.userSubmitMapper = userSubmitMapper;
@@ -152,7 +171,7 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
         result.setEndAt(version.getEndTime());
         result.setDurationMinutes(version.getDurationMinutes());
         result.setTimezone(version.getTimezone());
-        result.setPrivacyNotice("考试期间会记录会话标识、网络与浏览器摘要以及切屏等诚信事件；证据仅供人工复核，不自动认定作弊。");
+        result.setPrivacyNotice("考试期间会记录会话标识、网络与浏览器摘要以及切屏等诚信事件；不采集剪贴板正文，证据默认保存 180 天，仅供人工复核，不自动认定作弊。");
         if (attempt != null) {
             result.setAttemptId(attempt.getAttemptId());
             result.setCanResume(ExamAttemptStatus.fromCode(attempt.getStatus()) == ExamAttemptStatus.IN_PROGRESS);
@@ -446,6 +465,81 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
         return finalizeVO(attempt, false);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ExamResultVO result(Long attemptId) {
+        long userId = currentUserId();
+        ExamAttempt attempt = ownedAttemptForUpdate(attemptId, userId);
+        Exam exam = examMapper.selectById(attempt.getExamId());
+        if (exam == null || ExamStatus.fromCode(exam.getStatus()) != ExamStatus.RESULT_RELEASED) {
+            throw new ServiceException(ResultCode.EXAM_RESULT_NOT_RELEASED);
+        }
+        ExamGrade grade = gradeMapper.selectOne(new LambdaQueryWrapper<ExamGrade>()
+                .eq(ExamGrade::getAttemptId, attemptId)
+                .eq(ExamGrade::getCurrentFlag, 1));
+        if (grade == null || ExamGradeStatus.fromCode(grade.getStatus()) != ExamGradeStatus.RELEASED) {
+            throw new ServiceException(ResultCode.EXAM_GRADE_NOT_READY);
+        }
+        ExamResultVO result = new ExamResultVO();
+        result.setAttemptId(attemptId);
+        result.setStatus(ExamGradeStatus.RELEASED.name());
+        result.setTotalScore(grade.getTotalScore());
+        result.setMaxScore(grade.getMaxScore());
+        result.setReleasedAt(grade.getReleasedTime());
+        result.setItems(gradeItemMapper.selectList(new LambdaQueryWrapper<ExamGradeItem>()
+                        .eq(ExamGradeItem::getGradeId, grade.getGradeId())
+                        .orderByAsc(ExamGradeItem::getVersionQuestionId))
+                .stream().map(this::gradeItemVO).toList());
+        return result;
+    }
+
+    @Override
+    @Transactional
+    public IntegrityBatchResultVO recordIntegrityEvents(Long attemptId, IntegrityEventBatchDTO request) {
+        long userId = currentUserId();
+        ExamAttempt attempt = ownedAttemptForUpdate(attemptId, userId);
+        validateIntegrityBatch(attempt, request);
+        LocalDateTime now = now();
+        int accepted = 0;
+        int duplicates = 0;
+        int riskPoints = 0;
+        for (IntegrityEventDTO item : request.getEvents()) {
+            IntegrityEvent event = new IntegrityEvent();
+            event.setAttemptId(attemptId);
+            event.setSessionId(request.getSessionId());
+            event.setClientSequence(item.getClientSequence());
+            event.setEventType(item.getEventType());
+            event.setClientObservedTime(item.getClientObservedTime());
+            event.setServerReceivedTime(now);
+            event.setMetadataJson(writeJson(safeIntegrityMetadata(item.getMetadata())));
+            int points = integrityRiskPoints(item.getEventType());
+            event.setRiskPoints(points);
+            event.setCreateTime(now);
+            try {
+                integrityEventMapper.insert(event);
+                accepted++;
+                riskPoints += points;
+            } catch (DuplicateKeyException exception) {
+                duplicates++;
+            }
+        }
+        if (accepted > 0) {
+            Integer storedRiskPoints = integrityEventMapper.sumRiskPointsByAttemptId(attemptId);
+            int cumulativeRiskPoints = storedRiskPoints == null ? riskPoints : storedRiskPoints;
+            int calculatedLevel = cumulativeRiskPoints >= 10 ? 3 : cumulativeRiskPoints >= 5 ? 2
+                    : cumulativeRiskPoints > 0 ? 1 : 0;
+            attempt.setRiskLevel(calculatedLevel);
+            attempt.setUpdateTime(now);
+            attempt.setRowVersion(attempt.getRowVersion() + 1);
+            attemptMapper.updateById(attempt);
+            audit(attempt.getExamId(), attemptId, userId, "INTEGRITY_EVENTS_RECORDED",
+                    "integrity:" + request.getSessionId() + ":" + request.getEvents().get(0).getClientSequence(),
+                    Map.of("accepted", accepted, "duplicates", duplicates, "batchRiskPoints", riskPoints,
+                            "cumulativeRiskPoints", cumulativeRiskPoints));
+        }
+        return new IntegrityBatchResultVO(accepted, duplicates, riskPoints);
+    }
+
     private void reconcileExamState(Exam exam, LocalDateTime now) {
         ExamStatus state = ExamStatus.fromCode(exam.getStatus());
         ExamStatus target = state;
@@ -661,6 +755,56 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
         result.setSavedAt(answer.getSavedTime());
         result.setFrozen(answer.getFrozenTime() != null);
         return result;
+    }
+
+    private ExamGradeItemVO gradeItemVO(ExamGradeItem item) {
+        ExamGradeItemVO result = new ExamGradeItemVO();
+        result.setVersionQuestionId(item.getVersionQuestionId());
+        result.setAwardedScore(item.getAwardedScore());
+        result.setMaxScore(item.getMaxScore());
+        result.setGradingMode(item.getGradingMode());
+        return result;
+    }
+
+    private void validateIntegrityBatch(ExamAttempt attempt, IntegrityEventBatchDTO request) {
+        if (ExamAttemptStatus.fromCode(attempt.getStatus()) != ExamAttemptStatus.IN_PROGRESS
+                || request == null || request.getSessionId() == null
+                || !Objects.equals(request.getSessionId(), attempt.getCurrentSessionId())
+                || request.getEvents() == null || request.getEvents().isEmpty()
+                || request.getEvents().size() > 100) {
+            throw new ServiceException(ResultCode.EXAM_INTEGRITY_EVENT_REJECTED);
+        }
+        long previous = -1;
+        for (IntegrityEventDTO item : request.getEvents()) {
+            if (item == null || item.getClientSequence() == null || item.getClientSequence() < 0
+                    || item.getClientSequence() <= previous || item.getEventType() == null
+                    || !INTEGRITY_EVENT_TYPES.contains(item.getEventType())) {
+                throw new ServiceException(ResultCode.EXAM_INTEGRITY_EVENT_REJECTED);
+            }
+            previous = item.getClientSequence();
+        }
+    }
+
+    private Map<String, Object> safeIntegrityMetadata(Map<String, Object> metadata) {
+        if (metadata == null || metadata.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Object> safe = new java.util.LinkedHashMap<>();
+        metadata.forEach((key, value) -> {
+            if (INTEGRITY_METADATA_KEYS.contains(key)
+                    && (value instanceof String || value instanceof Number || value instanceof Boolean)) {
+                safe.put(key, value);
+            }
+        });
+        return safe;
+    }
+
+    private int integrityRiskPoints(String eventType) {
+        return switch (eventType) {
+            case "FULLSCREEN_EXIT" -> 2;
+            case "SESSION_CHANGE" -> 3;
+            default -> 1;
+        };
     }
 
     private ExamFinalizeVO finalizeVO(ExamAttempt attempt, boolean replayed) {

@@ -16,6 +16,7 @@ import com.sintao.common.core.enums.ResultCode;
 import com.sintao.common.core.utils.ThreadLocalUtil;
 import com.sintao.common.security.exception.ServiceException;
 import com.sintao.system.domain.exam.Exam;
+import com.sintao.system.domain.exam.ExamAttempt;
 import com.sintao.system.domain.exam.ExamAuditEvent;
 import com.sintao.system.domain.exam.ExamCommand;
 import com.sintao.system.domain.exam.ExamQuestion;
@@ -35,6 +36,7 @@ import com.sintao.system.domain.question.Question;
 import com.sintao.system.domain.question.vo.QuestionVO;
 import com.sintao.system.manager.ExamCacheManager;
 import com.sintao.system.mapper.exam.ExamAuditEventMapper;
+import com.sintao.system.mapper.exam.ExamAttemptMapper;
 import com.sintao.system.mapper.exam.ExamCommandMapper;
 import com.sintao.system.mapper.exam.ExamMapper;
 import com.sintao.system.mapper.exam.ExamQuestionMapper;
@@ -79,6 +81,7 @@ public class ExamServiceImpl extends ServiceImpl<ExamQuestionMapper, ExamQuestio
     private final ExamVersionQuestionMapper examVersionQuestionMapper;
     private final ExamCommandMapper examCommandMapper;
     private final ExamAuditEventMapper examAuditEventMapper;
+    private final ExamAttemptMapper examAttemptMapper;
     private final ExamCacheManager examCacheManager;
     private final ObjectMapper objectMapper;
     private final Clock clock;
@@ -90,6 +93,7 @@ public class ExamServiceImpl extends ServiceImpl<ExamQuestionMapper, ExamQuestio
                            ExamVersionQuestionMapper examVersionQuestionMapper,
                            ExamCommandMapper examCommandMapper,
                            ExamAuditEventMapper examAuditEventMapper,
+                           ExamAttemptMapper examAttemptMapper,
                            ExamCacheManager examCacheManager,
                            ObjectMapper objectMapper,
                            Clock clock) {
@@ -100,6 +104,7 @@ public class ExamServiceImpl extends ServiceImpl<ExamQuestionMapper, ExamQuestio
         this.examVersionQuestionMapper = examVersionQuestionMapper;
         this.examCommandMapper = examCommandMapper;
         this.examAuditEventMapper = examAuditEventMapper;
+        this.examAttemptMapper = examAttemptMapper;
         this.examCacheManager = examCacheManager;
         this.objectMapper = objectMapper;
         this.clock = clock;
@@ -319,6 +324,12 @@ public class ExamServiceImpl extends ServiceImpl<ExamQuestionMapper, ExamQuestio
         }
         if (ExamStatus.fromCode(exam.getStatus()) != ExamStatus.PUBLISHED || !now().isBefore(exam.getStartTime())) {
             throw new ServiceException(ResultCode.EXAM_STATE_CONFLICT);
+        }
+        Long attemptCount = examAttemptMapper.selectCount(new LambdaQueryWrapper<ExamAttempt>()
+                .eq(ExamAttempt::getExamId, examId));
+        if (attemptCount != null && attemptCount > 0) {
+            throw new ServiceException(ResultCode.EXAM_STATE_CONFLICT,
+                    Map.of("reason", "attemptAlreadyExists"));
         }
         exam.setStatus(ExamStatus.DRAFT.getCode());
         exam.setRowVersion(exam.getRowVersion() + 1);

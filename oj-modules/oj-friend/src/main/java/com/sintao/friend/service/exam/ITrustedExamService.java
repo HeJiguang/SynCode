@@ -4,12 +4,15 @@ import com.sintao.friend.domain.exam.dto.ExamSubmissionDTO;
 import com.sintao.friend.domain.exam.dto.HeartbeatDTO;
 import com.sintao.friend.domain.exam.dto.SaveAnswerDTO;
 import com.sintao.friend.domain.exam.dto.StartExamDTO;
+import com.sintao.friend.domain.exam.dto.IntegrityEventBatchDTO;
 import com.sintao.friend.domain.exam.vo.ExamAccessVO;
 import com.sintao.friend.domain.exam.vo.ExamAnswerVO;
 import com.sintao.friend.domain.exam.vo.ExamAttemptVO;
 import com.sintao.friend.domain.exam.vo.ExamFinalizeVO;
 import com.sintao.friend.domain.exam.vo.ExamSubmissionVO;
 import com.sintao.friend.domain.exam.vo.HeartbeatVO;
+import com.sintao.friend.domain.exam.vo.ExamResultVO;
+import com.sintao.friend.domain.exam.vo.IntegrityBatchResultVO;
 
 public interface ITrustedExamService {
     ExamAccessVO access(Long examId);
@@ -21,4 +24,8 @@ public interface ITrustedExamService {
     ExamSubmissionVO submit(Long attemptId, ExamSubmissionDTO request, String requestId);
     ExamFinalizeVO finalizeAttempt(Long attemptId, String idempotencyKey, String requestId);
     ExamFinalizeVO receipt(Long attemptId);
+
+    ExamResultVO result(Long attemptId);
+
+    IntegrityBatchResultVO recordIntegrityEvents(Long attemptId, IntegrityEventBatchDTO request);
 }

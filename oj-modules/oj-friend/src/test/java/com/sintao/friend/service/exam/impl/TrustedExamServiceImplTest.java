@@ -13,11 +13,14 @@ import com.sintao.friend.domain.exam.Exam;
 import com.sintao.friend.domain.exam.ExamAnswer;
 import com.sintao.friend.domain.exam.ExamAttempt;
 import com.sintao.friend.domain.exam.ExamGrade;
+import com.sintao.friend.domain.exam.IntegrityEvent;
 import com.sintao.friend.domain.exam.ExamVersion;
 import com.sintao.friend.domain.exam.ExamVersionQuestion;
 import com.sintao.friend.domain.exam.dto.ExamSubmissionDTO;
 import com.sintao.friend.domain.exam.dto.SaveAnswerDTO;
 import com.sintao.friend.domain.exam.dto.StartExamDTO;
+import com.sintao.friend.domain.exam.dto.IntegrityEventBatchDTO;
+import com.sintao.friend.domain.exam.dto.IntegrityEventDTO;
 import com.sintao.friend.domain.exam.vo.ExamAnswerVO;
 import com.sintao.friend.domain.exam.vo.ExamAttemptVO;
 import com.sintao.friend.domain.exam.vo.ExamFinalizeVO;
@@ -30,6 +33,8 @@ import com.sintao.friend.mapper.exam.ExamAttemptMapper;
 import com.sintao.friend.mapper.exam.ExamAuditEventMapper;
 import com.sintao.friend.mapper.exam.ExamCommandMapper;
 import com.sintao.friend.mapper.exam.ExamGradeMapper;
+import com.sintao.friend.mapper.exam.ExamGradeItemMapper;
+import com.sintao.friend.mapper.exam.IntegrityEventMapper;
 import com.sintao.friend.mapper.exam.ExamMapper;
 import com.sintao.friend.mapper.exam.ExamVersionMapper;
 import com.sintao.friend.mapper.exam.ExamVersionQuestionMapper;
@@ -52,6 +57,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -79,6 +85,8 @@ class TrustedExamServiceImplTest {
     @Mock private ExamCommandMapper commandMapper;
     @Mock private ExamAuditEventMapper auditMapper;
     @Mock private ExamGradeMapper gradeMapper;
+    @Mock private ExamGradeItemMapper gradeItemMapper;
+    @Mock private IntegrityEventMapper integrityEventMapper;
     @Mock private UserExamMapper userExamMapper;
     @Mock private UserMapper userMapper;
     @Mock private UserSubmitMapper userSubmitMapper;
@@ -91,7 +99,8 @@ class TrustedExamServiceImplTest {
     void setUp() {
         service = new TrustedExamServiceImpl(
                 examMapper, versionMapper, versionQuestionMapper, attemptMapper, answerMapper,
-                commandMapper, auditMapper, gradeMapper, userExamMapper, userMapper,
+                commandMapper, auditMapper, gradeMapper, gradeItemMapper, integrityEventMapper,
+                userExamMapper, userMapper,
                 userSubmitMapper, judgeProducer, judgeRuntimeStateService,
                 new ObjectMapper().findAndRegisterModules(), Clock.fixed(NOW, ZoneOffset.UTC), "test-salt");
         ThreadLocalUtil.set(Constants.USER_ID, 99L);
@@ -225,6 +234,46 @@ class TrustedExamServiceImplTest {
         ArgumentCaptor<ExamGrade> gradeCaptor = ArgumentCaptor.forClass(ExamGrade.class);
         verify(gradeMapper).insert(gradeCaptor.capture());
         assertEquals(100, gradeCaptor.getValue().getMaxScore());
+    }
+
+    @Test
+    void resultShouldRemainHiddenUntilExamAndGradeAreReleased() {
+        ExamAttempt attempt = inProgressAttempt(NOW_UTC.plusMinutes(30));
+        attempt.setStatus(ExamAttemptStatus.SUBMITTED.getCode());
+        when(attemptMapper.selectByIdForUpdate(900L)).thenReturn(attempt);
+        Exam exam = exam();
+        exam.setStatus(ExamStatus.FINISHED.getCode());
+        when(examMapper.selectById(10L)).thenReturn(exam);
+
+        ServiceException exception = assertThrows(ServiceException.class, () -> service.result(900L));
+
+        assertEquals(ResultCode.EXAM_RESULT_NOT_RELEASED, exception.getResultCode());
+        verify(gradeMapper, never()).selectOne(any());
+    }
+
+    @Test
+    void integrityBatchShouldStoreOnlyWhitelistedMetadata() {
+        ExamAttempt attempt = inProgressAttempt(NOW_UTC.plusMinutes(30));
+        attempt.setCurrentSessionId("session-1");
+        attempt.setRiskLevel(0);
+        when(attemptMapper.selectByIdForUpdate(900L)).thenReturn(attempt);
+        when(integrityEventMapper.sumRiskPointsByAttemptId(900L)).thenReturn(6);
+        IntegrityEventDTO event = new IntegrityEventDTO();
+        event.setClientSequence(1L);
+        event.setEventType("PASTE");
+        event.setClientObservedTime(NOW_UTC.minusSeconds(1));
+        event.setMetadata(Map.of("target", "editor", "text", "secret clipboard"));
+        IntegrityEventBatchDTO request = new IntegrityEventBatchDTO();
+        request.setSessionId("session-1");
+        request.setEvents(List.of(event));
+
+        service.recordIntegrityEvents(900L, request);
+
+        ArgumentCaptor<IntegrityEvent> captor = ArgumentCaptor.forClass(IntegrityEvent.class);
+        verify(integrityEventMapper).insert(captor.capture());
+        assertTrue(captor.getValue().getMetadataJson().contains("target"));
+        assertFalse(captor.getValue().getMetadataJson().contains("secret clipboard"));
+        assertEquals(2, attempt.getRiskLevel());
     }
 
     private void stubStartDependencies() {

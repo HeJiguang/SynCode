@@ -9,12 +9,15 @@ import com.sintao.friend.domain.exam.dto.ExamSubmissionDTO;
 import com.sintao.friend.domain.exam.dto.HeartbeatDTO;
 import com.sintao.friend.domain.exam.dto.SaveAnswerDTO;
 import com.sintao.friend.domain.exam.dto.StartExamDTO;
+import com.sintao.friend.domain.exam.dto.IntegrityEventBatchDTO;
 import com.sintao.friend.domain.exam.vo.ExamAccessVO;
 import com.sintao.friend.domain.exam.vo.ExamAnswerVO;
 import com.sintao.friend.domain.exam.vo.ExamAttemptVO;
 import com.sintao.friend.domain.exam.vo.ExamFinalizeVO;
 import com.sintao.friend.domain.exam.vo.ExamSubmissionVO;
 import com.sintao.friend.domain.exam.vo.HeartbeatVO;
+import com.sintao.friend.domain.exam.vo.ExamResultVO;
+import com.sintao.friend.domain.exam.vo.IntegrityBatchResultVO;
 import com.sintao.friend.service.exam.IExamService;
 import com.sintao.friend.service.exam.ITrustedExamService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -160,6 +163,20 @@ public class ExamController extends BaseController {
     @Operation(summary = "交卷回执", description = "查询服务端确认的终态和成绩处理状态")
     public R<ExamFinalizeVO> receipt(@PathVariable Long attemptId) {
         return R.ok(trustedExamService.receipt(attemptId));
+    }
+
+    @GetMapping("/attempts/{attemptId}/result")
+    @Operation(summary = "查询考试成绩", description = "成绩发布前一律不可见")
+    public R<ExamResultVO> result(@PathVariable Long attemptId) {
+        return R.ok(trustedExamService.result(attemptId));
+    }
+
+    @PostMapping("/attempts/{attemptId}/integrity-events")
+    @Operation(summary = "批量记录诚信事件", description = "仅保存白名单元数据，事件仅供人工复核")
+    public R<IntegrityBatchResultVO> integrityEvents(
+            @PathVariable Long attemptId,
+            @RequestBody IntegrityEventBatchDTO body) {
+        return R.ok(trustedExamService.recordIntegrityEvents(attemptId, body));
     }
 
     private String clientIp(HttpServletRequest request) {

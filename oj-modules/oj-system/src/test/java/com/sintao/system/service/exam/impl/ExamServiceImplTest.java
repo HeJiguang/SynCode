@@ -17,6 +17,7 @@ import com.sintao.system.domain.exam.vo.ExamPublicationVO;
 import com.sintao.system.domain.question.Question;
 import com.sintao.system.manager.ExamCacheManager;
 import com.sintao.system.mapper.exam.ExamAuditEventMapper;
+import com.sintao.system.mapper.exam.ExamAttemptMapper;
 import com.sintao.system.mapper.exam.ExamCommandMapper;
 import com.sintao.system.mapper.exam.ExamMapper;
 import com.sintao.system.mapper.exam.ExamQuestionMapper;
@@ -60,6 +61,7 @@ class ExamServiceImplTest {
     @Mock private ExamVersionQuestionMapper examVersionQuestionMapper;
     @Mock private ExamCommandMapper examCommandMapper;
     @Mock private ExamAuditEventMapper examAuditEventMapper;
+    @Mock private ExamAttemptMapper examAttemptMapper;
     @Mock private ExamCacheManager examCacheManager;
 
     private ExamServiceImpl service;
@@ -70,7 +72,7 @@ class ExamServiceImplTest {
         objectMapper = new ObjectMapper().findAndRegisterModules();
         service = new ExamServiceImpl(
                 examMapper, questionMapper, examQuestionMapper, examVersionMapper,
-                examVersionQuestionMapper, examCommandMapper, examAuditEventMapper,
+                examVersionQuestionMapper, examCommandMapper, examAuditEventMapper, examAttemptMapper,
                 examCacheManager, objectMapper, Clock.fixed(NOW, ZoneOffset.UTC));
         ThreadLocalUtil.set(Constants.USER_ID, 77L);
     }
@@ -184,6 +186,21 @@ class ExamServiceImplTest {
         assertEquals(800L, replay.getVersionId());
         verify(examMapper, never()).selectByIdForUpdate(any());
         verify(examVersionMapper, never()).insert(any());
+    }
+
+    @Test
+    void withdrawShouldRejectWhenAnyAttemptExists() {
+        Exam published = validDraft();
+        published.setStatus(ExamStatus.PUBLISHED.getCode());
+        when(examMapper.selectByIdForUpdate(10L)).thenReturn(published);
+        when(examAttemptMapper.selectCount(any())).thenReturn(1L);
+
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> service.cancelPublish(10L));
+
+        assertEquals(ResultCode.EXAM_STATE_CONFLICT, exception.getResultCode());
+        verify(examMapper, never()).updateById(any());
+        verify(examAuditEventMapper, never()).insert(any());
     }
 
     private Exam validDraft() {

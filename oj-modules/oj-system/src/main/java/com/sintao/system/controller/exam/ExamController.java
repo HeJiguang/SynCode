@@ -8,8 +8,16 @@ import com.sintao.system.domain.exam.dto.ExamEditDTO;
 import com.sintao.system.domain.exam.dto.ExamQueryDTO;
 import com.sintao.system.domain.exam.dto.ExamQuestAddDTO;
 import com.sintao.system.domain.exam.dto.ExamQuestionsReplaceDTO;
+import com.sintao.system.domain.exam.dto.CandidateAuthorizationDTO;
+import com.sintao.system.domain.exam.dto.CandidateRevokeDTO;
+import com.sintao.system.domain.exam.dto.ExamCancelDTO;
+import com.sintao.system.domain.exam.vo.ExamCandidateVO;
 import com.sintao.system.domain.exam.vo.ExamDetailVO;
+import com.sintao.system.domain.exam.vo.ExamGradeVO;
+import com.sintao.system.domain.exam.vo.ExamEvidenceEventVO;
+import com.sintao.system.domain.exam.vo.ExamMonitorVO;
 import com.sintao.system.domain.exam.vo.ExamPublicationVO;
+import com.sintao.system.service.exam.IExamAdministrationService;
 import com.sintao.system.service.exam.IExamService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -27,6 +35,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/exam")
 @Tag(name = "后台测试管理接口")
@@ -34,6 +44,9 @@ public class ExamController extends BaseController {
 
     @Autowired
     private IExamService examService;
+
+    @Autowired
+    private IExamAdministrationService examAdministrationService;
 
     @GetMapping("/list")
     @Operation(summary = "测试列表", description = "分页查询测试列表，支持按标题等条件筛选")
@@ -153,5 +166,72 @@ public class ExamController extends BaseController {
     @ApiResponse(responseCode = "2000", description = "测试已开始或服务异常")
     public R<Void> cancelPublish(@Parameter(description = "测试ID") Long examId) {
         return toR(examService.cancelPublish(examId));
+    }
+
+    @PostMapping("/{examId}/candidates")
+    @Operation(summary = "授权考试候选人", description = "支持单个或批量授权，重复授权保持幂等")
+    public R<List<ExamCandidateVO>> authorizeCandidates(
+            @PathVariable Long examId,
+            @RequestBody CandidateAuthorizationDTO request,
+            @RequestHeader(value = "X-Request-ID", required = false) String requestId) {
+        return R.ok(examAdministrationService.authorizeCandidates(examId, request, requestId));
+    }
+
+    @GetMapping("/{examId}/candidates")
+    @Operation(summary = "考试候选人列表", description = "返回授权状态及当前 Attempt 摘要")
+    public R<List<ExamCandidateVO>> candidates(@PathVariable Long examId) {
+        return R.ok(examAdministrationService.candidates(examId));
+    }
+
+    @DeleteMapping("/{examId}/candidates/{userId}")
+    @Operation(summary = "撤销候选人资格", description = "已有 Attempt 的候选人不能通过资格接口移除")
+    public R<Void> revokeCandidate(
+            @PathVariable Long examId,
+            @PathVariable Long userId,
+            @RequestBody CandidateRevokeDTO request,
+            @RequestHeader(value = "X-Request-ID", required = false) String requestId) {
+        examAdministrationService.revokeCandidate(examId, userId,
+                request == null ? null : request.getReason(), requestId);
+        return R.ok();
+    }
+
+    @PostMapping("/{examId}/cancel")
+    @Operation(summary = "取消考试", description = "开始后取消考试并原子终止所有进行中的 Attempt")
+    public R<Void> cancel(
+            @PathVariable Long examId,
+            @RequestBody ExamCancelDTO request,
+            @RequestHeader(value = "X-Request-ID", required = false) String requestId) {
+        examAdministrationService.cancel(examId, request == null ? null : request.getReason(), requestId);
+        return R.ok();
+    }
+
+    @GetMapping("/{examId}/monitor")
+    @Operation(summary = "考试实时监控", description = "按服务端心跳汇总未开始、作答、断线和终态人数")
+    public R<ExamMonitorVO> monitor(@PathVariable Long examId) {
+        return R.ok(examAdministrationService.monitor(examId));
+    }
+
+    @GetMapping("/{examId}/grades")
+    @Operation(summary = "考试成绩预览", description = "管理员可在发布前查看当前成绩与风险状态")
+    public R<List<ExamGradeVO>> grades(@PathVariable Long examId) {
+        return R.ok(examAdministrationService.grades(examId));
+    }
+
+    @PostMapping("/{examId}/results/release")
+    @Operation(summary = "发布考试成绩", description = "仅当所有 Attempt 成绩就绪时原子发布")
+    public R<Void> releaseResults(
+            @PathVariable Long examId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestHeader(value = "X-Request-ID", required = false) String requestId) {
+        examAdministrationService.releaseResults(examId, idempotencyKey, requestId);
+        return R.ok();
+    }
+
+    @GetMapping("/{examId}/attempts/{attemptId}/evidence")
+    @Operation(summary = "查看考试证据时间线", description = "合并诚信事件与业务审计记录，仅供人工复核")
+    public R<List<ExamEvidenceEventVO>> evidence(
+            @PathVariable Long examId,
+            @PathVariable Long attemptId) {
+        return R.ok(examAdministrationService.evidence(examId, attemptId));
     }
 }
