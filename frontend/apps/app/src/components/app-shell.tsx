@@ -39,13 +39,13 @@ export function AppShell({ children, rail, immersive, demoMode = false }: AppShe
             <a href={`${appPublicPath("/")}#announcements`}>
               <Button size="sm" variant="ghost">
                 <BellDot size={14} className="text-[var(--text-muted)]" />
-                <span>公告</span>
+                <span className="hidden sm:inline">公告</span>
               </Button>
             </a>
             <a href={appPublicPath("/settings")}>
               <Button size="sm" variant="ghost">
                 <Settings size={14} className="text-[var(--text-muted)]" />
-                <span>设置</span>
+                <span className="hidden sm:inline">设置</span>
               </Button>
             </a>
             {demoMode && !frontendPreviewMode ? (

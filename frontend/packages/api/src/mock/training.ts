@@ -38,9 +38,9 @@ export const trainingSnapshot: TrainingSnapshot = {
     },
     {
       taskId: "task-3",
-      title: "用一场 60 分钟小测验证回溯题稳定性",
+      title: "完成实验室招新编程体验考试",
       status: TRAINING_STATUS_PENDING,
-      focus: "搜索树拆解",
+      focus: "哈希 / 区间 / 拓扑排序",
       difficulty: "Hard",
       rawStatus: 0,
       taskType: "test",
@@ -52,10 +52,10 @@ export const trainingSnapshot: TrainingSnapshot = {
 export const examDetails: Record<string, ExamDetail> = {
   "exam-sprint-01": {
     examId: "exam-sprint-01",
-    title: "周末算法冲刺测",
-    status: EXAM_STATUS_UPCOMING,
-    startTime: "2026-03-30 19:30",
-    endTime: "2026-03-30 21:00",
+    title: "实验室招新编程体验考试",
+    status: EXAM_STATUS_ACTIVE,
+    startTime: "现在可进入",
+    endTime: "进入后 90 分钟",
     durationMinutes: 90,
     questionCount: 3,
     firstQuestionId: "two-sum"
@@ -63,9 +63,9 @@ export const examDetails: Record<string, ExamDetail> = {
   "exam-checkpoint-02": {
     examId: "exam-checkpoint-02",
     title: "数组与哈希阶段测",
-    status: EXAM_STATUS_ACTIVE,
-    startTime: "2026-03-29 20:00",
-    endTime: "2026-03-29 21:00",
+    status: EXAM_STATUS_UPCOMING,
+    startTime: "2026-09-18 19:00",
+    endTime: "2026-09-18 20:00",
     durationMinutes: 60,
     questionCount: 2,
     firstQuestionId: "merge-intervals"
@@ -74,8 +74,8 @@ export const examDetails: Record<string, ExamDetail> = {
     examId: "exam-review-03",
     title: "回溯专题复盘测",
     status: EXAM_STATUS_FINISHED,
-    startTime: "2026-03-27 19:00",
-    endTime: "2026-03-27 20:00",
+    startTime: "2026-09-12 19:00",
+    endTime: "2026-09-12 20:00",
     durationMinutes: 60,
     questionCount: 2,
     firstQuestionId: "n-queens"

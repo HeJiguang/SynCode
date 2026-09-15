@@ -49,10 +49,11 @@ async function main() {
   ];
 
   assert.match(loginSource, /使用测试数据体验/);
+  assert.match(loginSource, /题库、训练和体验考试/);
   assert.match(loginSource, /clearBrowserAccessToken/);
   assert.match(middlewareSource, /syncode_demo_session|DEMO_SESSION_KEY/);
   assert.match(middlewareSource, /SYNCODE_DEMO_LOGIN_ENABLED/);
-  assert.match(examPageSource, /正式考试需要登录/);
+  assert.match(examPageSource, /TrustedExamWorkspace examId=\{examId\} demoMode=\{demoMode\}/);
   assert.match(editorSource, /frontendPreviewMode \|\| demoMode/);
   assert.match(aiSource, /frontendPreviewMode \|\| demoMode/);
   assert.match(appShellSource, /当前使用测试数据/);
