@@ -41,6 +41,7 @@ async function main() {
   const examPageSource = fs.readFileSync(path.resolve(testDir, "../app/exams/[examId]/page.tsx"), "utf8");
   const editorSource = fs.readFileSync(path.resolve(testDir, "../components/editor-panel.tsx"), "utf8");
   const aiSource = fs.readFileSync(path.resolve(testDir, "../components/ai-panel.tsx"), "utf8");
+  const appShellSource = fs.readFileSync(path.resolve(testDir, "../components/app-shell.tsx"), "utf8");
   const aiRouteSources = [
     fs.readFileSync(path.resolve(testDir, "../app/api/ai/runs/route.ts"), "utf8"),
     fs.readFileSync(path.resolve(testDir, "../app/api/ai/runs/[runId]/events/route.ts"), "utf8"),
@@ -54,6 +55,8 @@ async function main() {
   assert.match(examPageSource, /正式考试需要登录/);
   assert.match(editorSource, /frontendPreviewMode \|\| demoMode/);
   assert.match(aiSource, /frontendPreviewMode \|\| demoMode/);
+  assert.match(appShellSource, /当前使用测试数据/);
+  assert.doesNotMatch(appShellSource, /当前为测试体验模式：页面使用内置测试数据/);
   for (const routeSource of aiRouteSources) {
     assert.match(routeSource, /if \(!token\)/);
     assert.match(routeSource, /status: 401/);

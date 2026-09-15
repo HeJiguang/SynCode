@@ -1,6 +1,6 @@
 import * as React from "react";
 import type { ReactNode } from "react";
-import { BellDot, LogIn, Settings, Sparkles } from "lucide-react";
+import { BellDot, Database, LogIn, Settings, Sparkles } from "lucide-react";
 
 import { appNav, frontendPreviewLabel, frontendPreviewMode, productName, productTagline } from "@aioj/config";
 import { Button } from "@aioj/ui";
@@ -49,12 +49,21 @@ export function AppShell({ children, rail, immersive, demoMode = false }: AppShe
               </Button>
             </a>
             {demoMode && !frontendPreviewMode ? (
-              <a href={appPublicPath("/login")}>
-                <Button size="sm" variant="secondary">
-                  <LogIn size={14} className="text-[var(--text-secondary)]" />
-                  <span>登录</span>
-                </Button>
-              </a>
+              <>
+                <div
+                  aria-label="当前使用测试数据"
+                  title="当前使用测试数据"
+                  className="hidden items-center gap-1.5 px-2 text-xs text-[var(--text-faint)] sm:flex"
+                >
+                  <Database size={13} />
+                  <span>体验</span>
+                </div>
+                <a href={appPublicPath("/login")} aria-label="登录正式账号" title="登录正式账号">
+                  <Button size="sm" variant="ghost" className="w-9 px-0">
+                    <LogIn size={14} className="text-[var(--text-muted)]" />
+                  </Button>
+                </a>
+              </>
             ) : null}
             {frontendPreviewMode ? (
               <div className="hidden rounded-full border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)] sm:block">
@@ -66,18 +75,16 @@ export function AppShell({ children, rail, immersive, demoMode = false }: AppShe
         </div>
       </header>
 
-      {demoMode ? (
+      {frontendPreviewMode ? (
         <div className="border-b border-[var(--border-soft)] bg-[var(--surface-muted)]">
           <div className={`mx-auto flex items-center justify-between gap-4 px-5 py-3 md:px-6 ${immersive ? "w-full" : "max-w-[var(--shell-max)]"}`}>
             <p className="max-w-4xl text-sm leading-7 text-[var(--text-secondary)]">
-              {frontendPreviewMode
-                ? "当前是前端预览模式：页面已放开登录与后端依赖，方便你直接查看和调整界面。写操作不会真正提交。"
-                : "当前为测试体验模式：页面使用内置测试数据，运行、提交和资料修改不会保存，正式考试需要登录后进入。"}
+              当前是前端预览模式：页面已放开登录与后端依赖，方便你直接查看和调整界面。写操作不会真正提交。
             </p>
-            <a href={appPublicPath(frontendPreviewMode ? "/problems" : "/login")} className="shrink-0">
+            <a href={appPublicPath("/problems")} className="shrink-0">
               <Button size="sm">
                 <Sparkles size={14} />
-                {frontendPreviewMode ? "进入题库预览" : "正式登录"}
+                进入题库预览
               </Button>
             </a>
           </div>
