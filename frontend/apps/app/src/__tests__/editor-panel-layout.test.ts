@@ -9,6 +9,12 @@ async function main() {
 
   assert.match(source, /code-editor-frame flex min-h-\[260px\] flex-1 flex-col/);
   assert.match(source, /max-h-\[46vh\] shrink-0 overflow-auto border-b/);
+  assert.match(source, /loader\.config\(\{ monaco \}\)/);
+  assert.match(source, /editContext: false/);
+  assert.match(source, /disposeInlineCompletions\(\)/);
+  assert.doesNotMatch(source, /freeInlineCompletions\(\)/);
+  assert.match(source, /aria-label="代码编辑器"/);
+  assert.match(source, /setEditorFallback\(true\)/);
 }
 
 void main();
