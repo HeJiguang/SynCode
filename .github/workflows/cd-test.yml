@@ -98,6 +98,10 @@ jobs:
         run: |
           printf '%s\n' "${{ secrets.STACK_ENV_TEST }}" > "${STACK_ENV_FILE}"
           printf '%s\n' "${{ secrets.RUNTIME_ENV_TEST }}" > "${RUNTIME_ENV_FILE}"
+          {
+            echo "NEXT_PUBLIC_SYNCODE_DEMO_LOGIN=1"
+            echo "SYNCODE_DEMO_LOGIN_ENABLED=true"
+          } >> "${STACK_ENV_FILE}"
           sed -i "s#sha-REPLACE_ME#${{ steps.source.outputs.image_tag }}#g" "${STACK_ENV_FILE}"
 
       - name: Migrate test database

@@ -7,7 +7,7 @@ import { AiPanel } from "../../../components/ai-panel";
 import { AppShell } from "../../../components/app-shell";
 import { EditorPanel } from "../../../components/editor-panel";
 import { JudgePanel } from "../../../components/judge-panel";
-import { getServerAccessToken } from "../../../lib/server-auth";
+import { getServerAuthSession } from "../../../lib/server-auth";
 import { WorkspaceLayout } from "./workspace-layout";
 
 type PageProps = {
@@ -16,10 +16,10 @@ type PageProps = {
 
 export default async function WorkspacePage({ params }: PageProps) {
   const { questionId } = await params;
-  const token = await getServerAccessToken();
+  const { token, demoMode } = await getServerAuthSession();
 
   const [detail, submissions] = await Promise.all([
-    getProblemDetail(questionId, token),
+    getProblemDetail(questionId, token, { forceMock: demoMode }),
     getSubmissionHistory(questionId, token)
   ]);
 
@@ -113,10 +113,11 @@ export default async function WorkspacePage({ params }: PageProps) {
   );
 
   return (
-    <AppShell immersive demoMode={!token}>
+    <AppShell immersive demoMode={demoMode}>
       <WorkspaceLayout
         aiPanel={
           <AiPanel
+            demoMode={demoMode}
             initialArtifacts={[]}
             questionId={questionId}
             questionTitle={detail.title}
@@ -143,6 +144,7 @@ export default async function WorkspacePage({ params }: PageProps) {
         }
         editorPanel={
           <EditorPanel
+            demoMode={demoMode}
             initialCode={detail.starterCode}
             questionId={questionId}
             questionTitle={detail.title}

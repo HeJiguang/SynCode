@@ -11,9 +11,10 @@ import { Button, Input, Panel, Textarea } from "@aioj/ui";
 
 type ProfileSettingsFormProps = {
   profile: UserProfile;
+  demoMode?: boolean;
 };
 
-export function ProfileSettingsForm({ profile }: ProfileSettingsFormProps) {
+export function ProfileSettingsForm({ profile, demoMode = false }: ProfileSettingsFormProps) {
   const [form, setForm] = useState({
     nickName: profile.nickName,
     email: profile.email,
@@ -44,8 +45,8 @@ export function ProfileSettingsForm({ profile }: ProfileSettingsFormProps) {
     setMessage(null);
     setError(null);
 
-    if (frontendPreviewMode) {
-      setMessage("当前是前端预览模式，资料改动不会提交到后端。");
+    if (frontendPreviewMode || demoMode) {
+      setMessage(demoMode ? "测试体验模式下的资料改动不会保存。" : "当前是前端预览模式，资料改动不会提交到后端。");
       return;
     }
 
@@ -73,8 +74,8 @@ export function ProfileSettingsForm({ profile }: ProfileSettingsFormProps) {
 
     setMessage(null);
     setError(null);
-    if (frontendPreviewMode) {
-      setMessage("当前是前端预览模式，头像上传已关闭。");
+    if (frontendPreviewMode || demoMode) {
+      setMessage(demoMode ? "测试体验模式下不能上传头像。" : "当前是前端预览模式，头像上传已关闭。");
       return;
     }
     startUploading(async () => {
@@ -111,7 +112,7 @@ export function ProfileSettingsForm({ profile }: ProfileSettingsFormProps) {
             </div>
             <label className="inline-flex cursor-pointer items-center gap-2 rounded-[14px] border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--text-primary)] transition hover:border-[var(--border-strong)]">
               {isUploading ? <LoaderCircle size={14} className="animate-spin" /> : <Camera size={14} />}
-              {frontendPreviewMode ? "预览模式下不可上传" : "上传头像"}
+              {frontendPreviewMode || demoMode ? "测试模式下不可上传" : "上传头像"}
               <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
             </label>
           </div>
@@ -168,7 +169,7 @@ export function ProfileSettingsForm({ profile }: ProfileSettingsFormProps) {
         <div className="flex items-center gap-3">
           <Button type="submit" disabled={isSaving || isUploading}>
             {isSaving ? <LoaderCircle size={14} className="animate-spin" /> : null}
-            {frontendPreviewMode ? "预览模式下不可保存" : "保存资料"}
+            {frontendPreviewMode || demoMode ? "测试模式下不可保存" : "保存资料"}
           </Button>
         </div>
       </form>

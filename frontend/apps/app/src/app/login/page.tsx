@@ -1,11 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Database } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import { frontendPreviewMode } from "@aioj/config";
-import { setBrowserAccessToken } from "@aioj/api";
+import { frontendDemoLoginEnabled, frontendPreviewMode } from "@aioj/config";
+import { clearBrowserAccessToken, setBrowserAccessToken } from "@aioj/api";
 import { Button, Input, Panel } from "@aioj/ui";
 import { appApiPath, appInternalPath } from "../../lib/paths";
 
@@ -970,6 +970,27 @@ export default function LoginPage() {
     }
   }
 
+  async function enterDemo() {
+    setLoading(true);
+    setStatus(null);
+
+    try {
+      const response = await fetch(appApiPath("/auth/demo"), { method: "POST" });
+      const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+      if (!response.ok) {
+        throw new Error(payload?.message ?? "进入测试体验失败。");
+      }
+
+      clearBrowserAccessToken();
+      router.push(appInternalPath("/"));
+      router.refresh();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "进入测试体验失败。");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const statusTone = status?.includes("失败") ? "text-[var(--danger)]" : "text-[var(--success)]";
 
   return (
@@ -1038,6 +1059,23 @@ export default function LoginPage() {
                 <Button className="w-full" disabled={loading || !email || !code} size="lg" onClick={login}>
                   登录并进入工作台
                 </Button>
+
+                {frontendDemoLoginEnabled ? (
+                  <>
+                    <div className="flex items-center gap-3 py-1 text-xs text-[var(--text-muted)]">
+                      <span className="h-px flex-1 bg-[var(--border-soft)]" />
+                      <span>无需账号</span>
+                      <span className="h-px flex-1 bg-[var(--border-soft)]" />
+                    </div>
+                    <Button className="w-full" variant="secondary" size="lg" disabled={loading} onClick={() => void enterDemo()}>
+                      <Database size={16} />
+                      使用测试数据体验
+                    </Button>
+                    <p className="text-center text-xs leading-6 text-[var(--text-muted)]">
+                      可浏览题库和训练功能；测试操作不会保存，也不能进入正式考试。
+                    </p>
+                  </>
+                ) : null}
 
                 {frontendPreviewMode ? (
                   <Button className="w-full" variant="secondary" size="lg" onClick={() => router.push(appInternalPath("/"))}>

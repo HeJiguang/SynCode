@@ -1,15 +1,30 @@
-import { ACCESS_TOKEN_KEY } from "@aioj/api";
-import { frontendPreviewMode } from "@aioj/config";
+import { ACCESS_TOKEN_KEY, DEMO_SESSION_KEY } from "@aioj/api";
+import { frontendDemoLoginEnabled, frontendPreviewMode } from "@aioj/config";
 import { cookies } from "next/headers";
 
-export async function getServerAccessToken() {
+export type ServerAuthSession = {
+  token: string | null;
+  demoMode: boolean;
+};
+
+export function isDemoLoginEnabled() {
+  return frontendDemoLoginEnabled && process.env.SYNCODE_DEMO_LOGIN_ENABLED === "true";
+}
+
+export async function getServerAuthSession(): Promise<ServerAuthSession> {
   if (frontendPreviewMode) {
-    return null;
+    return { token: null, demoMode: true };
   }
   try {
     const cookieStore = await cookies();
-    return cookieStore.get(ACCESS_TOKEN_KEY)?.value ?? null;
+    const token = cookieStore.get(ACCESS_TOKEN_KEY)?.value ?? null;
+    const demoMode = !token && isDemoLoginEnabled() && cookieStore.get(DEMO_SESSION_KEY)?.value === "1";
+    return { token, demoMode };
   } catch {
-    return null;
+    return { token: null, demoMode: false };
   }
+}
+
+export async function getServerAccessToken() {
+  return (await getServerAuthSession()).token;
 }

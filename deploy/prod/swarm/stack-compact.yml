@@ -51,6 +51,7 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       SYNCODE_BACKEND_BASE_URL: http://oj-runtime:19090
+      SYNCODE_DEMO_LOGIN_ENABLED: ${SYNCODE_DEMO_LOGIN_ENABLED:-false}
     networks:
       - edge
       - backend

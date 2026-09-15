@@ -8,6 +8,9 @@ import { getServerAccessToken } from "../../../../lib/server-auth";
 
 export async function POST(request: Request) {
   const token = await getServerAccessToken();
+  if (!token) {
+    return NextResponse.json({ message: "请先登录后使用 AI 辅助。" }, { status: 401 });
+  }
   const body = await request.json();
 
   if (!body?.context?.userMessage?.trim()) {

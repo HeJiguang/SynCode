@@ -23,6 +23,7 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
 
 type EditorPanelProps = {
   initialCode: Record<CodeLanguage, string>;
+  demoMode?: boolean;
   questionId?: string;
   examId?: string;
   questionTitle?: string;
@@ -140,6 +141,7 @@ function emitJudgeResult(detail: JudgeResultDetail) {
 
 export function EditorPanel({
   initialCode,
+  demoMode = false,
   questionId = "unknown",
   examId,
   questionTitle,
@@ -451,11 +453,11 @@ export function EditorPanel({
     setRunResult(null);
     setShowConsole(true);
 
-    if (frontendPreviewMode) {
-      setJudgeStage({ label: "当前是前端预览模式，运行代码功能已禁用。", done: true, error: false });
+    if (frontendPreviewMode || demoMode) {
+      setJudgeStage({ label: demoMode ? "测试体验模式不会运行或保存代码。" : "当前是前端预览模式，运行代码功能已禁用。", done: true, error: false });
       setRunResult({
         runStatus: "PREVIEW",
-        exeMessage: "这里只保留编辑器与结果面板的界面预览，不会真正调用后端运行代码。",
+        exeMessage: demoMode ? "你可以编辑测试代码，但运行请求不会发送到真实判题服务。" : "这里只保留编辑器与结果面板的界面预览，不会真正调用后端运行代码。",
         useMemory: null,
         useTime: null,
         caseResults: []
@@ -513,13 +515,13 @@ export function EditorPanel({
       setJudgeStage({ label: message, done: true, error: true });
       window.setTimeout(() => setJudgeStage(null), 2200);
     }
-  }, [activeCode, clearEditorErrors, customInput, examId, language, questionId]);
+  }, [activeCode, clearEditorErrors, customInput, demoMode, examId, language, questionId]);
 
   const handleSubmit = useCallback(async () => {
     clearEditorErrors();
 
-    if (frontendPreviewMode) {
-      const message = "当前是前端预览模式，提交评测功能已禁用。";
+    if (frontendPreviewMode || demoMode) {
+      const message = demoMode ? "测试体验模式不会提交或保存判题记录。" : "当前是前端预览模式，提交评测功能已禁用。";
       setJudgeStage({ label: message, done: true, error: false });
       emitJudgeResult({ questionId, status: "Pending", message });
       window.setTimeout(() => setJudgeStage(null), 2200);
@@ -663,7 +665,7 @@ export function EditorPanel({
       emitJudgeResult({ questionId, status: "Compile Error", message });
       window.setTimeout(() => setJudgeStage(null), 2200);
     }
-  }, [activeCode, clearEditorErrors, examId, language, pollJudgeResult, questionId, setEditorError]);
+  }, [activeCode, clearEditorErrors, demoMode, examId, language, pollJudgeResult, questionId, setEditorError]);
 
   const submitEnabled = isJudgeLanguageSupported(language);
 
@@ -838,17 +840,17 @@ export function EditorPanel({
           <div className="flex items-center gap-3">
             <Button variant="secondary" size="sm" id="btn-run-code" className="h-8 px-4 font-medium" onClick={handleRun}>
               <Play size={13} className="mr-1.5 text-[var(--text-secondary)]" />
-              {frontendPreviewMode ? "预览运行区" : "运行代码"}
+              {frontendPreviewMode || demoMode ? "体验运行区" : "运行代码"}
             </Button>
             <Button
               size="sm"
               id="btn-submit-code"
               className="h-8 px-5 font-semibold"
               onClick={handleSubmit}
-              disabled={!submitEnabled && !frontendPreviewMode}
+              disabled={!submitEnabled && !frontendPreviewMode && !demoMode}
             >
               <SendHorizontal size={13} className="mr-1.5 opacity-90" />
-              {frontendPreviewMode ? "预览提交区" : "提交评测"}
+              {frontendPreviewMode || demoMode ? "体验提交区" : "提交评测"}
             </Button>
           </div>
         </div>

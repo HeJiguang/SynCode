@@ -11,6 +11,9 @@ type RouteProps = {
 
 export async function GET(_request: Request, { params }: RouteProps) {
   const token = await getServerAccessToken();
+  if (!token) {
+    return NextResponse.json({ message: "请先登录后查看 AI 运行事件。" }, { status: 401 });
+  }
   const { runId } = await params;
   const headers = new Headers();
 

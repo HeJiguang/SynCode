@@ -31,6 +31,22 @@ wait_for_status() {
 wait_for_status "/" "200"
 wait_for_status "/app/login" "200"
 wait_for_status "/admin/login" "200"
+
+demo_headers="$(curl --silent --show-error --dump-header - --output /dev/null \
+  --request POST --connect-timeout 5 --max-time 15 "${BASE_URL}/app/api/auth/demo")"
+if [[ "$demo_headers" != *"syncode_demo_session=1"* ]]; then
+  echo "[smoke] demo login did not issue a session cookie" >&2
+  exit 1
+fi
+
+demo_page="$(curl --silent --show-error --header 'Cookie: syncode_demo_session=1' \
+  --connect-timeout 5 --max-time 15 "${BASE_URL}/app")"
+if [[ "$demo_page" != *"当前为测试体验模式"* ]]; then
+  echo "[smoke] demo session did not reach the test-data dashboard" >&2
+  exit 1
+fi
+echo "[smoke] demo login: 200 with isolated test-data session"
+
 wait_for_status "/app/api/trusted-exams/exams/1/access" "307 401"
 wait_for_status "/friend/exam/1/access" "200"
 

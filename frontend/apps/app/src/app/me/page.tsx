@@ -1,7 +1,6 @@
 import * as React from "react";
 import { ArrowRight, BookOpen, Clock3, Flame, Settings, Sparkles } from "lucide-react";
 import { getPublicMessages, getSubmissionHistory, getTrainingSnapshot, getUserProfile } from "@aioj/api";
-import { frontendPreviewMode } from "@aioj/config";
 import { redirect } from "next/navigation";
 
 import { AnnouncementCenter } from "../../components/announcement-center";
@@ -9,19 +8,19 @@ import { AppShell } from "../../components/app-shell";
 import { SubmissionHeatmap } from "../../components/submission-heatmap";
 import { appInternalPath, appPublicPath } from "../../lib/paths";
 import { getTrainingStatusLabel, getTrainingStatusTone, withFallback } from "../../lib/presentation";
-import { getServerAccessToken } from "../../lib/server-auth";
+import { getServerAuthSession } from "../../lib/server-auth";
 import { Panel, Tag } from "@aioj/ui";
 
 export default async function ProfilePage() {
-  const token = await getServerAccessToken();
-  if (!token && !frontendPreviewMode) {
+  const { token, demoMode } = await getServerAuthSession();
+  if (!token && !demoMode) {
     redirect(appInternalPath("/login"));
   }
 
   const [profile, training, messages, submissions] = await Promise.all([
     getUserProfile(token),
     getTrainingSnapshot(token),
-    getPublicMessages(token),
+    getPublicMessages(token, { forceMock: demoMode }),
     getSubmissionHistory(undefined, token)
   ]);
 
@@ -32,7 +31,7 @@ export default async function ProfilePage() {
 
   return (
     <AppShell
-      demoMode={!token}
+      demoMode={demoMode}
       rail={
         <>
           <AnnouncementCenter messages={messages.slice(0, 3)} />

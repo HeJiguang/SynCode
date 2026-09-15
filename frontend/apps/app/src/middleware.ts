@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { frontendPreviewMode } from "@aioj/config";
+import { DEMO_SESSION_KEY } from "@aioj/api";
+import { frontendDemoLoginEnabled, frontendPreviewMode } from "@aioj/config";
 
 const ACCESS_TOKEN_KEY = "syncode_access_token";
 
 // 不需要登录就能访问的路径（相对于 basePath /app）
-const PUBLIC_PATHS = ["/login", "/api/auth/send-code", "/api/auth/login"];
+const PUBLIC_PATHS = ["/login", "/api/auth/send-code", "/api/auth/login", "/api/auth/demo"];
 
 export function middleware(request: NextRequest) {
   if (frontendPreviewMode) {
@@ -19,8 +20,12 @@ export function middleware(request: NextRequest) {
   }
 
   const token = request.cookies.get(ACCESS_TOKEN_KEY)?.value;
+  const demoSession =
+    frontendDemoLoginEnabled &&
+    process.env.SYNCODE_DEMO_LOGIN_ENABLED === "true" &&
+    request.cookies.get(DEMO_SESSION_KEY)?.value === "1";
 
-  if (!token) {
+  if (!token && !demoSession) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     return NextResponse.redirect(loginUrl);
