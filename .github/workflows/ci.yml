@@ -185,7 +185,7 @@ jobs:
             .
 
       - name: Upload source bundle
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: deploy-source-${{ github.sha }}
           path: ${{ runner.temp }}/deploy-source.tar.gz
