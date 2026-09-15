@@ -17,9 +17,23 @@ import { normalizeJudgeOutcome, type JudgeResultDetail } from "../lib/judge-resu
 import { appApiPath } from "../lib/paths";
 import { Button, Tag, Textarea } from "@aioj/ui";
 
-const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
-  ssr: false
-});
+const MonacoEditor = dynamic(
+  async () => {
+    const [{ default: Editor, loader }, monaco] = await Promise.all([
+      import("@monaco-editor/react"),
+      import("monaco-editor/esm/vs/editor/editor.api.js"),
+      import("monaco-editor/esm/vs/basic-languages/java/java.contribution.js"),
+      import("monaco-editor/esm/vs/basic-languages/cpp/cpp.contribution.js"),
+      import("monaco-editor/esm/vs/basic-languages/python/python.contribution.js"),
+      import("monaco-editor/esm/vs/basic-languages/go/go.contribution.js"),
+      import("monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js")
+    ]);
+
+    loader.config({ monaco });
+    return Editor;
+  },
+  { ssr: false }
+);
 
 type EditorPanelProps = {
   initialCode: Record<CodeLanguage, string>;
@@ -157,6 +171,8 @@ export function EditorPanel({
   const [customInput, setCustomInput] = useState("");
   const [runResult, setRunResult] = useState<RunResult | null>(null);
   const [lightTheme, setLightTheme] = useState(false);
+  const [editorReady, setEditorReady] = useState(false);
+  const [editorFallback, setEditorFallback] = useState(false);
 
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
@@ -172,6 +188,13 @@ export function EditorPanel({
       if (wsRef.current) wsRef.current.close();
     };
   }, []);
+
+  useEffect(() => {
+    if (!mounted || editorReady || editorFallback) return;
+
+    const timer = window.setTimeout(() => setEditorFallback(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, [editorFallback, editorReady, mounted]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: light)");
@@ -282,7 +305,7 @@ export function EditorPanel({
 
         return { items: [] };
       },
-      freeInlineCompletions() {}
+      disposeInlineCompletions() {}
     });
   }, []);
 
@@ -337,6 +360,7 @@ export function EditorPanel({
     (editor: any, monaco: any) => {
       editorRef.current = editor;
       monacoRef.current = monaco;
+      setEditorReady(true);
 
       registerGhostText(monaco, language);
 
@@ -705,6 +729,19 @@ export function EditorPanel({
 
         {!mounted ? (
           <pre className="m-0 flex-1 overflow-auto bg-[var(--surface-1)] p-5 text-sm leading-7 text-[var(--text-secondary)]">{activeCode}</pre>
+        ) : editorFallback ? (
+          <textarea
+            aria-label="代码编辑器"
+            spellCheck={false}
+            value={activeCode}
+            onChange={(event) => {
+              setDrafts((current) => ({
+                ...current,
+                [language]: event.target.value
+              }));
+            }}
+            className="min-h-[260px] flex-1 resize-none bg-[#0b0f16] p-5 font-mono text-[13px] leading-[22px] text-[#e8edf2] outline-none"
+          />
         ) : (
           <MonacoEditor
             height="100%"
@@ -719,6 +756,7 @@ export function EditorPanel({
               scrollbar: { verticalScrollbarSize: 6 },
               smoothScrolling: true,
               renderLineHighlight: "line",
+              editContext: false,
               inlineSuggest: { enabled: true },
               quickSuggestions: false
             }}
