@@ -32,5 +32,6 @@ wait_for_status "/" "200"
 wait_for_status "/app/login" "200"
 wait_for_status "/admin/login" "200"
 wait_for_status "/app/api/trusted-exams/exams/1/access" "307 401"
+wait_for_status "/friend/exam/1/access" "200"
 
 echo "[smoke] test environment is serving all Phase 1 entry points"

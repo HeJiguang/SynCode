@@ -12,6 +12,7 @@ This directory contains the production deploy assets for the domestic-first rele
 - The manager copies worker-only images to `101.96.200.77`.
 - The manager runs `docker stack deploy` after both nodes have the required images.
 - `docker stack deploy` uses `--resolve-image never`, so Swarm does not try to resolve tags against an external registry during rollout.
+- The deploy command waits for every service update and desired replica to converge before smoke or end-to-end tests start.
 
 This avoids two unstable dependencies:
 
@@ -49,7 +50,7 @@ The compact layout is the default for the 4 vCPU / 8 GiB test host. It preserves
 5. The job migrates and validates the production database, then renders the runtime configuration.
 6. The manager builds the production images locally.
 7. The manager saves and copies the worker image set to `101.96.200.77`, then verifies those images exist on the worker.
-8. The manager runs `docker stack deploy --resolve-image never`.
+8. The manager runs `docker stack deploy --resolve-image never` and waits for the Swarm rollout to converge.
 
 ## First-Time Bootstrap
 
@@ -72,6 +73,8 @@ deploy/prod/scripts/deploy.sh
 ```
 
 For compact deployment, set `DEPLOYMENT_MODE=compact`, `RUNTIME_IMAGE`, and `BACKEND_NETWORK`, then use `STACK_FILE=deploy/prod/swarm/stack-compact.yml`. The external backend overlay network must exist before deploying the infrastructure and application stacks.
+
+`STACK_WAIT_TIMEOUT_SECONDS` controls the rollout timeout (default `600`), and `STACK_WAIT_POLL_SECONDS` controls its polling interval (default `5`). A paused, rolling-back, or timed-out service update fails the deployment before acceptance tests begin.
 
 ## Notes
 

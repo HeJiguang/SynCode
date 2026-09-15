@@ -9,6 +9,8 @@ RUNTIME_ENV_FILE="${RUNTIME_ENV_FILE:-deploy/prod/env/runtime.env}"
 BUILD_LOCAL_IMAGES="${BUILD_LOCAL_IMAGES:-false}"
 SYNC_WORKER_IMAGES="${SYNC_WORKER_IMAGES:-false}"
 WORKER_SSH_KEY_FILE="${WORKER_SSH_KEY_FILE:-}"
+STACK_WAIT_TIMEOUT_SECONDS="${STACK_WAIT_TIMEOUT_SECONDS:-600}"
+STACK_WAIT_POLL_SECONDS="${STACK_WAIT_POLL_SECONDS:-5}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
@@ -31,6 +33,8 @@ Environment variables:
   BUILD_LOCAL_IMAGES   Build all production images locally before deploy. Default: false
   SYNC_WORKER_IMAGES   Copy worker images to the worker node before deploy. Default: false
   WORKER_SSH_KEY_FILE  Private key used when SYNC_WORKER_IMAGES=true
+  STACK_WAIT_TIMEOUT_SECONDS  Maximum time to wait for Swarm convergence. Default: 600
+  STACK_WAIT_POLL_SECONDS     Swarm convergence polling interval. Default: 5
 EOF
 }
 
@@ -97,3 +101,10 @@ docker stack deploy \
   "$STACK_NAME"
 
 echo "[deploy] stack deploy submitted"
+
+STACK_NAME="$STACK_NAME" \
+STACK_WAIT_TIMEOUT_SECONDS="$STACK_WAIT_TIMEOUT_SECONDS" \
+STACK_WAIT_POLL_SECONDS="$STACK_WAIT_POLL_SECONDS" \
+  "$SCRIPT_DIR/wait-for-stack.sh"
+
+echo "[deploy] stack deploy converged"

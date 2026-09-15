@@ -43,7 +43,13 @@ latest_start_time="${exam_times[1]}"
 end_time="${exam_times[2]}"
 
 redact_response() {
-  jq 'if (.data | type) == "string" then .data = "<redacted>" else . end'
+  local response
+  response="$(cat)"
+  if printf '%s' "$response" | jq -e . >/dev/null 2>&1; then
+    printf '%s' "$response" | jq 'if (.data | type) == "string" then .data = "<redacted>" else . end'
+  else
+    echo '{"error":"response was not valid JSON and was omitted"}'
+  fi
 }
 
 fail_response() {
@@ -59,6 +65,9 @@ expect_code() {
   local response="$2"
   local expected_code="$3"
   local actual_code
+  if ! printf '%s' "$response" | jq -e 'type == "object"' >/dev/null 2>&1; then
+    fail_response "$step" "$response"
+  fi
   actual_code="$(printf '%s' "$response" | jq -r '.code // empty')"
   if [[ "$actual_code" != "$expected_code" ]]; then
     fail_response "$step" "$response"
@@ -67,7 +76,12 @@ expect_code() {
 }
 
 request() {
-  curl --silent --show-error --max-time 20 "$@"
+  local response
+  if ! response="$(curl --silent --show-error --fail-with-body --max-time 20 "$@")"; then
+    echo "[e2e] request failed: ${!#}" >&2
+    return 1
+  fi
+  printf '%s' "$response"
 }
 
 admin_login_body="$(jq -n \
