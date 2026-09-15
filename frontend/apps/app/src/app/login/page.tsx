@@ -1072,7 +1072,7 @@ export default function LoginPage() {
                       使用测试数据体验
                     </Button>
                     <p className="text-center text-xs leading-6 text-[var(--text-muted)]">
-                      可浏览题库和训练功能；测试操作不会保存，也不能进入正式考试。
+                      可浏览题库、训练和体验考试；测试操作只保存在当前浏览器，不会进入正式考试数据。
                     </p>
                   </>
                 ) : null}

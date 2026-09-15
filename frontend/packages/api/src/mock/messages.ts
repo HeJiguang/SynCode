@@ -19,8 +19,8 @@ export const publicMessages: PublicMessage[] = [
   },
   {
     textId: "msg-3",
-    title: "考试提醒：周末算法冲刺测将在明晚开始",
-    content: "请提前检查网络、语言模板和本地输入输出习惯，避免在正式考试中消耗额外时间。",
+    title: "体验考试：招新编程样卷现已开放",
+    content: "可从考试页面进入样卷，体验计时、整卷导航、代码编辑、自动保存和交卷流程。",
     category: "考试",
     publishedAt: "昨天 21:00",
     pinned: false

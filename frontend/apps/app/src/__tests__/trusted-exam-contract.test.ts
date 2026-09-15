@@ -25,5 +25,6 @@ for (const contract of [
 }
 
 assert.ok(!workspace.includes("clipboardData"), "clipboard content must never be collected");
+assert.match(workspace, /if \(!demoMode\) window\.localStorage\.removeItem/, "demo drafts must survive reloads");
 assert.ok(route.includes("/^[a-zA-Z0-9-]+$/"), "trusted exam BFF must reject unsafe path segments");
 assert.ok(route.includes('"idempotency-key"'), "trusted exam BFF must forward idempotency keys");

@@ -7,9 +7,10 @@ import {
 } from "lucide-react";
 import { Button, Panel, Tag } from "@aioj/ui";
 
+import { createDemoExamAccess, createDemoExamAttempt, type DemoExamLifecycle } from "./demo-trusted-exam";
 import { appApiPath } from "../lib/paths";
 
-type Access = {
+export type Access = {
   title: string;
   description?: string;
   serverNow: string;
@@ -21,7 +22,7 @@ type Access = {
   canResume: boolean;
 };
 
-type Question = {
+export type Question = {
   versionQuestionId: string;
   questionOrder: number;
   score: number;
@@ -34,7 +35,7 @@ type Question = {
   starterCode: Record<string, string>;
 };
 
-type Answer = {
+export type Answer = {
   answerId?: string;
   versionQuestionId: string;
   language: string;
@@ -44,7 +45,7 @@ type Answer = {
   frozen: boolean;
 };
 
-type Attempt = {
+export type Attempt = {
   attemptId: string;
   title: string;
   description?: string;
@@ -103,7 +104,35 @@ function formatRemaining(milliseconds: number) {
     .join(":");
 }
 
-export function TrustedExamWorkspace({ examId }: { examId: string }) {
+function formatDateTime(value?: string) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(date);
+}
+
+function demoStateKey(examId: string) {
+  return `syncode-demo-exam-state:${examId}`;
+}
+
+function readDemoLifecycle(examId: string): DemoExamLifecycle | null {
+  try {
+    const stored = window.localStorage.getItem(demoStateKey(examId));
+    if (!stored) return null;
+    const state = JSON.parse(stored) as DemoExamLifecycle;
+    return state.status === "IN_PROGRESS" || state.status === "SUBMITTED" ? state : null;
+  } catch {
+    return null;
+  }
+}
+
+export function TrustedExamWorkspace({ examId, demoMode = false }: { examId: string; demoMode?: boolean }) {
   const [access, setAccess] = React.useState<Access | null>(null);
   const [attempt, setAttempt] = React.useState<Attempt | null>(null);
   const [result, setResult] = React.useState<ExamResult | null>(null);
@@ -124,12 +153,16 @@ export function TrustedExamWorkspace({ examId }: { examId: string }) {
   const activeAnswer = activeQuestion ? drafts[activeQuestion.versionQuestionId] : undefined;
 
   const loadResult = React.useCallback(async (attemptId: string) => {
+    if (demoMode) {
+      setResult(null);
+      return;
+    }
     try {
       setResult(await api<ExamResult>(`attempts/${attemptId}/result`));
     } catch {
       setResult(null);
     }
-  }, []);
+  }, [demoMode]);
 
   const applyAttempt = React.useCallback((next: Attempt) => {
     setAttempt(next);
@@ -157,6 +190,12 @@ export function TrustedExamWorkspace({ examId }: { examId: string }) {
   const loadAccess = React.useCallback(async () => {
     setError(null);
     try {
+      if (demoMode) {
+        const lifecycle = readDemoLifecycle(examId);
+        setAccess(createDemoExamAccess(examId, lifecycle?.status === "IN_PROGRESS"));
+        if (lifecycle) applyAttempt(createDemoExamAttempt(examId, lifecycle));
+        return;
+      }
       const next = await api<Access>(`exams/${examId}/access`);
       setAccess(next);
       clockOffset.current = new Date(next.serverNow).getTime() - Date.now();
@@ -164,7 +203,7 @@ export function TrustedExamWorkspace({ examId }: { examId: string }) {
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "无法检查考试资格。");
     }
-  }, [applyAttempt, examId]);
+  }, [applyAttempt, demoMode, examId]);
 
   React.useEffect(() => { void loadAccess(); }, [loadAccess]);
 
@@ -174,14 +213,26 @@ export function TrustedExamWorkspace({ examId }: { examId: string }) {
       const next = new Date(attempt.deadlineAt).getTime() - (Date.now() + clockOffset.current);
       setRemaining(next);
       if (next <= 0) {
-        void api<Attempt>(`exams/${examId}/attempts/current`).then(applyAttempt).catch(() => undefined);
+        if (demoMode) {
+          const submittedAt = new Date().toISOString();
+          const lifecycle: DemoExamLifecycle = {
+            status: "SUBMITTED",
+            serverNow: submittedAt,
+            deadlineAt: attempt.deadlineAt,
+            submittedAt
+          };
+          window.localStorage.setItem(demoStateKey(examId), JSON.stringify(lifecycle));
+          applyAttempt({ ...attempt, status: "SUBMITTED", submittedAt });
+        } else {
+          void api<Attempt>(`exams/${examId}/attempts/current`).then(applyAttempt).catch(() => undefined);
+        }
       }
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [applyAttempt, attempt, examId, terminal]);
+  }, [applyAttempt, attempt, demoMode, examId, terminal]);
 
   const flushIntegrity = React.useCallback(async () => {
-    if (!attempt || terminal || integrityQueue.current.length === 0) return;
+    if (demoMode || !attempt || terminal || integrityQueue.current.length === 0) return;
     const events = integrityQueue.current.splice(0);
     try {
       await api(`attempts/${attempt.attemptId}/integrity-events`, {
@@ -191,10 +242,10 @@ export function TrustedExamWorkspace({ examId }: { examId: string }) {
     } catch {
       integrityQueue.current.unshift(...events);
     }
-  }, [attempt, examId, terminal]);
+  }, [attempt, demoMode, examId, terminal]);
 
   React.useEffect(() => {
-    if (!attempt || terminal) return;
+    if (demoMode || !attempt || terminal) return;
     const record = (eventType: string, metadata: Record<string, unknown> = {}) => integrityQueue.current.push({
       clientSequence: nextIntegritySequence(attempt.attemptId),
       eventType,
@@ -217,10 +268,10 @@ export function TrustedExamWorkspace({ examId }: { examId: string }) {
       document.removeEventListener("copy", copy);
       window.clearInterval(timer);
     };
-  }, [attempt, flushIntegrity, terminal]);
+  }, [attempt, demoMode, flushIntegrity, terminal]);
 
   React.useEffect(() => {
-    if (!attempt || terminal) return;
+    if (demoMode || !attempt || terminal) return;
     const timer = window.setInterval(async () => {
       try {
         const heartbeat = await api<{ serverNow: string; status: string }>(`attempts/${attempt.attemptId}/heartbeat`, {
@@ -236,18 +287,20 @@ export function TrustedExamWorkspace({ examId }: { examId: string }) {
       }
     }, 20000);
     return () => window.clearInterval(timer);
-  }, [applyAttempt, attempt, examId, terminal]);
+  }, [applyAttempt, attempt, demoMode, examId, terminal]);
 
   const persistAnswer = React.useCallback(async (attemptId: string, questionId: string, answer: Answer) => {
-      const saved = await api<Answer>(`attempts/${attemptId}/answers/${questionId}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          answerType: "CODE",
-          language: answer.language,
-          content: answer.content,
-          expectedVersion: answer.answerVersion
-        })
-      });
+      const saved = demoMode
+        ? { ...answer, answerVersion: answer.answerVersion + 1, savedAt: new Date().toISOString() }
+        : await api<Answer>(`attempts/${attemptId}/answers/${questionId}`, {
+            method: "PUT",
+            body: JSON.stringify({
+              answerType: "CODE",
+              language: answer.language,
+              content: answer.content,
+              expectedVersion: answer.answerVersion
+            })
+          });
       const latest = draftsRef.current[questionId];
       const unchanged = latest?.content === answer.content && latest?.language === answer.language;
       const next = unchanged ? saved : {
@@ -259,13 +312,13 @@ export function TrustedExamWorkspace({ examId }: { examId: string }) {
       draftsRef.current = { ...draftsRef.current, [questionId]: next };
       setDrafts(draftsRef.current);
       if (unchanged) {
-        window.localStorage.removeItem(`syncode-exam-draft:${attemptId}:${questionId}`);
+        if (!demoMode) window.localStorage.removeItem(`syncode-exam-draft:${attemptId}:${questionId}`);
         setSaveState("saved");
       } else {
         setSaveState("dirty");
       }
       return saved;
-  }, []);
+  }, [demoMode]);
 
   const saveActive = React.useCallback(async () => {
     if (!attempt || !activeQuestion || !activeAnswer || terminal) return activeAnswer;
@@ -289,6 +342,18 @@ export function TrustedExamWorkspace({ examId }: { examId: string }) {
     setBusy(true);
     setError(null);
     try {
+      if (demoMode) {
+        const next = createDemoExamAttempt(examId);
+        const lifecycle: DemoExamLifecycle = {
+          status: "IN_PROGRESS",
+          serverNow: next.serverNow,
+          deadlineAt: next.deadlineAt
+        };
+        window.localStorage.setItem(demoStateKey(examId), JSON.stringify(lifecycle));
+        setAccess(createDemoExamAccess(examId, true));
+        applyAttempt(next);
+        return;
+      }
       applyAttempt(await api<Attempt>(`exams/${examId}/attempts/start`, {
         method: "POST",
         headers: { "Idempotency-Key": idempotencyKey("start") },
@@ -318,6 +383,12 @@ export function TrustedExamWorkspace({ examId }: { examId: string }) {
     try {
       const saved = await saveActive();
       if (!attempt || !activeQuestion || !saved) return;
+      if (demoMode) {
+        setNotice(kind === "RUN"
+          ? "体验运行已完成：这里不会调用真实判题服务。"
+          : "体验提交已记录在当前浏览器，不会生成真实成绩。");
+        return;
+      }
       const response = await api<{ remainingFormalSubmissions: number }>(`attempts/${attempt.attemptId}/submissions`, {
         method: "POST",
         headers: { "Idempotency-Key": idempotencyKey("judge") },
@@ -340,6 +411,24 @@ export function TrustedExamWorkspace({ examId }: { examId: string }) {
     setBusy(true);
     setError(null);
     try {
+      if (demoMode) {
+        const submittedAt = new Date().toISOString();
+        const lifecycle: DemoExamLifecycle = {
+          status: "SUBMITTED",
+          serverNow: submittedAt,
+          deadlineAt: attempt.deadlineAt,
+          submittedAt
+        };
+        window.localStorage.setItem(demoStateKey(examId), JSON.stringify(lifecycle));
+        applyAttempt({
+          ...attempt,
+          status: "SUBMITTED",
+          serverNow: submittedAt,
+          submittedAt,
+          answers: Object.values(draftsRef.current).map((answer) => ({ ...answer, frozen: true }))
+        });
+        return;
+      }
       for (const question of attempt.questions) {
         const key = `syncode-exam-draft:${attempt.attemptId}:${question.versionQuestionId}`;
         const answer = draftsRef.current[question.versionQuestionId];
@@ -361,6 +450,22 @@ export function TrustedExamWorkspace({ examId }: { examId: string }) {
     }
   }
 
+  function resetDemo() {
+    if (!attempt) return;
+    window.localStorage.removeItem(demoStateKey(examId));
+    attempt.questions.forEach((question) => {
+      window.localStorage.removeItem(`syncode-exam-draft:${attempt.attemptId}:${question.versionQuestionId}`);
+    });
+    draftsRef.current = {};
+    setDrafts({});
+    setAttempt(null);
+    setResult(null);
+    setNotice(null);
+    setError(null);
+    setSaveState("idle");
+    setAccess(createDemoExamAccess(examId));
+  }
+
   if (!access && !error) {
     return <div className="flex min-h-[60vh] items-center justify-center"><LoaderCircle className="animate-spin text-[var(--text-muted)]" /></div>;
   }
@@ -374,13 +479,13 @@ export function TrustedExamWorkspace({ examId }: { examId: string }) {
             <div className="min-w-0"><p className="kicker">考试进入检查</p><h1 className="mt-2 text-3xl font-semibold">{access?.title ?? "无法进入考试"}</h1><p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">{access?.description}</p></div>
           </div>
           {access ? <div className="mt-7 grid gap-3 md:grid-cols-3">
-            <div className="border-t border-[var(--border-soft)] pt-4"><p className="text-xs text-[var(--text-muted)]">开始时间</p><p className="mt-2 text-sm">{access.startAt}</p></div>
-            <div className="border-t border-[var(--border-soft)] pt-4"><p className="text-xs text-[var(--text-muted)]">最晚入场</p><p className="mt-2 text-sm">{access.latestStartAt}</p></div>
+            <div className="border-t border-[var(--border-soft)] pt-4"><p className="text-xs text-[var(--text-muted)]">开始时间</p><p className="mt-2 text-sm">{demoMode ? "现在可进入" : formatDateTime(access.startAt)}</p></div>
+            <div className="border-t border-[var(--border-soft)] pt-4"><p className="text-xs text-[var(--text-muted)]">最晚入场</p><p className="mt-2 text-sm">{demoMode ? "今日体验时段内" : formatDateTime(access.latestStartAt)}</p></div>
             <div className="border-t border-[var(--border-soft)] pt-4"><p className="text-xs text-[var(--text-muted)]">作答时长</p><p className="mt-2 text-sm">{access.durationMinutes} 分钟</p></div>
           </div> : null}
           <div className="mt-7 border-l-2 border-[var(--warning)] pl-4 text-sm leading-7 text-[var(--text-secondary)]">{access?.privacyNotice}</div>
           {error ? <p className="mt-5 flex items-center gap-2 text-sm text-[var(--danger)]"><AlertTriangle size={15} />{error}</p> : null}
-          <div className="mt-7 flex gap-3"><Button onClick={() => void start()} disabled={!access?.canStart || busy}>{busy ? <LoaderCircle size={15} className="animate-spin" /> : <Play size={15} />}开始考试</Button><Button variant="secondary" onClick={() => void loadAccess()}><RefreshCw size={15} />重新检查</Button></div>
+          <div className="mt-7 flex gap-3"><Button onClick={() => void start()} disabled={!access?.canStart || busy}>{busy ? <LoaderCircle size={15} className="animate-spin" /> : <Play size={15} />}{demoMode ? "进入体验考试" : "开始考试"}</Button><Button variant="secondary" onClick={() => void loadAccess()}><RefreshCw size={15} />重新检查</Button></div>
         </Panel>
       </div>
     );
@@ -388,14 +493,14 @@ export function TrustedExamWorkspace({ examId }: { examId: string }) {
 
   return <div className="grid h-full min-h-0 grid-rows-[auto_1fr] bg-[var(--bg)]">
     <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-soft)] bg-[var(--surface-2)] px-4 py-3 md:px-6">
-      <div className="min-w-0"><p className="truncate text-sm font-semibold">{attempt.title}</p><p className="mt-1 text-xs text-[var(--text-muted)]">服务端计时 · {attempt.questions.length} 题</p></div>
+      <div className="min-w-0"><div className="flex items-center gap-2"><p className="truncate text-sm font-semibold">{attempt.title}</p>{demoMode ? <Tag>体验卷</Tag> : null}</div><p className="mt-1 text-xs text-[var(--text-muted)]">{demoMode ? "本地体验计时" : "服务端计时"} · {attempt.questions.length} 题 · 100 分</p></div>
       <div className="flex items-center gap-2"><div className="flex h-9 items-center gap-2 rounded-[8px] border border-[var(--border-soft)] bg-[var(--surface-3)] px-3 font-mono text-sm"><Clock3 size={15} />{formatRemaining(remaining)}</div><Button size="sm" variant="secondary" onClick={() => void finalize()} disabled={busy || terminal}><Send size={14} />交卷</Button></div>
     </header>
-    {terminal ? <div className="flex items-center justify-center p-6"><Panel className="w-full max-w-xl p-8 text-center"><CheckCircle2 size={36} className="mx-auto text-[var(--success)]" /><h1 className="mt-4 text-2xl font-semibold">交卷已确认</h1><p className="mt-3 text-sm text-[var(--text-secondary)]">状态：{attempt.status} · {attempt.submittedAt}</p>{result ? <div className="mt-6 border-t border-[var(--border-soft)] pt-6"><p className="text-sm text-[var(--text-muted)]">最终成绩</p><p className="mt-2 text-4xl font-semibold">{result.totalScore}<span className="text-lg text-[var(--text-muted)]"> / {result.maxScore}</span></p></div> : <div className="mt-5"><p className="text-sm text-[var(--text-muted)]">成绩将在教师发布后显示。</p><Button className="mt-4" size="sm" variant="secondary" onClick={() => void loadResult(attempt.attemptId)}><RefreshCw size={14} />刷新成绩</Button></div>}</Panel></div> :
-      <div className="grid min-h-0 lg:grid-cols-[220px_minmax(0,0.85fr)_minmax(420px,1.15fr)]">
-        <aside className="overflow-auto border-r border-[var(--border-soft)] bg-[var(--surface-2)] p-3"><p className="px-2 py-2 text-xs font-semibold text-[var(--text-muted)]">题目导航</p><div className="space-y-1">{attempt.questions.map((question) => { const answer = drafts[question.versionQuestionId]; const selected = question.versionQuestionId === activeQuestion?.versionQuestionId; return <button key={question.versionQuestionId} onClick={() => setActiveId(question.versionQuestionId)} className={`flex w-full items-center gap-3 rounded-[8px] px-3 py-3 text-left text-sm ${selected ? "bg-[var(--surface-1)]" : "text-[var(--text-secondary)] hover:bg-[var(--surface-3)]"}`}><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--border-soft)] font-mono text-xs">{answer?.answerVersion > 0 ? <Check size={13} /> : question.questionOrder}</span><span className="min-w-0 flex-1 truncate">{question.title}</span><span className="text-xs text-[var(--text-muted)]">{question.score}</span></button>; })}</div></aside>
-        <main className="overflow-auto border-r border-[var(--border-soft)] p-5 md:p-6"><div className="flex flex-wrap gap-2"><Tag tone="accent">第 {activeQuestion?.questionOrder} 题</Tag><Tag>{activeQuestion?.score} 分</Tag>{activeQuestion?.required ? <Tag tone="warning">必答</Tag> : null}</div><h1 className="mt-4 text-2xl font-semibold">{activeQuestion?.title}</h1><div className="mt-6 whitespace-pre-wrap text-sm leading-8 text-[var(--text-secondary)]">{activeQuestion?.content}</div><div className="mt-8 flex gap-4 border-t border-[var(--border-soft)] pt-4 text-xs text-[var(--text-muted)]"><span>时间 {activeQuestion?.timeLimit} ms</span><span>内存 {activeQuestion?.spaceLimit} KB</span></div></main>
-        <section className="grid min-h-0 grid-rows-[auto_1fr_auto] bg-[var(--surface-1)]"><div className="flex items-center justify-between border-b border-[var(--border-soft)] px-4 py-3"><div className="flex items-center gap-2 text-sm font-medium"><FileCode2 size={15} />Java</div><div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">{saveState === "saving" ? <LoaderCircle size={13} className="animate-spin" /> : saveState === "offline" || saveState === "conflict" ? <CloudOff size={13} /> : <Cloud size={13} />}{saveState === "dirty" ? "待保存" : saveState === "saving" ? "保存中" : saveState === "offline" ? "网络异常" : saveState === "conflict" ? "版本冲突" : "已保存"}</div></div><textarea aria-label="代码编辑器" spellCheck={false} readOnly={busy} value={activeAnswer?.content ?? ""} onChange={(event) => updateCode(event.target.value)} className="min-h-[360px] w-full resize-none bg-[#101418] p-5 font-mono text-sm leading-7 text-[#e8edf2] outline-none" /><div className="border-t border-[var(--border-soft)] p-4">{error ? <p className="mb-3 flex items-center gap-2 text-sm text-[var(--danger)]"><AlertTriangle size={14} />{error}</p> : null}{notice ? <p className="mb-3 text-sm text-[var(--success)]">{notice}</p> : null}<div className="flex flex-wrap justify-between gap-3"><div className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><LockKeyhole size={13} />正式提交使用当前已保存版本</div><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={busy} onClick={() => void submit("RUN")}><Play size={14} />运行</Button><Button size="sm" disabled={busy} onClick={() => void submit("FORMAL")}><Send size={14} />提交</Button></div></div></div></section>
+    {terminal ? <div className="flex items-center justify-center overflow-auto p-6"><Panel className="w-full max-w-xl p-8 text-center"><CheckCircle2 size={36} className="mx-auto text-[var(--success)]" /><h1 className="mt-4 text-2xl font-semibold">交卷已确认</h1><p className="mt-3 text-sm text-[var(--text-secondary)]">{formatDateTime(attempt.submittedAt)}</p>{demoMode ? <div className="mt-5"><p className="text-sm leading-7 text-[var(--text-muted)]">体验流程已经完成。本次作答只保存在当前浏览器，没有执行真实判题，也不会计入成绩。</p><Button className="mt-4" size="sm" variant="secondary" onClick={resetDemo}><RefreshCw size={14} />重新体验</Button></div> : result ? <div className="mt-6 border-t border-[var(--border-soft)] pt-6"><p className="text-sm text-[var(--text-muted)]">最终成绩</p><p className="mt-2 text-4xl font-semibold">{result.totalScore}<span className="text-lg text-[var(--text-muted)]"> / {result.maxScore}</span></p></div> : <div className="mt-5"><p className="text-sm text-[var(--text-muted)]">成绩将在教师发布后显示。</p><Button className="mt-4" size="sm" variant="secondary" onClick={() => void loadResult(attempt.attemptId)}><RefreshCw size={14} />刷新成绩</Button></div>}</Panel></div> :
+      <div className="grid min-h-0 overflow-auto lg:grid-cols-[220px_minmax(0,0.85fr)_minmax(420px,1.15fr)] lg:overflow-hidden">
+        <aside className="border-b border-[var(--border-soft)] bg-[var(--surface-2)] p-3 lg:overflow-auto lg:border-b-0 lg:border-r"><p className="px-2 py-2 text-xs font-semibold text-[var(--text-muted)]">题目导航</p><div className="flex gap-1 overflow-x-auto lg:block lg:space-y-1">{attempt.questions.map((question) => { const answer = drafts[question.versionQuestionId]; const selected = question.versionQuestionId === activeQuestion?.versionQuestionId; return <button key={question.versionQuestionId} aria-current={selected ? "step" : undefined} onClick={() => setActiveId(question.versionQuestionId)} className={`flex min-w-[190px] items-center gap-3 rounded-[8px] px-3 py-3 text-left text-sm lg:w-full lg:min-w-0 ${selected ? "bg-[var(--surface-1)]" : "text-[var(--text-secondary)] hover:bg-[var(--surface-3)]"}`}><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--border-soft)] font-mono text-xs">{answer?.answerVersion > 0 ? <Check size={13} /> : question.questionOrder}</span><span className="min-w-0 flex-1 truncate">{question.title}</span><span className="text-xs text-[var(--text-muted)]">{question.score}</span></button>; })}</div></aside>
+        <main className="border-b border-[var(--border-soft)] p-5 md:p-6 lg:overflow-auto lg:border-b-0 lg:border-r"><div className="flex flex-wrap gap-2"><Tag tone="accent">第 {activeQuestion?.questionOrder} 题</Tag><Tag>{activeQuestion?.score} 分</Tag>{activeQuestion?.required ? <Tag tone="warning">必答</Tag> : null}</div><h1 className="mt-4 text-2xl font-semibold">{activeQuestion?.title}</h1><div className="mt-6 whitespace-pre-wrap text-sm leading-8 text-[var(--text-secondary)]">{activeQuestion?.content}</div><div className="mt-8 flex gap-4 border-t border-[var(--border-soft)] pt-4 text-xs text-[var(--text-muted)]"><span>时间 {activeQuestion?.timeLimit} ms</span><span>内存 {activeQuestion?.spaceLimit} KB</span></div></main>
+        <section className="grid min-h-[520px] grid-rows-[auto_1fr_auto] bg-[var(--surface-1)] lg:min-h-0"><div className="flex items-center justify-between border-b border-[var(--border-soft)] px-4 py-3"><div className="flex items-center gap-2 text-sm font-medium"><FileCode2 size={15} />Java</div><div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">{saveState === "saving" ? <LoaderCircle size={13} className="animate-spin" /> : saveState === "offline" || saveState === "conflict" ? <CloudOff size={13} /> : <Cloud size={13} />}{saveState === "dirty" ? "待保存" : saveState === "saving" ? "保存中" : saveState === "offline" ? "网络异常" : saveState === "conflict" ? "版本冲突" : demoMode ? "已保存到本机" : "已保存"}</div></div><textarea aria-label="代码编辑器" spellCheck={false} readOnly={busy} value={activeAnswer?.content ?? ""} onChange={(event) => updateCode(event.target.value)} className="min-h-[360px] w-full resize-none bg-[#101418] p-5 font-mono text-sm leading-7 text-[#e8edf2] outline-none" /><div className="border-t border-[var(--border-soft)] p-4">{error ? <p className="mb-3 flex items-center gap-2 text-sm text-[var(--danger)]"><AlertTriangle size={14} />{error}</p> : null}{notice ? <p className="mb-3 text-sm text-[var(--success)]">{notice}</p> : null}<div className="flex flex-wrap justify-between gap-3"><div className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><LockKeyhole size={13} />{demoMode ? "体验操作不会发送到判题服务" : "正式提交使用当前已保存版本"}</div><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={busy} onClick={() => void submit("RUN")}><Play size={14} />运行</Button><Button size="sm" disabled={busy} onClick={() => void submit("FORMAL")}><Send size={14} />提交</Button></div></div></div></section>
       </div>}
   </div>;
 }
