@@ -4,7 +4,8 @@ This directory contains the production deploy assets for the domestic-first rele
 
 ## Deployment Model
 
-- `ci.yml` runs on GitHub-hosted runners.
+- `ci.yml` runs Java, Python, frontend, and MySQL migration checks on GitHub-hosted runners.
+- `cd-test.yml` automatically deploys a successful `main` build to the isolated test environment.
 - `bootstrap-runner.yml` installs a self-hosted runner on `101.96.200.76`.
 - `cd.yml` runs on that self-hosted runner.
 - The manager builds all production images locally.
@@ -33,12 +34,13 @@ This avoids two unstable dependencies:
 ## Release Flow
 
 1. GitHub runs `ci.yml`.
-2. After `ci.yml` succeeds on `main`, GitHub schedules `cd.yml`.
-3. The self-hosted runner on `101.96.200.76` checks out the target revision.
-4. The job renders `deploy/prod/env/stack.env` and `deploy/prod/env/runtime.env` from GitHub Secrets.
-5. The manager builds the production images locally.
-6. The manager saves and copies the worker image set to `101.96.200.77`, then verifies those images exist on the worker.
-7. The manager runs `docker stack deploy --resolve-image never`.
+2. After `ci.yml` succeeds on `main`, `cd-test.yml` deploys and smoke-tests the test environment.
+3. GitHub sends the production approval notification; an administrator manually starts `cd.yml` with the successful CI run id.
+4. The self-hosted runner on `101.96.200.76` downloads that exact tested revision.
+5. The job migrates and validates the production database, then renders the runtime configuration.
+6. The manager builds the production images locally.
+7. The manager saves and copies the worker image set to `101.96.200.77`, then verifies those images exist on the worker.
+8. The manager runs `docker stack deploy --resolve-image never`.
 
 ## First-Time Bootstrap
 

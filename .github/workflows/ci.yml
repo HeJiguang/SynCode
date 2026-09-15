@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   java:
-    name: Java Compile
+    name: Java Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -27,8 +27,73 @@ jobs:
           java-version: "17"
           cache: maven
 
-      - name: Compile reactor
-        run: mvn -q -DskipTests compile
+      - name: Test reactor
+        run: mvn --batch-mode test -DskipTests=false
+
+  database-migrations:
+    name: MySQL Migration Verification
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: bitoj_dev
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --host=127.0.0.1 --user=root --password=root"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      MYSQL_PWD: root
+      SYNCODE_DB_URL: jdbc:mysql://127.0.0.1:3306/bitoj_dev?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+      SYNCODE_DB_USER: root
+      SYNCODE_DB_PASSWORD: root
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Install MySQL client
+        run: sudo apt-get update && sudo apt-get install --yes mysql-client
+
+      - name: Initialize legacy schema
+        run: mysql --host=127.0.0.1 --user=root < deploy/dev/sql/init-complete.sql
+
+      - name: Verify legacy preflight
+        run: |
+          violations="$(mysql --batch --skip-column-names --host=127.0.0.1 --user=root bitoj_dev < deploy/migrations/mysql/preflight/legacy_schema_preflight.sql)"
+          if [[ -n "${violations}" ]]; then
+            echo "Legacy preflight returned violations:" >&2
+            echo "${violations}" >&2
+            exit 1
+          fi
+
+      - name: Baseline, migrate twice, and validate
+        run: |
+          mvn --batch-mode -f deploy/migrations/pom.xml flyway:baseline
+          mvn --batch-mode -f deploy/migrations/pom.xml flyway:migrate
+          mvn --batch-mode -f deploy/migrations/pom.xml flyway:migrate
+          mvn --batch-mode -f deploy/migrations/pom.xml flyway:validate
+
+      - name: Verify migrated schema
+        run: |
+          output="$(mysql --batch --skip-column-names --host=127.0.0.1 --user=root bitoj_dev < deploy/migrations/mysql/verification/verify_V2026091401__trusted_exam_core_schema.sql)"
+          violations="$(printf '%s\n' "${output}" | sed '$d')"
+          if [[ -n "${violations}" ]]; then
+            echo "Migration verification returned violations:" >&2
+            echo "${violations}" >&2
+            exit 1
+          fi
+          printf '%s\n' "${output}" | tail -n 1
 
   oj-agent:
     name: Python Agent Tests
@@ -105,6 +170,7 @@ jobs:
       - java
       - oj-agent
       - frontend
+      - database-migrations
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -5,10 +5,28 @@ This repository now uses a split pipeline:
 - `ci.yml` runs on GitHub-hosted runners.
 - `deploy-notify.yml` runs on GitHub-hosted runners and emails a deployment approval request after `ci.yml` succeeds on `main`.
 - `cd.yml` runs on the self-hosted runner installed on `101.96.200.76`, but only when you trigger it manually.
+- `cd-test.yml` automatically deploys successful `main` builds on a separate runner labelled `syncode-test`.
 
 The production deploy path no longer depends on GHCR or on GitHub-hosted runners SSHing into the manager for every release.
 
 ## Required Secrets
+
+### Test environment
+
+- `STACK_ENV_TEST`: isolated test stack image and placement configuration.
+- `RUNTIME_ENV_TEST`: test-only Nacos, MySQL, Redis, RabbitMQ, and application configuration.
+- `SYNCODE_DB_URL_TEST`, `SYNCODE_DB_USER_TEST`, `SYNCODE_DB_PASSWORD_TEST`: Flyway credentials for the test database.
+- `TEST_BASE_URL`: externally reachable test URL used by the post-deploy smoke test.
+
+The test values must not reference production databases, queues, Redis namespaces, or Nacos namespaces.
+
+### Production migration credentials
+
+- `SYNCODE_DB_URL_PROD`
+- `SYNCODE_DB_USER_PROD`
+- `SYNCODE_DB_PASSWORD_PROD`
+
+These are used only by the manually approved production workflow to run Flyway before service rollout. Grant schema migration permissions without granting unrelated administrative privileges.
 
 ### `DEPLOY_SSH_HOST`
 
