@@ -179,10 +179,12 @@ jobs:
         shell: bash
         run: |
           cp deploy/prod/env/runtime.env.example deploy/prod/env/runtime.env
-          set -a
-          source deploy/prod/env/stack.env.example
-          source deploy/test/env/infra.env.example
-          set +a
+          for env_file in deploy/prod/env/stack.env.example deploy/test/env/infra.env.example; do
+            while IFS= read -r line || [[ -n "${line}" ]]; do
+              [[ -z "${line}" || "${line}" =~ ^[[:space:]]*# ]] && continue
+              export "${line}"
+            done < "${env_file}"
+          done
           docker stack config --compose-file deploy/prod/swarm/stack.yml > /dev/null
           docker stack config --compose-file deploy/prod/swarm/stack-compact.yml > /dev/null
           docker stack config --compose-file deploy/test/swarm/infra.yml > /dev/null
