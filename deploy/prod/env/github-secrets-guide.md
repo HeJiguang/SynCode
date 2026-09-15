@@ -17,6 +17,9 @@ The production deploy path no longer depends on GHCR or on GitHub-hosted runners
 - `RUNTIME_ENV_TEST`: test-only Nacos, MySQL, Redis, RabbitMQ, and application configuration.
 - `SYNCODE_DB_URL_TEST`, `SYNCODE_DB_USER_TEST`, `SYNCODE_DB_PASSWORD_TEST`: Flyway credentials for the test database.
 - `TEST_BASE_URL`: externally reachable test URL used by the post-deploy smoke test.
+- `TEST_ADMIN_ACCOUNT`, `TEST_ADMIN_PASSWORD`: test-only administrator used by the full exam acceptance flow.
+- `TEST_CANDIDATE_EMAIL`, `TEST_CANDIDATE_CODE`: base email and test-only verification code; each run registers a unique plus-addressed candidate.
+- `TEST_QUESTION_ID`: seeded A+B programming question used for real sandbox judging.
 
 The test values must not reference production databases, queues, Redis namespaces, or Nacos namespaces.
 

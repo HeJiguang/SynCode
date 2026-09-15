@@ -240,7 +240,7 @@ class TrustedExamServiceImplTest {
     void resultShouldRemainHiddenUntilExamAndGradeAreReleased() {
         ExamAttempt attempt = inProgressAttempt(NOW_UTC.plusMinutes(30));
         attempt.setStatus(ExamAttemptStatus.SUBMITTED.getCode());
-        when(attemptMapper.selectByIdForUpdate(900L)).thenReturn(attempt);
+        when(attemptMapper.selectById(900L)).thenReturn(attempt);
         Exam exam = exam();
         exam.setStatus(ExamStatus.FINISHED.getCode());
         when(examMapper.selectById(10L)).thenReturn(exam);
@@ -248,6 +248,7 @@ class TrustedExamServiceImplTest {
         ServiceException exception = assertThrows(ServiceException.class, () -> service.result(900L));
 
         assertEquals(ResultCode.EXAM_RESULT_NOT_RELEASED, exception.getResultCode());
+        verify(attemptMapper, never()).selectByIdForUpdate(any());
         verify(gradeMapper, never()).selectOne(any());
     }
 

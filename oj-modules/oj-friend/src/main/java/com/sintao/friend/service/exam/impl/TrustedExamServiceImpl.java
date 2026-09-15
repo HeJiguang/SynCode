@@ -469,7 +469,7 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
     @Transactional(readOnly = true)
     public ExamResultVO result(Long attemptId) {
         long userId = currentUserId();
-        ExamAttempt attempt = ownedAttemptForUpdate(attemptId, userId);
+        ExamAttempt attempt = ownedAttempt(attemptId, userId);
         Exam exam = examMapper.selectById(attempt.getExamId());
         if (exam == null || ExamStatus.fromCode(exam.getStatus()) != ExamStatus.RESULT_RELEASED) {
             throw new ServiceException(ResultCode.EXAM_RESULT_NOT_RELEASED);
@@ -666,6 +666,14 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
 
     private ExamAttempt ownedAttemptForUpdate(Long attemptId, long userId) {
         ExamAttempt attempt = attemptMapper.selectByIdForUpdate(attemptId);
+        if (attempt == null || !Objects.equals(attempt.getUserId(), userId)) {
+            throw new ServiceException(ResultCode.EXAM_ATTEMPT_NOT_FOUND);
+        }
+        return attempt;
+    }
+
+    private ExamAttempt ownedAttempt(Long attemptId, long userId) {
+        ExamAttempt attempt = attemptMapper.selectById(attemptId);
         if (attempt == null || !Objects.equals(attempt.getUserId(), userId)) {
             throw new ServiceException(ResultCode.EXAM_ATTEMPT_NOT_FOUND);
         }

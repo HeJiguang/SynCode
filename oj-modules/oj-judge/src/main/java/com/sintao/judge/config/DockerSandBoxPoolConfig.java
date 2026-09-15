@@ -29,6 +29,9 @@ public class DockerSandBoxPoolConfig {
     @Value("${sandbox.limit.cpu:1}")
     private Long cpuLimit;
 
+    @Value("${sandbox.limit.pids:64}")
+    private Long pidsLimit;
+
     @Value("${sandbox.docker.pool.size:4}")
     private int poolSize;
 
@@ -49,7 +52,7 @@ public class DockerSandBoxPoolConfig {
     @Bean
     public DockerSandBoxPool createDockerSandBoxPool(DockerClient dockerClient) {
         DockerSandBoxPool dockerSandBoxPool = new DockerSandBoxPool(dockerClient, sandboxImage, volumeDir, memoryLimit,
-                memorySwapLimit, cpuLimit, poolSize, containerNamePrefix);
+                memorySwapLimit, cpuLimit, pidsLimit, poolSize, containerNamePrefix);
         dockerSandBoxPool.initDockerPool();
         return dockerSandBoxPool;
     }

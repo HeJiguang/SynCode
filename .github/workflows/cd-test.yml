@@ -37,12 +37,19 @@ jobs:
     environment: test
     env:
       STACK_NAME: onlineoj-test
+      STACK_FILE: deploy/prod/swarm/stack-compact.yml
       STACK_ENV_FILE: deploy/prod/env/stack.env
       RUNTIME_ENV_FILE: deploy/prod/env/runtime.env
+      DEPLOYMENT_MODE: compact
       SYNCODE_DB_URL: ${{ secrets.SYNCODE_DB_URL_TEST }}
       SYNCODE_DB_USER: ${{ secrets.SYNCODE_DB_USER_TEST }}
       SYNCODE_DB_PASSWORD: ${{ secrets.SYNCODE_DB_PASSWORD_TEST }}
       TEST_BASE_URL: ${{ secrets.TEST_BASE_URL }}
+      TEST_ADMIN_ACCOUNT: ${{ secrets.TEST_ADMIN_ACCOUNT }}
+      TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+      TEST_CANDIDATE_EMAIL: ${{ secrets.TEST_CANDIDATE_EMAIL }}
+      TEST_CANDIDATE_CODE: ${{ secrets.TEST_CANDIDATE_CODE }}
+      TEST_QUESTION_ID: ${{ secrets.TEST_QUESTION_ID }}
     steps:
       - name: Resolve successful CI run
         id: source
@@ -61,8 +68,12 @@ jobs:
             gh api "repos/${{ github.repository }}/actions/runs/${source_run_id}" \
               --jq '[.head_sha, .head_branch, .conclusion] | @tsv'
           )"
-          if [[ "${source_branch}" != "main" || "${source_conclusion}" != "success" ]]; then
-            echo "CI run ${source_run_id} is not a successful main build" >&2
+          if [[ "${source_conclusion}" != "success" ]]; then
+            echo "CI run ${source_run_id} is not successful" >&2
+            exit 1
+          fi
+          if [[ "${{ github.event_name }}" != "workflow_dispatch" && "${source_branch}" != "main" ]]; then
+            echo "automatic test deployment only accepts main builds" >&2
             exit 1
           fi
           echo "run_id=${source_run_id}" >> "$GITHUB_OUTPUT"
@@ -100,7 +111,7 @@ jobs:
         shell: bash
         working-directory: repo
         run: |
-          chmod +x deploy/prod/scripts/*.sh deploy/test/scripts/smoke.sh
+          chmod +x deploy/prod/scripts/*.sh deploy/test/scripts/*.sh
           BUILD_LOCAL_IMAGES=true STACK_ENV_FILE="${STACK_ENV_FILE}" RUNTIME_ENV_FILE="${RUNTIME_ENV_FILE}" \
             deploy/prod/scripts/deploy.sh
 
@@ -108,3 +119,8 @@ jobs:
         shell: bash
         working-directory: repo
         run: deploy/test/scripts/smoke.sh
+
+      - name: Trusted exam end-to-end acceptance
+        shell: bash
+        working-directory: repo
+        run: deploy/test/scripts/trusted-exam-e2e.sh

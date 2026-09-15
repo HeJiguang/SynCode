@@ -10,6 +10,8 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
+import java.nio.charset.StandardCharsets;
+
 @Getter
 @Setter
 @Slf4j
@@ -26,17 +28,19 @@ public class DockerStartResultCallback extends ExecStartResultCallback {
         StreamType streamType = frame.getStreamType();
         if (StreamType.STDERR.equals(streamType)) {
             if (StrUtil.isEmpty(errorMessage)) {
-                errorMessage = new String(frame.getPayload());
+                errorMessage = new String(frame.getPayload(), StandardCharsets.UTF_8);
             } else {
-                errorMessage = errorMessage + new String(frame.getPayload());
+                errorMessage = errorMessage + new String(frame.getPayload(), StandardCharsets.UTF_8);
             }
             codeRunStatus = CodeRunStatus.FAILED;
         } else {
-            String msgTmp = new String(frame.getPayload());
+            String msgTmp = new String(frame.getPayload(), StandardCharsets.UTF_8);
             if (StrUtil.isNotEmpty(msgTmp)) {
-                message = new String(frame.getPayload());
+                message = StrUtil.nullToEmpty(message) + msgTmp;
             }
-            codeRunStatus = CodeRunStatus.SUCCEED;
+            if (!CodeRunStatus.FAILED.equals(codeRunStatus)) {
+                codeRunStatus = CodeRunStatus.SUCCEED;
+            }
         }
         super.onNext(frame);
     }

@@ -28,7 +28,7 @@ import com.sintao.friend.domain.user.dto.UserRunDTO;
 import com.sintao.friend.domain.user.dto.UserSubmitDTO;
 import com.sintao.friend.domain.user.vo.AsyncSubmitResponseVO;
 import com.sintao.friend.domain.user.vo.UserSubmissionHistoryVO;
-import com.sintao.friend.elasticsearch.QuestionRepository;
+import com.sintao.friend.elasticsearch.FriendQuestionRepository;
 import com.sintao.friend.mapper.question.QuestionMapper;
 import com.sintao.friend.mapper.user.UserSubmitMapper;
 import com.sintao.friend.rabbit.JudgeProducer;
@@ -47,7 +47,7 @@ import java.util.stream.Collectors;
 public class UserQuestionServiceImpl implements IUserQuestionService {
 
     @Autowired
-    private QuestionRepository questionRepository;
+    private FriendQuestionRepository questionRepository;
 
     @Autowired
     private QuestionMapper questionMapper;

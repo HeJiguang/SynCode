@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: oj-runtime
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${NACOS_DISCOVERY_ENABLED:false}
+      config:
+        enabled: ${NACOS_CONFIG_ENABLED:false}

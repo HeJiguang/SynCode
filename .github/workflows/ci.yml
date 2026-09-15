@@ -175,6 +175,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Validate deploy definitions
+        shell: bash
+        run: |
+          cp deploy/prod/env/runtime.env.example deploy/prod/env/runtime.env
+          set -a
+          source deploy/prod/env/stack.env.example
+          source deploy/test/env/infra.env.example
+          set +a
+          docker stack config --compose-file deploy/prod/swarm/stack.yml > /dev/null
+          docker stack config --compose-file deploy/prod/swarm/stack-compact.yml > /dev/null
+          docker stack config --compose-file deploy/test/swarm/infra.yml > /dev/null
+          bash -n deploy/prod/scripts/build-images.sh deploy/prod/scripts/deploy.sh deploy/test/scripts/*.sh
+
       - name: Create source bundle
         run: |
           bundle_path="${RUNNER_TEMP}/deploy-source.tar.gz"

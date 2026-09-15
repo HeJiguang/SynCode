@@ -27,4 +27,11 @@ class DockerExecInputSpecTest {
         assertArrayEquals(JudgeConstants.DOCKER_JAVA_EXEC_CMD, spec.command());
         assertNull(spec.stdin());
     }
+
+    @Test
+    void javaCommandsShouldMatchPublishedMainClassTemplate() {
+        assertArrayEquals(new String[]{"javac", "/usr/share/java/Main.java"}, JudgeConstants.DOCKER_JAVAC_CMD);
+        assertArrayEquals(new String[]{"java", "-cp", "/usr/share/java", "Main"},
+                JudgeConstants.DOCKER_JAVA_EXEC_CMD);
+    }
 }

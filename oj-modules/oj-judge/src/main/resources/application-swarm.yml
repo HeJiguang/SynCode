@@ -17,7 +17,7 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:change-me-runtime}
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:mysql}:3306/${MYSQL_DATABASE:bitoj_dev}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://${MYSQL_HOST:mysql}:3306/${MYSQL_DATABASE:bitoj_dev}?useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
     username: ${MYSQL_APP_USER:ojtest}
     password: ${MYSQL_PASSWORD:change-me-runtime}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -30,3 +30,12 @@ sandbox:
 judge:
   runtime-state:
     ttl-minutes: 1440
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never

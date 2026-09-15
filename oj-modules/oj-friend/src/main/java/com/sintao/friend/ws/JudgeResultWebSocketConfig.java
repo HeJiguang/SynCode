@@ -1,6 +1,7 @@
 package com.sintao.friend.ws;
 
 import com.sintao.common.core.constants.CacheConstants;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -13,6 +14,9 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @Configuration
 @EnableWebSocket
 public class JudgeResultWebSocketConfig implements WebSocketConfigurer {
+
+    @Value("${syncode.friend.web-socket-path:/ws/judge/result}")
+    private String webSocketPath;
 
 
     // 真正处理WebSocket消息的地方
@@ -34,7 +38,7 @@ public class JudgeResultWebSocketConfig implements WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(handler, "/ws/judge/result") // friend内部的WebSocket路径
+        registry.addHandler(handler, webSocketPath) // friend内部的WebSocket路径
                 .addInterceptors(handshakeInterceptor) // 在升级为WebSocket之前，先走拦截器做校验
                 .setAllowedOrigins("*"); // 允许跨域来源
     }

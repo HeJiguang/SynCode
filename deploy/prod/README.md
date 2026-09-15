@@ -18,12 +18,21 @@ This avoids two unstable dependencies:
 - GitHub-hosted runners SSHing into domestic production for every release.
 - Production nodes pulling large images from foreign registries during rollout.
 
+Two application layouts are supported from the same module sources:
+
+- `swarm/stack.yml` keeps gateway, system, friend, job, and judge as separate JVMs.
+- `swarm/stack-compact.yml` runs system, friend, and trusted-exam jobs in `oj-runtime`; judge remains a separate JVM and the Python agent remains a separate process.
+
+The compact layout is the default for the 4 vCPU / 8 GiB test host. It preserves the public `/system/**` and `/friend/**` contracts, performs gateway-equivalent JWT validation in a Servlet filter, and keeps the judge sandbox outside the business JVM.
+
 ## Key Files
 
 - [docker/java-service.Dockerfile](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/docker/java-service.Dockerfile)
 - [docker/next-app.Dockerfile](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/docker/next-app.Dockerfile)
 - [docker/oj-agent.Dockerfile](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/docker/oj-agent.Dockerfile)
 - [swarm/stack.yml](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/swarm/stack.yml)
+- `swarm/stack-compact.yml`
+- `../test/swarm/infra.yml`
 - [scripts/build-images.sh](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/scripts/build-images.sh)
 - [scripts/sync-worker-images.sh](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/scripts/sync-worker-images.sh)
 - [scripts/deploy.sh](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/scripts/deploy.sh)
@@ -47,8 +56,8 @@ This avoids two unstable dependencies:
 1. Fill in the required GitHub Secrets described in [env/github-secrets-guide.md](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/env/github-secrets-guide.md).
 2. Generate a fresh runner registration token for this repository.
 3. Save that token as `SELF_HOSTED_RUNNER_BOOTSTRAP_TOKEN`.
-4. Run `bootstrap-runner.yml`.
-5. Confirm a runner with label `syncode-prod` is online.
+4. Run `bootstrap-runner.yml`; for test use labels `syncode-test,onlineoj-test`, otherwise keep the production defaults.
+5. Confirm a runner with the selected environment label is online.
 6. Trigger `cd.yml` manually once.
 
 ## Manual Local Deploy
@@ -61,6 +70,8 @@ STACK_ENV_FILE=deploy/prod/env/stack.env \
 RUNTIME_ENV_FILE=deploy/prod/env/runtime.env \
 deploy/prod/scripts/deploy.sh
 ```
+
+For compact deployment, set `DEPLOYMENT_MODE=compact`, `RUNTIME_IMAGE`, and `BACKEND_NETWORK`, then use `STACK_FILE=deploy/prod/swarm/stack-compact.yml`. The external backend overlay network must exist before deploying the infrastructure and application stacks.
 
 ## Notes
 

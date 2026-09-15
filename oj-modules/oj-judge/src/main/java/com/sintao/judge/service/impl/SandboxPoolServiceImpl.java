@@ -37,36 +37,35 @@ public class SandboxPoolServiceImpl implements ISandboxPoolService {
     @Value("${sandbox.limit.time:5}")
     private Long timeLimit;
 
-    private String containerId;
-
-    private String userCodeFileName;
-
     @Override
     public SandBoxExecuteResult exeJavaCode(Long userId, String userCode, List<String> inputList) {
-        containerId = sandBoxPool.getContainer();
-        createUserCodeFile(userCode);
+        String containerId = sandBoxPool.getContainer();
+        String codeDir = sandBoxPool.getCodeDir(containerId);
+        createUserCodeFile(codeDir, userCode);
         try {
-            CompileResult compileResult = compileCodeByDocker();
+            CompileResult compileResult = compileCodeByDocker(containerId);
             if (!compileResult.isCompiled()) {
                 return SandBoxExecuteResult.fail(CodeRunStatus.COMPILE_FAILED, compileResult.getExeMessage());
             }
-            return executeJavaCodeByDocker(inputList);
+            return executeJavaCodeByDocker(containerId, inputList);
         } finally {
-            sandBoxPool.returnContainer(containerId);
-            deleteUserCodeFile();
+            try {
+                FileUtil.clean(codeDir);
+            } finally {
+                sandBoxPool.returnContainer(containerId);
+            }
         }
     }
 
-    private void createUserCodeFile(String userCode) {
-        String codeDir = sandBoxPool.getCodeDir(containerId);
-        userCodeFileName = codeDir + File.separator + JudgeConstants.USER_CODE_JAVA_CLASS_NAME;
+    private void createUserCodeFile(String codeDir, String userCode) {
+        String userCodeFileName = codeDir + File.separator + JudgeConstants.USER_CODE_JAVA_CLASS_NAME;
         if (FileUtil.exist(userCodeFileName)) {
             FileUtil.del(userCodeFileName);
         }
         FileUtil.writeString(userCode, userCodeFileName, Constants.UTF8);
     }
 
-    private CompileResult compileCodeByDocker() {
+    private CompileResult compileCodeByDocker(String containerId) {
         String cmdId = createExecCmd(DockerExecInputSpec.forCompile(JudgeConstants.DOCKER_JAVAC_CMD), containerId);
         DockerStartResultCallback resultCallback = new DockerStartResultCallback();
         CompileResult compileResult = new CompileResult();
@@ -85,7 +84,7 @@ public class SandboxPoolServiceImpl implements ISandboxPoolService {
         }
     }
 
-    private SandBoxExecuteResult executeJavaCodeByDocker(List<String> inputList) {
+    private SandBoxExecuteResult executeJavaCodeByDocker(String containerId, List<String> inputList) {
         List<String> outList = new ArrayList<>();
         long maxMemory = 0L;
         long maxUseTime = 0L;
@@ -97,7 +96,12 @@ public class SandboxPoolServiceImpl implements ISandboxPoolService {
             long startNanos = System.nanoTime();
             DockerStartResultCallback resultCallback = new DockerStartResultCallback();
             try {
-                execStart(cmdId, execInputSpec.stdin(), resultCallback).awaitCompletion(timeLimit, TimeUnit.SECONDS);
+                boolean completed = execStart(cmdId, execInputSpec.stdin(), resultCallback)
+                        .awaitCompletion(timeLimit, TimeUnit.SECONDS);
+                if (!completed) {
+                    sandBoxPool.restartContainer(containerId);
+                    return SandBoxExecuteResult.fail(CodeRunStatus.OUT_OF_TIME, outList, maxMemory, timeLimit * 1000L);
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Interrupted while executing code in sandbox", e);
@@ -146,9 +150,4 @@ public class SandboxPoolServiceImpl implements ISandboxPoolService {
         return SandBoxExecuteResult.success(CodeRunStatus.SUCCEED, outList, maxMemory, maxUseTime);
     }
 
-    private void deleteUserCodeFile() {
-        if (userCodeFileName != null) {
-            FileUtil.del(userCodeFileName);
-        }
-    }
 }
