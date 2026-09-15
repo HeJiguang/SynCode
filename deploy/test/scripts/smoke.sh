@@ -41,7 +41,7 @@ fi
 
 demo_page="$(curl --silent --show-error --header 'Cookie: syncode_demo_session=1' \
   --connect-timeout 5 --max-time 15 "${BASE_URL}/app")"
-if [[ "$demo_page" != *"当前为测试体验模式"* ]]; then
+if [[ "$demo_page" != *"完成两数之和并总结"* ]]; then
   echo "[smoke] demo session did not reach the test-data dashboard" >&2
   exit 1
 fi
