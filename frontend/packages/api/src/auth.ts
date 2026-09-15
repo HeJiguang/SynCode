@@ -1,4 +1,5 @@
 export const ACCESS_TOKEN_KEY = "syncode_access_token";
+export const DEMO_SESSION_KEY = "syncode_demo_session";
 
 export function getBrowserAccessToken() {
   if (typeof window === "undefined") return null;

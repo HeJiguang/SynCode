@@ -4,7 +4,7 @@ import { getHotProblemList, getProblemDetail } from "@aioj/api";
 
 import { AppShell } from "../../../components/app-shell";
 import { HotProblemsPanel } from "../../../components/hot-problems-panel";
-import { getServerAccessToken } from "../../../lib/server-auth";
+import { getServerAuthSession } from "../../../lib/server-auth";
 import { Button, Panel, Tag } from "@aioj/ui";
 
 type PageProps = {
@@ -13,11 +13,14 @@ type PageProps = {
 
 export default async function ProblemDetailPage({ params }: PageProps) {
   const { questionId } = await params;
-  const token = await getServerAccessToken();
-  const [detail, hotProblems] = await Promise.all([getProblemDetail(questionId, token), getHotProblemList()]);
+  const { token, demoMode } = await getServerAuthSession();
+  const [detail, hotProblems] = await Promise.all([
+    getProblemDetail(questionId, token, { forceMock: demoMode }),
+    getHotProblemList({ forceMock: demoMode })
+  ]);
 
   return (
-    <AppShell demoMode={!token} rail={<HotProblemsPanel problems={hotProblems.slice(0, 3)} />}>
+    <AppShell demoMode={demoMode} rail={<HotProblemsPanel problems={hotProblems.slice(0, 3)} />}>
       <Panel className="hero-grid mb-6 overflow-hidden p-6 md:p-7" tone="strong">
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">

@@ -72,12 +72,12 @@ export function AppShell({ children, rail, immersive, demoMode = false }: AppShe
             <p className="max-w-4xl text-sm leading-7 text-[var(--text-secondary)]">
               {frontendPreviewMode
                 ? "当前是前端预览模式：页面已放开登录与后端依赖，方便你直接查看和调整界面。写操作不会真正提交。"
-                : "当前展示的是公开体验内容。登录后可以访问个人训练计划、考试工作区、提交记录以及完整的辅助能力。"}
+                : "当前为测试体验模式：页面使用内置测试数据，运行、提交和资料修改不会保存，正式考试需要登录后进入。"}
             </p>
             <a href={appPublicPath(frontendPreviewMode ? "/problems" : "/login")} className="shrink-0">
               <Button size="sm">
                 <Sparkles size={14} />
-                {frontendPreviewMode ? "进入题库预览" : "立即登录"}
+                {frontendPreviewMode ? "进入题库预览" : "正式登录"}
               </Button>
             </a>
           </div>

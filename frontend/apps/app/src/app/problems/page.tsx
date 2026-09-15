@@ -5,21 +5,21 @@ import { getHotProblemList, getProblemList, getPublicMessages } from "@aioj/api"
 import { AnnouncementCenter } from "../../components/announcement-center";
 import { AppShell } from "../../components/app-shell";
 import { HotProblemsPanel } from "../../components/hot-problems-panel";
-import { getServerAccessToken } from "../../lib/server-auth";
+import { getServerAuthSession } from "../../lib/server-auth";
 import { Panel, Tag } from "@aioj/ui";
 
 export default async function ProblemsPage() {
-  const token = await getServerAccessToken();
+  const { token, demoMode } = await getServerAuthSession();
   const [problems, hotProblems, messages] = await Promise.all([
-    getProblemList(),
-    getHotProblemList(),
-    getPublicMessages(token)
+    getProblemList({ forceMock: demoMode }),
+    getHotProblemList({ forceMock: demoMode }),
+    getPublicMessages(token, { forceMock: demoMode })
   ]);
   const featuredTags = ["全部题目", "哈希表", "数组", "双指针", "动态规划", "二叉树", "回溯"];
 
   return (
     <AppShell
-      demoMode={!token}
+      demoMode={demoMode}
       rail={
         <>
           <HotProblemsPanel problems={hotProblems.slice(0, 3)} />

@@ -5,7 +5,7 @@ import { getExamList, getPublicMessages } from "@aioj/api";
 import { AnnouncementCenter } from "../../components/announcement-center";
 import { AppShell } from "../../components/app-shell";
 import { appPublicPath } from "../../lib/paths";
-import { getServerAccessToken } from "../../lib/server-auth";
+import { getServerAuthSession } from "../../lib/server-auth";
 import { Panel, Tag } from "@aioj/ui";
 
 const ACTIVE_STATUS = "进行中" as const;
@@ -28,12 +28,15 @@ function isActiveExam(status: string) {
 }
 
 export default async function ExamsPage() {
-  const token = await getServerAccessToken();
-  const [exams, messages] = await Promise.all([getExamList(), getPublicMessages(token)]);
+  const { token, demoMode } = await getServerAuthSession();
+  const [exams, messages] = await Promise.all([
+    getExamList({ forceMock: demoMode }),
+    getPublicMessages(token, { forceMock: demoMode })
+  ]);
 
   return (
     <AppShell
-      demoMode={!token}
+      demoMode={demoMode}
       rail={<AnnouncementCenter messages={messages.slice(0, 2)} />}
     >
       <section className="syncode-page-stack">

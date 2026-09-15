@@ -13,7 +13,7 @@ import { AnnouncementCenter } from "../components/announcement-center";
 import { AppShell } from "../components/app-shell";
 import { HotProblemsPanel } from "../components/hot-problems-panel";
 import { appPublicPath } from "../lib/paths";
-import { getServerAccessToken } from "../lib/server-auth";
+import { getServerAuthSession } from "../lib/server-auth";
 import { Button, Panel, Tag } from "@aioj/ui";
 
 function getGreeting(name: string) {
@@ -30,11 +30,11 @@ function resolvePlanTone(statusLabel: string) {
 }
 
 export default async function DashboardPage() {
-  const token = await getServerAccessToken();
+  const { token, demoMode } = await getServerAuthSession();
   const [hotProblems, problems, messages] = await Promise.all([
-    getHotProblemList(),
-    getProblemList(),
-    getPublicMessages(token)
+    getHotProblemList({ forceMock: demoMode }),
+    getProblemList({ forceMock: demoMode }),
+    getPublicMessages(token, { forceMock: demoMode })
   ]);
 
   let training = token
@@ -99,7 +99,7 @@ export default async function DashboardPage() {
 
   return (
     <AppShell
-      demoMode={!token}
+      demoMode={demoMode}
       rail={
         <>
           <AnnouncementCenter messages={messages.slice(0, 3)} />

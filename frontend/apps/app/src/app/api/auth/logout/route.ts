@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-import { ACCESS_TOKEN_KEY, requestJson } from "@aioj/api";
+import { ACCESS_TOKEN_KEY, DEMO_SESSION_KEY, requestJson } from "@aioj/api";
 
 export async function POST() {
   const cookieStore = await cookies();
@@ -21,6 +21,12 @@ export async function POST() {
   const response = NextResponse.json({ ok: true });
   response.cookies.set({
     name: ACCESS_TOKEN_KEY,
+    value: "",
+    maxAge: 0,
+    path: "/"
+  });
+  response.cookies.set({
+    name: DEMO_SESSION_KEY,
     value: "",
     maxAge: 0,
     path: "/"

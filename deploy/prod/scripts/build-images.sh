@@ -43,7 +43,10 @@ echo "[build] web image -> $WEB_IMAGE"
 docker build -f deploy/prod/docker/next-app.Dockerfile --build-arg APP_NAME=web -t "$WEB_IMAGE" .
 
 echo "[build] app image -> $APP_IMAGE"
-docker build -f deploy/prod/docker/next-app.Dockerfile --build-arg APP_NAME=app -t "$APP_IMAGE" .
+docker build -f deploy/prod/docker/next-app.Dockerfile \
+  --build-arg APP_NAME=app \
+  --build-arg NEXT_PUBLIC_SYNCODE_DEMO_LOGIN="${NEXT_PUBLIC_SYNCODE_DEMO_LOGIN:-0}" \
+  -t "$APP_IMAGE" .
 
 echo "[build] admin image -> $ADMIN_IMAGE"
 docker build -f deploy/prod/docker/next-app.Dockerfile --build-arg APP_NAME=admin -t "$ADMIN_IMAGE" .

@@ -27,7 +27,12 @@ export * from "./auth";
 export * from "./client";
 export * from "./runtime";
 
-export async function getProblemList(): Promise<QuestionListItem[]> {
+type DataSourceOptions = {
+  forceMock?: boolean;
+};
+
+export async function getProblemList(options: DataSourceOptions = {}): Promise<QuestionListItem[]> {
+  if (options.forceMock) return questions;
   try {
     return await fetchLiveProblemList();
   } catch {
@@ -35,7 +40,8 @@ export async function getProblemList(): Promise<QuestionListItem[]> {
   }
 }
 
-export async function getHotProblemList(): Promise<QuestionListItem[]> {
+export async function getHotProblemList(options: DataSourceOptions = {}): Promise<QuestionListItem[]> {
+  if (options.forceMock) return hotQuestions;
   try {
     return await fetchLiveHotProblemList();
   } catch {
@@ -43,7 +49,12 @@ export async function getHotProblemList(): Promise<QuestionListItem[]> {
   }
 }
 
-export async function getProblemDetail(questionId: string, token?: string | null): Promise<QuestionDetail> {
+export async function getProblemDetail(
+  questionId: string,
+  token?: string | null,
+  options: DataSourceOptions = {}
+): Promise<QuestionDetail> {
+  if (options.forceMock) return questionDetails[questionId] ?? questionDetails["two-sum"];
   if (token) {
     return fetchLiveProblemDetail(questionId, token);
   }
@@ -65,7 +76,8 @@ export async function getTrainingSnapshot(token?: string | null): Promise<Traini
   return fetchLiveTrainingSnapshot(token);
 }
 
-export async function getExamList(): Promise<ExamSummary[]> {
+export async function getExamList(options: DataSourceOptions = {}): Promise<ExamSummary[]> {
+  if (options.forceMock) return exams;
   try {
     return await fetchLiveExamList();
   } catch {
@@ -86,7 +98,8 @@ export async function getUserProfile(token?: string | null): Promise<UserProfile
   return fetchLiveUserProfile(token);
 }
 
-export async function getPublicMessages(token?: string | null): Promise<PublicMessage[]> {
+export async function getPublicMessages(token?: string | null, options: DataSourceOptions = {}): Promise<PublicMessage[]> {
+  if (options.forceMock) return getMessageMockFallback();
   try {
     return await fetchLiveMessages(token);
   } catch {

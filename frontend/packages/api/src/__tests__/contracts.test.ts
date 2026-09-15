@@ -107,6 +107,30 @@ async function main() {
   assert.equal(typeof api.getHotProblemList, "function");
   assert.equal(typeof api.getPublicMessages, "function");
 
+  const originalFetchForDemo = globalThis.fetch;
+  let demoFetchCount = 0;
+  globalThis.fetch = (async () => {
+    demoFetchCount += 1;
+    throw new Error("demo reads must not reach live APIs");
+  }) as typeof fetch;
+  try {
+    const [demoProblems, demoHotProblems, demoDetail, demoExams, demoMessages] = await Promise.all([
+      api.getProblemList({ forceMock: true }),
+      api.getHotProblemList({ forceMock: true }),
+      api.getProblemDetail("two-sum", null, { forceMock: true }),
+      api.getExamList({ forceMock: true }),
+      api.getPublicMessages(null, { forceMock: true })
+    ]);
+    assert.ok(demoProblems.length > 0);
+    assert.ok(demoHotProblems.length > 0);
+    assert.equal(demoDetail.questionId, "two-sum");
+    assert.ok(demoExams.length > 0);
+    assert.ok(demoMessages.length > 0);
+    assert.equal(demoFetchCount, 0);
+  } finally {
+    globalThis.fetch = originalFetchForDemo;
+  }
+
   assert.equal(
     api.resolveBackendBaseUrl("http://localhost:19090/"),
     "http://localhost:19090"

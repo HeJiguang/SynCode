@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { ACCESS_TOKEN_KEY, requestJson, unwrapData } from "@aioj/api";
+import { ACCESS_TOKEN_KEY, DEMO_SESSION_KEY, requestJson, unwrapData } from "@aioj/api";
 import { resolveApiRouteError } from "../../../../lib/api-route-error";
 
 export async function POST(request: Request) {
@@ -18,6 +18,12 @@ export async function POST(request: Request) {
       value: token,
       httpOnly: true,
       sameSite: "lax",
+      path: "/"
+    });
+    response.cookies.set({
+      name: DEMO_SESSION_KEY,
+      value: "",
+      maxAge: 0,
       path: "/"
     });
     return response;

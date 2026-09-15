@@ -13,6 +13,7 @@ import { Button } from "@aioj/ui";
 
 type AiPanelProps = {
   initialArtifacts?: AiArtifact[];
+  demoMode?: boolean;
   questionId?: string;
   questionTitle?: string;
   questionContent?: string;
@@ -238,6 +239,7 @@ function ArtifactCard({ artifact }: { artifact: AiArtifact }) {
 
 export function AiPanel({
   initialArtifacts = [],
+  demoMode = false,
   questionId,
   questionTitle,
   questionContent
@@ -290,13 +292,15 @@ export function AiPanel({
 
   const executeRun = useCallback(
     async (userMessage: string, runType: RunType) => {
-      if (frontendPreviewMode) {
+      if (frontendPreviewMode || demoMode) {
         const previewArtifact = buildErrorArtifact(
-          `当前是前端预览模式，AI 面板不会真正调用后端。你刚才的请求是「${userMessage}」，现在只保留界面和交互走查。`
+          demoMode
+            ? `测试体验模式不会调用真实 AI 服务。你刚才的请求是「${userMessage}」。`
+            : `当前是前端预览模式，AI 面板不会真正调用后端。你刚才的请求是「${userMessage}」，现在只保留界面和交互走查。`
         );
-        previewArtifact.title = "Preview Response";
-        previewArtifact.summary = `预览模式下已拦截 ${runType} 请求。`;
-        previewArtifact.body.nextAction = "如果要联调真实 AI 能力，请关闭前端预览模式并接通本地后端。";
+        previewArtifact.title = demoMode ? "测试体验提示" : "Preview Response";
+        previewArtifact.summary = `${demoMode ? "测试体验" : "预览"}模式下已拦截 ${runType} 请求。`;
+        previewArtifact.body.nextAction = demoMode ? "正式登录后可使用真实 AI 辅助能力。" : "如果要联调真实 AI 能力，请关闭前端预览模式并接通本地后端。";
         setRunStatus("PREVIEW");
         setEntries((current) => mergeArtifacts(current, [previewArtifact]));
         setLatestEvents([]);
@@ -336,7 +340,7 @@ export function AiPanel({
       await loadRunSnapshot(run.runId);
       return run;
     },
-    [loadRunSnapshot, questionContent, questionId, questionTitle]
+    [demoMode, loadRunSnapshot, questionContent, questionId, questionTitle]
   );
 
   const submitPrompt = useCallback(

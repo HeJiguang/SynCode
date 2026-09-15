@@ -11,6 +11,7 @@ import { getTrainingStatusLabel, getTrainingStatusTone } from "../lib/presentati
 type TrainingActionsProps = {
   direction: string;
   tasks: TrainingTask[];
+  demoMode?: boolean;
 };
 
 const TASK_STATUS_PENDING = 0;
@@ -25,11 +26,15 @@ function resolveTaskHref(task: TrainingTask) {
   return null;
 }
 
-export function TrainingActions({ direction, tasks }: TrainingActionsProps) {
+export function TrainingActions({ direction, tasks, demoMode = false }: TrainingActionsProps) {
   const [loadingKey, setLoadingKey] = React.useState<string | null>(null);
   const [message, setMessage] = React.useState<string | null>(null);
 
   async function generatePlan() {
+    if (demoMode) {
+      setMessage("测试体验模式不会生成或保存新的训练计划。");
+      return;
+    }
     setLoadingKey("generate");
     setMessage(null);
 
@@ -52,6 +57,10 @@ export function TrainingActions({ direction, tasks }: TrainingActionsProps) {
   }
 
   async function finishTask(taskId: string) {
+    if (demoMode) {
+      setMessage("测试体验模式不会修改任务完成状态。");
+      return;
+    }
     setLoadingKey(taskId);
     setMessage(null);
 
@@ -124,7 +133,7 @@ export function TrainingActions({ direction, tasks }: TrainingActionsProps) {
         })}
       </div>
 
-      {message ? <p className="mt-3 text-sm text-[var(--danger)]">{message}</p> : null}
+      {message ? <p className={`mt-3 text-sm ${demoMode ? "text-[var(--text-secondary)]" : "text-[var(--danger)]"}`}>{message}</p> : null}
     </Panel>
   );
 }
