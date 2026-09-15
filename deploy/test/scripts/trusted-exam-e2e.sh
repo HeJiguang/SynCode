@@ -77,7 +77,7 @@ expect_code() {
 
 request() {
   local response
-  if ! response="$(curl --silent --show-error --fail-with-body --max-time 20 "$@")"; then
+  if ! response="$(curl --silent --show-error --max-time 20 "$@")"; then
     echo "[e2e] request failed: ${!#}" >&2
     return 1
   fi
