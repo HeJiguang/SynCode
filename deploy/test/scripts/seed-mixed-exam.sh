@@ -74,7 +74,7 @@ if [[ "$(jq -r '.data.status' <<<"$detail")" == "0" ]]; then
   row_version="$(jq -r '.data.rowVersion' <<<"$detail")"
   refreshed="$(jq -n --arg title "$exam_title" --arg start "$start_time" --argjson rowVersion "$row_version" '{title:$title,description:"覆盖九种题型的实验室招新测试卷。客观题自动评分，主观题由教师阅卷。",startTime:$start,latestStartTime:"2029-12-30 00:00:00",endTime:"2029-12-31 00:00:00",durationMinutes:90,timezone:"Asia/Shanghai",maxFormalSubmissions:10,resultReleasePolicy:"MANUAL",expectedRowVersion:$rowVersion}')"
   api -X PUT -H 'Content-Type: application/json' -H "Authorization: Bearer $teacher_token" -d "$refreshed" "$base_url/system/exam/$exam_id" >/dev/null
-  composition="$(jq -n --argjson programming "$programming_id" --argjson single "$single_id" --argjson multiple "$multiple_id" --argjson trueFalse "$true_id" --argjson fill "$fill_id" --argjson short "$short_id" --argjson sql "$sql_id" --argjson file "$file_id" --argjson project "$project_id" '{questions:[
+  composition="$(jq -n --arg programming "$programming_id" --arg single "$single_id" --arg multiple "$multiple_id" --arg trueFalse "$true_id" --arg fill "$fill_id" --arg short "$short_id" --arg sql "$sql_id" --arg file "$file_id" --arg project "$project_id" '{questions:[
     {questionId:$programming,questionOrder:1,score:25,required:true,questionType:"PROGRAMMING"},
     {questionId:$single,questionOrder:2,score:8,required:true,questionType:"SINGLE_CHOICE"},
     {questionId:$multiple,questionOrder:3,score:10,required:true,questionType:"MULTIPLE_CHOICE"},
@@ -89,7 +89,7 @@ if [[ "$(jq -r '.data.status' <<<"$detail")" == "0" ]]; then
   api -X POST -H "Authorization: Bearer $teacher_token" -H 'Idempotency-Key: seed-mixed-exam-v1' "$base_url/system/exam/$exam_id/publish" >/dev/null
 fi
 
-authorization="$(jq -n --argjson userId "$student_id" '{userIds:[$userId],source:"MANUAL"}')"
+authorization="$(jq -n --arg userId "$student_id" '{userIds:[$userId],source:"MANUAL"}')"
 api -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer $teacher_token" -H 'X-Request-ID: seed-mixed-student-v1' -d "$authorization" "$base_url/system/exam/$exam_id/candidates" >/dev/null
 
 echo "[seed] mixed exam ready: examId=$exam_id student=$student_email teacher=$teacher_email"

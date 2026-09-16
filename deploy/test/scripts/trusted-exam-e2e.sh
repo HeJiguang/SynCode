@@ -130,7 +130,7 @@ created="$(request -H 'Content-Type: application/json' -H "Authorization: Bearer
 expect_code create-draft "$created" 1000
 exam_id="$(printf '%s' "$created" | jq -r '.data')"
 
-composition="$(jq -n --argjson questionId "$TEST_QUESTION_ID" \
+composition="$(jq -n --arg questionId "$TEST_QUESTION_ID" \
   '{questions:[{questionId:$questionId,questionOrder:1,score:100,required:true,questionType:"PROGRAMMING"}]}')"
 composed="$(request -X PUT -H 'Content-Type: application/json' -H "Authorization: Bearer ${admin_token}" \
   -d "$composition" "$base_url/system/exam/$exam_id/questions")"
