@@ -56,10 +56,14 @@ sql_id="$(ensure_question '[测试] SQL 查询题' SQL '{}' '{"rubric":"查询 u
 file_id="$(ensure_question '[测试] 设计文档提交' FILE '{"acceptedFormats":[".pdf",".txt"],"maxSizeKb":200}' '{"rubric":"文档结构、需求覆盖、风险分析各占三分之一。"}' '提交一份不超过 200KB 的设计说明文件。')"
 project_id="$(ensure_question '[测试] 项目作品提交' PROJECT '{"requireRepositoryUrl":true}' '{"rubric":"仓库可访问、README 完整、核心功能可运行。"}' '提交代码仓库地址，并说明项目目标与个人贡献。')"
 
+programming_list="$(api -G -H "Authorization: Bearer $teacher_token" --data-urlencode 'pageNum=1' --data-urlencode 'pageSize=20' --data-urlencode 'questionType=PROGRAMMING' "$base_url/system/question/list")"
+programming_id="$(jq -r --arg preferred "$TEST_QUESTION_ID" '([.rows[]? | select((.questionId | tostring) == $preferred)][0].questionId // .rows[0].questionId // empty)' <<<"$programming_list")"
+[[ "$programming_id" =~ ^[0-9]+$ ]] || { echo "[seed] cannot resolve a programming question" >&2; exit 1; }
+
 exam_list="$(api -G -H "Authorization: Bearer $teacher_token" --data-urlencode 'pageNum=1' --data-urlencode 'pageSize=20' --data-urlencode "title=$exam_title" "$base_url/system/exam/list")"
 exam_id="$(jq -r --arg title "$exam_title" '.rows[]? | select(.title == $title) | .examId' <<<"$exam_list" | head -1)"
+start_time="$(date -u -v+120S '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -u -d '+120 seconds' '+%Y-%m-%d %H:%M:%S')"
 if [[ -z "$exam_id" ]]; then
-  start_time="$(date -u -v+120S '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -u -d '+120 seconds' '+%Y-%m-%d %H:%M:%S')"
   body="$(jq -n --arg title "$exam_title" --arg start "$start_time" '{title:$title,description:"覆盖九种题型的实验室招新测试卷。客观题自动评分，主观题由教师阅卷。",startTime:$start,latestStartTime:"2029-12-30 00:00:00",endTime:"2029-12-31 00:00:00",durationMinutes:90,timezone:"Asia/Shanghai",maxFormalSubmissions:10,resultReleasePolicy:"MANUAL"}')"
   created="$(api -H 'Content-Type: application/json' -H "Authorization: Bearer $teacher_token" -d "$body" "$base_url/system/exam")"
   exam_id="$(jq -r '.data' <<<"$created")"
@@ -67,7 +71,10 @@ fi
 
 detail="$(api -H "Authorization: Bearer $teacher_token" "$base_url/system/exam/$exam_id")"
 if [[ "$(jq -r '.data.status' <<<"$detail")" == "0" ]]; then
-  composition="$(jq -n --argjson programming "$TEST_QUESTION_ID" --argjson single "$single_id" --argjson multiple "$multiple_id" --argjson trueFalse "$true_id" --argjson fill "$fill_id" --argjson short "$short_id" --argjson sql "$sql_id" --argjson file "$file_id" --argjson project "$project_id" '{questions:[
+  row_version="$(jq -r '.data.rowVersion' <<<"$detail")"
+  refreshed="$(jq -n --arg title "$exam_title" --arg start "$start_time" --argjson rowVersion "$row_version" '{title:$title,description:"覆盖九种题型的实验室招新测试卷。客观题自动评分，主观题由教师阅卷。",startTime:$start,latestStartTime:"2029-12-30 00:00:00",endTime:"2029-12-31 00:00:00",durationMinutes:90,timezone:"Asia/Shanghai",maxFormalSubmissions:10,resultReleasePolicy:"MANUAL",expectedRowVersion:$rowVersion}')"
+  api -X PUT -H 'Content-Type: application/json' -H "Authorization: Bearer $teacher_token" -d "$refreshed" "$base_url/system/exam/$exam_id" >/dev/null
+  composition="$(jq -n --argjson programming "$programming_id" --argjson single "$single_id" --argjson multiple "$multiple_id" --argjson trueFalse "$true_id" --argjson fill "$fill_id" --argjson short "$short_id" --argjson sql "$sql_id" --argjson file "$file_id" --argjson project "$project_id" '{questions:[
     {questionId:$programming,questionOrder:1,score:25,required:true,questionType:"PROGRAMMING"},
     {questionId:$single,questionOrder:2,score:8,required:true,questionType:"SINGLE_CHOICE"},
     {questionId:$multiple,questionOrder:3,score:10,required:true,questionType:"MULTIPLE_CHOICE"},
