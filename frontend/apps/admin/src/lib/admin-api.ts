@@ -21,6 +21,7 @@ type BackendQuestionRow = {
   questionId?: string | number | null;
   title?: string | null;
   difficulty?: number | string | null;
+  questionType?: string | null;
   createTime?: string | null;
 };
 
@@ -32,6 +33,9 @@ type BackendQuestionDetail = {
   knowledgeTags?: string | null;
   estimatedMinutes?: number | null;
   trainingEnabled?: number | null;
+  questionType?: string | null;
+  answerConfigJson?: string | null;
+  gradingConfigJson?: string | null;
   timeLimit?: number | null;
   spaceLimit?: number | null;
   content?: string | null;
@@ -70,6 +74,7 @@ type BackendExamDetail = {
     questionOrder?: number | null;
     score?: number | null;
     required?: boolean | null;
+    questionType?: string | null;
   }> | null;
 };
 
@@ -113,6 +118,9 @@ export type AdminQuestionDetail = {
   knowledgeTags: string;
   estimatedMinutes: number;
   trainingEnabled: number;
+  questionType: string;
+  answerConfigJson: string;
+  gradingConfigJson: string;
   timeLimit: number;
   spaceLimit: number;
   content: string;
@@ -143,6 +151,7 @@ export type AdminExamDetail = {
     questionOrder: number;
     score: number;
     required: boolean;
+    questionType: string;
   }>;
 };
 
@@ -219,7 +228,7 @@ export async function getAdminDashboardSummary(token?: string | null): Promise<A
 
 export async function getAdminQuestionRows(token?: string | null) {
   if (usePreviewAdminData(token)) {
-    return previewAdminQuestionRows.map((item) => ({ ...item }));
+    return previewAdminQuestionRows.map((item) => ({ ...item, questionType: "PROGRAMMING" }));
   }
   const payload = await requestJson<TableEnvelope<BackendQuestionRow>>("/system/question/list?pageNum=1&pageSize=50", { token });
   return unwrapTable(payload).rows.map((item) => ({
@@ -227,6 +236,7 @@ export async function getAdminQuestionRows(token?: string | null) {
     title: item.title ?? "未命名题目",
     difficulty: normalizeDifficulty(item.difficulty),
     trainingEnabled: false,
+    questionType: item.questionType ?? "PROGRAMMING",
     updatedAt: item.createTime ?? "--"
   }));
 }
@@ -234,7 +244,12 @@ export async function getAdminQuestionRows(token?: string | null) {
 export async function getAdminQuestionDetail(token: string | null | undefined, questionId: string) {
   if (usePreviewAdminData(token)) {
     const previewQuestion = previewAdminQuestionDetails[questionId as keyof typeof previewAdminQuestionDetails] ?? previewAdminQuestionDetails["101"];
-    return { ...previewQuestion };
+    return {
+      ...previewQuestion,
+      questionType: "PROGRAMMING",
+      answerConfigJson: "{}",
+      gradingConfigJson: "{}"
+    } satisfies AdminQuestionDetail;
   }
   const payload = await requestJson<ApiEnvelope<BackendQuestionDetail>>(`/system/question/detail?questionId=${encodeURIComponent(questionId)}`, { token });
   const data = unwrapData(payload);
@@ -246,6 +261,9 @@ export async function getAdminQuestionDetail(token: string | null | undefined, q
     knowledgeTags: data.knowledgeTags ?? "",
     estimatedMinutes: Number(data.estimatedMinutes ?? 20),
     trainingEnabled: Number(data.trainingEnabled ?? 0),
+    questionType: data.questionType ?? "PROGRAMMING",
+    answerConfigJson: data.answerConfigJson ?? "{}",
+    gradingConfigJson: data.gradingConfigJson ?? "{}",
     timeLimit: Number(data.timeLimit ?? 1000),
     spaceLimit: Number(data.spaceLimit ?? 262144),
     content: data.content ?? "",
@@ -293,9 +311,10 @@ export async function getAdminExamDetail(token: string | null | undefined, examI
         ...item,
         questionOrder: index + 1,
         score: 100,
-        required: true
+        required: true,
+        questionType: "PROGRAMMING"
       }))
-    };
+    } satisfies AdminExamDetail;
   }
   const payload = await requestJson<ApiEnvelope<BackendExamDetail>>(`/system/exam/detail?examId=${encodeURIComponent(examId)}`, { token });
   const data = unwrapData(payload);
@@ -320,7 +339,8 @@ export async function getAdminExamDetail(token: string | null | undefined, examI
       difficulty: normalizeDifficulty(item.difficulty),
       questionOrder: Number(item.questionOrder ?? 1),
       score: Number(item.score ?? 100),
-      required: item.required !== false
+      required: item.required !== false,
+      questionType: item.questionType ?? "PROGRAMMING"
     }))
   } satisfies AdminExamDetail;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { frontendPreviewMode } from "@aioj/config";
+import { frontendPreviewMode, frontendTestLoginEnabled, testTeacherEmail } from "@aioj/config";
 import { Button, Input, Panel, Tag } from "@aioj/ui";
 
 import { adminApiPath, adminPublicPath } from "../../lib/paths";
@@ -37,6 +37,25 @@ export default function AdminLoginPage() {
     }
   }
 
+  async function handleTestLogin() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const response = await fetch(adminApiPath("/auth/test-login"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: userAccount })
+      });
+      const payload = (await response.json().catch(() => ({}))) as { message?: string };
+      if (!response.ok) throw new Error(payload.message ?? "测试教师登录失败。");
+      window.location.href = adminPublicPath("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "测试教师登录失败。");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-12">
       <div className="grid w-full max-w-5xl gap-6 lg:grid-cols-[1fr_420px]">
@@ -61,6 +80,20 @@ export default function AdminLoginPage() {
             <Button className="w-full" size="lg" type="submit" disabled={submitting}>
               {submitting ? "登录中..." : "登录后台"}
             </Button>
+            {frontendTestLoginEnabled ? (
+              <div className="space-y-3 border-t border-[var(--border-soft)] pt-4">
+                <button
+                  className="text-left text-sm text-[var(--text-muted)] underline decoration-[var(--border-strong)] underline-offset-4"
+                  type="button"
+                  onClick={() => setUserAccount(testTeacherEmail)}
+                >
+                  测试教师：{testTeacherEmail}
+                </button>
+                <Button className="w-full" size="lg" type="button" variant="secondary" disabled={submitting || !userAccount} onClick={() => void handleTestLogin()}>
+                  使用邮箱直接登录
+                </Button>
+              </div>
+            ) : null}
             {frontendPreviewMode ? (
               <a href={adminPublicPath("/")} className="block">
                 <Button className="w-full" size="lg" type="button" variant="secondary">

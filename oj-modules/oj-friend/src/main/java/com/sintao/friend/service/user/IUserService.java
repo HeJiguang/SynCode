@@ -12,6 +12,8 @@ public interface IUserService {
 
     String codeLogin(String email, String code);
 
+    String testLogin(String email);
+
     boolean logout(String token);
 
     R<LoginUserVO> info(String token);

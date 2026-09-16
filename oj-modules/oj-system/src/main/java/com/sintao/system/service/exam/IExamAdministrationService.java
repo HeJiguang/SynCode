@@ -5,6 +5,8 @@ import com.sintao.system.domain.exam.vo.ExamCandidateVO;
 import com.sintao.system.domain.exam.vo.ExamGradeVO;
 import com.sintao.system.domain.exam.vo.ExamEvidenceEventVO;
 import com.sintao.system.domain.exam.vo.ExamMonitorVO;
+import com.sintao.system.domain.exam.vo.ExamGradeReviewVO;
+import com.sintao.system.domain.exam.dto.ExamGradeReviewDTO;
 
 import java.util.List;
 
@@ -17,4 +19,6 @@ public interface IExamAdministrationService {
     List<ExamGradeVO> grades(Long examId);
     void releaseResults(Long examId, String idempotencyKey, String requestId);
     List<ExamEvidenceEventVO> evidence(Long examId, Long attemptId);
+    ExamGradeReviewVO grading(Long examId, Long attemptId);
+    ExamGradeReviewVO reviewGrade(Long examId, Long attemptId, ExamGradeReviewDTO request, String requestId);
 }

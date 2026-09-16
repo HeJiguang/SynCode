@@ -5,7 +5,7 @@ import { frontendDemoLoginEnabled, frontendPreviewMode } from "@aioj/config";
 const ACCESS_TOKEN_KEY = "syncode_access_token";
 
 // 不需要登录就能访问的路径（相对于 basePath /app）
-const PUBLIC_PATHS = ["/login", "/api/auth/send-code", "/api/auth/login", "/api/auth/demo"];
+const PUBLIC_PATHS = ["/login", "/api/auth/send-code", "/api/auth/login", "/api/auth/test-login", "/api/auth/demo"];
 
 export function middleware(request: NextRequest) {
   if (frontendPreviewMode) {

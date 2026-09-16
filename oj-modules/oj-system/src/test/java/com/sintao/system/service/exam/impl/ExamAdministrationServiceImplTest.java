@@ -12,14 +12,19 @@ import com.sintao.system.domain.exam.Exam;
 import com.sintao.system.domain.exam.ExamAuditEvent;
 import com.sintao.system.domain.exam.ExamAttempt;
 import com.sintao.system.domain.exam.ExamGrade;
+import com.sintao.system.domain.exam.ExamGradeItem;
+import com.sintao.system.domain.exam.ExamVersionQuestion;
 import com.sintao.system.domain.exam.IntegrityEvent;
 import com.sintao.system.domain.exam.UserExam;
 import com.sintao.system.domain.exam.dto.CandidateAuthorizationDTO;
+import com.sintao.system.domain.exam.dto.ExamGradeReviewDTO;
 import com.sintao.system.domain.user.User;
 import com.sintao.system.mapper.exam.ExamAnswerMapper;
 import com.sintao.system.mapper.exam.ExamAttemptMapper;
 import com.sintao.system.mapper.exam.ExamAuditEventMapper;
 import com.sintao.system.mapper.exam.ExamGradeMapper;
+import com.sintao.system.mapper.exam.ExamGradeItemMapper;
+import com.sintao.system.mapper.exam.ExamVersionQuestionMapper;
 import com.sintao.system.mapper.exam.ExamMapper;
 import com.sintao.system.mapper.exam.UserExamMapper;
 import com.sintao.system.mapper.exam.IntegrityEventMapper;
@@ -58,6 +63,8 @@ class ExamAdministrationServiceImplTest {
     @Mock private ExamAttemptMapper attemptMapper;
     @Mock private ExamAnswerMapper answerMapper;
     @Mock private ExamGradeMapper gradeMapper;
+    @Mock private ExamGradeItemMapper gradeItemMapper;
+    @Mock private ExamVersionQuestionMapper versionQuestionMapper;
     @Mock private ExamAuditEventMapper auditMapper;
     @Mock private IntegrityEventMapper integrityEventMapper;
 
@@ -66,7 +73,8 @@ class ExamAdministrationServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new ExamAdministrationServiceImpl(examMapper, userExamMapper, userMapper,
-                attemptMapper, answerMapper, gradeMapper, auditMapper, integrityEventMapper,
+                attemptMapper, answerMapper, gradeMapper, gradeItemMapper, versionQuestionMapper,
+                auditMapper, integrityEventMapper,
                 new ObjectMapper().findAndRegisterModules(), Clock.fixed(NOW, ZoneOffset.UTC));
         ThreadLocalUtil.set(Constants.USER_ID, 77L);
     }
@@ -212,6 +220,42 @@ class ExamAdministrationServiceImplTest {
         assertTrue(evidence.get(1).getRiskPoints() > 0);
     }
 
+    @Test
+    void reviewShouldScoreManualItemsAndMarkGradeReady() {
+        ExamAttempt attempt = attempt();
+        attempt.setStatus(ExamAttemptStatus.SUBMITTED.getCode());
+        ExamGrade grade = grade(ExamGradeStatus.NEEDS_REVIEW);
+        grade.setTotalScore(40);
+        ExamGradeItem automatic = gradeItem(201L, "AUTO", 40, 40);
+        ExamGradeItem manual = gradeItem(202L, "MANUAL", 0, 60);
+        ExamVersionQuestion autoQuestion = versionQuestion(201L, 1, 40, "MULTIPLE_CHOICE");
+        ExamVersionQuestion manualQuestion = versionQuestion(202L, 2, 60, "SHORT_ANSWER");
+        when(examMapper.selectById(10L)).thenReturn(exam(ExamStatus.FINISHED));
+        when(attemptMapper.selectById(100L)).thenReturn(attempt);
+        when(gradeMapper.selectOne(any())).thenReturn(grade);
+        when(gradeItemMapper.selectList(any())).thenReturn(List.of(automatic, manual));
+        when(versionQuestionMapper.selectList(any())).thenReturn(List.of(autoQuestion, manualQuestion));
+        when(answerMapper.selectList(any())).thenReturn(List.of());
+        when(userMapper.selectById(1L)).thenReturn(user(1L));
+        ExamGradeReviewDTO.Item score = new ExamGradeReviewDTO.Item();
+        score.setVersionQuestionId(202L);
+        score.setAwardedScore(55);
+        score.setFeedback("结构完整");
+        ExamGradeReviewDTO request = new ExamGradeReviewDTO();
+        request.setItems(List.of(score));
+
+        var result = service.reviewGrade(10L, 100L, request, "review-request");
+
+        assertEquals(ExamGradeStatus.READY.getCode(), grade.getStatus());
+        assertEquals(95, grade.getTotalScore());
+        assertEquals("MIXED", grade.getCalculationSource());
+        assertEquals("结构完整", manual.getFeedback());
+        assertEquals("READY", result.getStatus());
+        assertEquals("按完整性评分", result.getItems().get(1).getGradingRubric());
+        verify(gradeItemMapper).updateById(manual);
+        verify(auditMapper).insert(any());
+    }
+
     private Exam exam(ExamStatus status) {
         Exam exam = new Exam();
         exam.setExamId(10L);
@@ -233,12 +277,35 @@ class ExamAdministrationServiceImplTest {
         ExamAttempt attempt = new ExamAttempt();
         attempt.setAttemptId(100L);
         attempt.setExamId(10L);
+        attempt.setVersionId(20L);
         attempt.setUserId(1L);
         attempt.setStatus(ExamAttemptStatus.IN_PROGRESS.getCode());
         attempt.setRowVersion(0);
         attempt.setStartedTime(NOW_UTC.minusMinutes(5));
         attempt.setLastActiveTime(NOW_UTC);
         return attempt;
+    }
+
+    private ExamGradeItem gradeItem(Long questionId, String mode, int score, int maxScore) {
+        ExamGradeItem item = new ExamGradeItem();
+        item.setGradeId(200L);
+        item.setVersionQuestionId(questionId);
+        item.setGradingMode(mode);
+        item.setAwardedScore(score);
+        item.setMaxScore(maxScore);
+        return item;
+    }
+
+    private ExamVersionQuestion versionQuestion(Long questionId, int order, int score, String type) {
+        ExamVersionQuestion question = new ExamVersionQuestion();
+        question.setVersionQuestionId(questionId);
+        question.setVersionId(20L);
+        question.setQuestionOrder(order);
+        question.setScore(score);
+        question.setQuestionType(type);
+        question.setTitle("Question " + order);
+        question.setGradingConfigJson("{\"rubric\":\"按完整性评分\"}");
+        return question;
     }
 
     private ExamGrade grade(ExamGradeStatus status) {

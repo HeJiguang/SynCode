@@ -13,8 +13,10 @@ public class CompactSecurityProperties {
     private List<String> publicPaths = new ArrayList<>(List.of(
             "/actuator/health",
             "/system/sysUser/login",
+            "/system/sysUser/test-login",
             "/friend/user/sendCode",
             "/friend/user/code/login",
+            "/friend/user/test-login",
             "/friend/question/semiLogin/**",
             "/friend/exam/semiLogin/**",
             "/friend/message/semiLogin/**"

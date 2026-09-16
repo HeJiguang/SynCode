@@ -19,6 +19,12 @@ public class QuestionAddDTO {
 
     private Integer trainingEnabled;
 
+    private String questionType;
+
+    private String answerConfigJson;
+
+    private String gradingConfigJson;
+
     private Long timeLimit;
 
     private Long spaceLimit;

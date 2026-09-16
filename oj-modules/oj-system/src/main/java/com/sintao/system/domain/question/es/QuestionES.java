@@ -37,6 +37,9 @@ public class QuestionES {
     @Field(type = FieldType.Byte)
     private Integer trainingEnabled;
 
+    @Field(type = FieldType.Keyword)
+    private String questionType;
+
     @Field(type = FieldType.Long)
     private Long timeLimit;
 

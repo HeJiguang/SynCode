@@ -11,6 +11,7 @@ import com.sintao.job.domain.exam.ExamAuditEvent;
 import com.sintao.job.domain.exam.ExamGrade;
 import com.sintao.job.domain.exam.ExamGradeItem;
 import com.sintao.job.domain.exam.ExamVersionQuestion;
+import com.sintao.job.domain.exam.ExamAnswer;
 import com.sintao.job.domain.user.UserSubmit;
 import com.sintao.job.mapper.exam.ExamAnswerMapper;
 import com.sintao.job.mapper.exam.ExamAttemptMapper;
@@ -39,6 +40,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class TrustedExamReconciliationServiceTest {
@@ -144,6 +146,41 @@ class TrustedExamReconciliationServiceTest {
         verify(userSubmitMapper, never()).selectList(any());
         verify(gradeItemMapper, never()).delete(any());
         verify(gradeMapper, never()).updateById(any());
+    }
+
+    @Test
+    void aggregateShouldAutoGradeObjectiveAndRequireReviewForSubjective() {
+        ExamAttempt attempt = attempt(ExamAttemptStatus.SUBMITTED);
+        ExamGrade grade = new ExamGrade();
+        grade.setGradeId(301L);
+        grade.setAttemptId(100L);
+        grade.setStatus(ExamGradeStatus.WAITING_FOR_JUDGE.getCode());
+        grade.setCurrentFlag(1);
+        ExamVersionQuestion choice = question(40);
+        choice.setQuestionType("MULTIPLE_CHOICE");
+        choice.setGradingConfigJson("{\"correctAnswers\":[\"A\",\"C\"],\"caseSensitive\":true}");
+        ExamVersionQuestion shortAnswer = question(60);
+        shortAnswer.setVersionQuestionId(202L);
+        shortAnswer.setQuestionOrder(2);
+        shortAnswer.setQuestionType("SHORT_ANSWER");
+        shortAnswer.setGradingConfigJson("{\"rubric\":\"manual\"}");
+        ExamAnswer choiceAnswer = new ExamAnswer();
+        choiceAnswer.setVersionQuestionId(201L);
+        choiceAnswer.setAnswerContent("[\"C\",\"A\"]");
+
+        when(attemptMapper.selectList(any())).thenReturn(List.of(attempt));
+        when(userSubmitMapper.selectList(any())).thenReturn(List.of());
+        when(gradeMapper.selectOne(any())).thenReturn(grade);
+        when(versionQuestionMapper.selectList(any())).thenReturn(List.of(choice, shortAnswer));
+        when(answerMapper.selectList(any())).thenReturn(List.of(choiceAnswer));
+
+        assertEquals(1, service.aggregateTerminalGrades());
+        assertEquals(40, grade.getTotalScore());
+        assertEquals(ExamGradeStatus.NEEDS_REVIEW.getCode(), grade.getStatus());
+        assertEquals("MIXED", grade.getCalculationSource());
+        ArgumentCaptor<ExamGradeItem> items = ArgumentCaptor.forClass(ExamGradeItem.class);
+        verify(gradeItemMapper, times(2)).insert(items.capture());
+        assertEquals(List.of("AUTO", "MANUAL"), items.getAllValues().stream().map(ExamGradeItem::getGradingMode).toList());
     }
 
     @Test

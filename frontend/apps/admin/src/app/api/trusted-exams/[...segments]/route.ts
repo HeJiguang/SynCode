@@ -4,7 +4,7 @@ import { requestJson, type ApiEnvelope, unwrapData } from "@aioj/api";
 import { getAdminAccessToken } from "../../../../lib/server-auth";
 
 type RouteContext = { params: Promise<{ segments: string[] }> };
-type Method = "GET" | "POST" | "DELETE";
+type Method = "GET" | "POST" | "PUT" | "DELETE";
 
 async function proxy(request: Request, context: RouteContext, method: Method) {
   const token = await getAdminAccessToken();
@@ -34,4 +34,5 @@ async function proxy(request: Request, context: RouteContext, method: Method) {
 
 export function GET(request: Request, context: RouteContext) { return proxy(request, context, "GET"); }
 export function POST(request: Request, context: RouteContext) { return proxy(request, context, "POST"); }
+export function PUT(request: Request, context: RouteContext) { return proxy(request, context, "PUT"); }
 export function DELETE(request: Request, context: RouteContext) { return proxy(request, context, "DELETE"); }

@@ -23,4 +23,5 @@ public class TrustedExamQuestionVO {
     private Long spaceLimit;
     private List<String> allowedLanguages;
     private Map<String, String> starterCode;
+    private Map<String, Object> answerConfig;
 }

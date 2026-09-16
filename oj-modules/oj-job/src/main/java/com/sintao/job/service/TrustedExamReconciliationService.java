@@ -8,6 +8,7 @@ import com.sintao.common.core.enums.ExamGradeStatus;
 import com.sintao.common.core.enums.ExamStatus;
 import com.sintao.common.core.enums.JudgeAsyncStatus;
 import com.sintao.common.core.enums.QuestionResType;
+import com.sintao.common.core.enums.QuestionType;
 import com.sintao.common.core.enums.ResultCode;
 import com.sintao.job.domain.exam.ExamAnswer;
 import com.sintao.job.domain.exam.ExamAttempt;
@@ -31,6 +32,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -39,6 +43,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.ArrayList;
+import java.util.HashSet;
 
 @Service
 public class TrustedExamReconciliationService {
@@ -56,6 +62,7 @@ public class TrustedExamReconciliationService {
     private final UserSubmitMapper userSubmitMapper;
     private final Clock clock;
     private final int integrityRetentionDays;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public TrustedExamReconciliationService(ExamAttemptMapper attemptMapper,
                                             ExamMapper examMapper,
@@ -240,15 +247,29 @@ public class TrustedExamReconciliationService {
                 .sorted(Comparator.comparing(UserSubmit::getCreateTime,
                         Comparator.nullsFirst(Comparator.naturalOrder())))
                 .forEach(item -> latestCompleted.put(item.getVersionQuestionId(), item));
+        Map<Long, ExamAnswer> answers = new HashMap<>();
+        answerMapper.selectList(new LambdaQueryWrapper<ExamAnswer>()
+                        .eq(ExamAnswer::getAttemptId, attempt.getAttemptId()))
+                .forEach(answer -> answers.put(answer.getVersionQuestionId(), answer));
 
         gradeItemMapper.delete(new LambdaQueryWrapper<ExamGradeItem>()
                 .eq(ExamGradeItem::getGradeId, grade.getGradeId()));
         int total = 0;
         int max = 0;
+        boolean requiresManualReview = false;
+        boolean hasAuto = false;
         for (ExamVersionQuestion question : questions) {
-            UserSubmit submission = latestCompleted.get(question.getVersionQuestionId());
-            boolean passed = submission != null && Objects.equals(submission.getPass(), QuestionResType.PASS.getValue());
-            int awarded = passed ? question.getScore() : 0;
+            QuestionType type = QuestionType.from(question.getQuestionType());
+            UserSubmit submission = type == QuestionType.PROGRAMMING
+                    ? latestCompleted.get(question.getVersionQuestionId()) : null;
+            boolean passed = type == QuestionType.PROGRAMMING
+                    ? submission != null && Objects.equals(submission.getPass(), QuestionResType.PASS.getValue())
+                    : type.isObjective() && objectiveAnswerMatches(
+                            answers.get(question.getVersionQuestionId()), question.getGradingConfigJson(), type);
+            boolean manual = !type.isObjective() && type != QuestionType.PROGRAMMING;
+            int awarded = !manual && passed ? question.getScore() : 0;
+            requiresManualReview |= manual;
+            hasAuto |= !manual;
             total += awarded;
             max += question.getScore();
             ExamGradeItem item = new ExamGradeItem();
@@ -257,26 +278,57 @@ public class TrustedExamReconciliationService {
             item.setSubmitId(submission == null ? null : submission.getSubmitId());
             item.setAwardedScore(awarded);
             item.setMaxScore(question.getScore());
-            item.setGradingMode("AUTO");
+            item.setGradingMode(manual ? "MANUAL" : "AUTO");
             item.setCreateBy(Constants.SYSTEM_USER_ID);
             item.setCreateTime(now);
             gradeItemMapper.insert(item);
-            if (passed && submission.getAnswerId() != null) {
+            if (type == QuestionType.PROGRAMMING && passed && submission.getAnswerId() != null) {
                 answerMapper.update(null, new UpdateWrapper<ExamAnswer>()
                         .eq("answer_id", submission.getAnswerId())
                         .set("latest_accepted_submit_id", submission.getSubmitId())
                         .set("update_time", now));
             }
         }
-        grade.setStatus(ExamGradeStatus.READY.getCode());
+        grade.setStatus(requiresManualReview ? ExamGradeStatus.NEEDS_REVIEW.getCode() : ExamGradeStatus.READY.getCode());
         grade.setTotalScore(total);
         grade.setMaxScore(max);
-        grade.setCalculationSource("AUTO");
+        grade.setCalculationSource(requiresManualReview ? (hasAuto ? "MIXED" : "MANUAL") : "AUTO");
         grade.setCalculatedTime(now);
         grade.setUpdateBy(Constants.SYSTEM_USER_ID);
         grade.setUpdateTime(now);
         gradeMapper.updateById(grade);
         return true;
+    }
+
+    private boolean objectiveAnswerMatches(ExamAnswer answer, String gradingConfigJson, QuestionType type) {
+        if (answer == null || answer.getAnswerContent() == null || gradingConfigJson == null) return false;
+        try {
+            JsonNode config = objectMapper.readTree(gradingConfigJson);
+            JsonNode correctNode = config.path("correctAnswers");
+            if (!correctNode.isArray() || correctNode.isEmpty()) return false;
+            List<String> correct = new ArrayList<>();
+            for (JsonNode item : correctNode) correct.add(item.asText().trim());
+            List<String> actual = parseCandidateAnswers(answer.getAnswerContent());
+            boolean caseSensitive = config.path("caseSensitive").asBoolean(false);
+            if (!caseSensitive) {
+                correct = correct.stream().map(value -> value.toLowerCase(java.util.Locale.ROOT)).toList();
+                actual = actual.stream().map(value -> value.toLowerCase(java.util.Locale.ROOT)).toList();
+            }
+            if (type == QuestionType.FILL_BLANK) return correct.equals(actual);
+            return new HashSet<>(correct).equals(new HashSet<>(actual)) && correct.size() == actual.size();
+        } catch (Exception exception) {
+            return false;
+        }
+    }
+
+    private List<String> parseCandidateAnswers(String content) throws Exception {
+        JsonNode node = objectMapper.readTree(content);
+        if (node.isArray()) {
+            List<String> values = new ArrayList<>();
+            node.forEach(item -> values.add(item.asText().trim()));
+            return values;
+        }
+        return List.of(node.asText().trim());
     }
 
     private ExamGrade ensureGrade(ExamAttempt attempt, LocalDateTime now) {

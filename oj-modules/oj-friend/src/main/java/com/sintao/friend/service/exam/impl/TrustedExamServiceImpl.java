@@ -17,6 +17,7 @@ import com.sintao.common.core.enums.JudgeAsyncStatus;
 import com.sintao.common.core.enums.ProgramType;
 import com.sintao.common.core.enums.QuestionResType;
 import com.sintao.common.core.enums.ResultCode;
+import com.sintao.common.core.enums.QuestionType;
 import com.sintao.common.core.utils.ThreadLocalUtil;
 import com.sintao.common.redis.service.JudgeRuntimeStateService;
 import com.sintao.common.security.exception.ServiceException;
@@ -320,11 +321,11 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
     @Transactional(noRollbackFor = ExamAttemptExpiredException.class)
     public ExamAnswerVO saveAnswer(Long attemptId, Long versionQuestionId, SaveAnswerDTO request) {
         long userId = currentUserId();
-        validateAnswerRequest(request);
         ExamAttempt attempt = ownedAttemptForUpdate(attemptId, userId);
         LocalDateTime now = now();
         requireWritableAttempt(attempt, now, userId);
-        requireVersionQuestion(versionQuestionId, attempt.getVersionId());
+        ExamVersionQuestion question = requireVersionQuestion(versionQuestionId, attempt.getVersionId());
+        validateAnswerRequest(request, question);
         ExamAnswer answer = answerMapper.selectOne(new LambdaQueryWrapper<ExamAnswer>()
                 .eq(ExamAnswer::getAttemptId, attemptId)
                 .eq(ExamAnswer::getVersionQuestionId, versionQuestionId));
@@ -344,8 +345,10 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
             answer.setVersionQuestionId(versionQuestionId);
             answer.setCreateTime(now);
         }
-        answer.setAnswerType(request.getAnswerType() == null ? "CODE" : request.getAnswerType());
-        answer.setLanguageCode(request.getLanguage() == null ? "java" : request.getLanguage());
+        QuestionType questionType = QuestionType.from(question.getQuestionType());
+        answer.setAnswerType(questionType.getAnswerType());
+        answer.setLanguageCode(questionType == QuestionType.PROGRAMMING
+                ? (request.getLanguage() == null ? "java" : request.getLanguage()) : null);
         answer.setAnswerContent(request.getContent());
         answer.setContentHash(hash);
         answer.setAnswerVersion(currentVersion + 1);
@@ -392,6 +395,9 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
         requireWritableAttempt(attempt, now, userId);
         ExamVersion version = getVersion(attempt.getVersionId());
         ExamVersionQuestion question = requireVersionQuestion(request.getVersionQuestionId(), attempt.getVersionId());
+        if (QuestionType.from(question.getQuestionType()) != QuestionType.PROGRAMMING) {
+            throw new ServiceException(ResultCode.FAILED_PARAMS_VALIDATE);
+        }
         ExamAnswer answer = answerMapper.selectOne(new LambdaQueryWrapper<ExamAnswer>()
                 .eq(ExamAnswer::getAttemptId, attemptId)
                 .eq(ExamAnswer::getVersionQuestionId, request.getVersionQuestionId()));
@@ -748,6 +754,7 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
         result.setSpaceLimit(question.getSpaceLimit());
         result.setAllowedLanguages(readJson(question.getAllowedLanguagesJson(), new TypeReference<List<String>>() {}, List.of("java")));
         result.setStarterCode(readJson(question.getStarterCodeJson(), new TypeReference<Map<String, String>>() {}, Map.of()));
+        result.setAnswerConfig(readJson(question.getAnswerConfigJson(), new TypeReference<Map<String, Object>>() {}, Map.of()));
         return result;
     }
 
@@ -835,14 +842,18 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
                         "currentHash", answer == null ? "" : answer.getContentHash()));
     }
 
-    private void validateAnswerRequest(SaveAnswerDTO request) {
+    private void validateAnswerRequest(SaveAnswerDTO request, ExamVersionQuestion question) {
         if (request == null || request.getExpectedVersion() == null || request.getExpectedVersion() < 0
                 || request.getContent() == null || request.getContent().length() > MAX_ANSWER_LENGTH) {
             throw new ServiceException(ResultCode.FAILED_PARAMS_VALIDATE);
         }
-        String type = request.getAnswerType() == null ? "CODE" : request.getAnswerType();
+        QuestionType questionType = QuestionType.from(question.getQuestionType());
+        String type = request.getAnswerType() == null ? questionType.getAnswerType() : request.getAnswerType();
+        if (!questionType.getAnswerType().equals(type)) {
+            throw new ServiceException(ResultCode.FAILED_PARAMS_VALIDATE);
+        }
         String language = request.getLanguage() == null ? "java" : request.getLanguage();
-        if (!"CODE".equals(type) || !"java".equalsIgnoreCase(language)) {
+        if (questionType == QuestionType.PROGRAMMING && !"java".equalsIgnoreCase(language)) {
             throw new ServiceException(ResultCode.FAILED_NOT_SUPPORT_PROGRAM);
         }
     }

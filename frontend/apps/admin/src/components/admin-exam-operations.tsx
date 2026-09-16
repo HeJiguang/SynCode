@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, Ban, RefreshCw, Send, ShieldCheck, UserPlus, Users } from "lucide-react";
+import { AlertTriangle, Ban, ClipboardCheck, RefreshCw, Send, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { Button, Input, Panel, Tag } from "@aioj/ui";
 
 import { frontendPreviewMode } from "@aioj/config";
@@ -50,6 +50,11 @@ type Evidence = {
   metadataJson?: string;
 };
 
+type GradeReview = {
+  attemptId: string; candidateName: string; status: string; totalScore: number; maxScore: number;
+  items: Array<{ versionQuestionId: string; questionOrder: number; title: string; questionType: string; answerContent?: string; gradingRubric?: string; awardedScore: number; maxScore: number; gradingMode: string; feedback?: string }>;
+};
+
 async function request<T>(path: string, init?: RequestInit) {
   const headers = new Headers(init?.headers);
   headers.set("Content-Type", "application/json");
@@ -73,6 +78,7 @@ export function AdminExamOperations({ examId }: { examId: string }) {
   const [candidateIds, setCandidateIds] = React.useState("");
   const [evidence, setEvidence] = React.useState<Evidence[]>([]);
   const [selectedAttempt, setSelectedAttempt] = React.useState<string | null>(null);
+  const [review, setReview] = React.useState<GradeReview | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -158,6 +164,25 @@ export function AdminExamOperations({ examId }: { examId: string }) {
     catch (nextError) { setError(nextError instanceof Error ? nextError.message : "证据加载失败。"); }
   }
 
+  async function openReview(attemptId: string) {
+    setError(null);
+    try { setReview(await request<GradeReview>(`${examId}/attempts/${attemptId}/grading`)); }
+    catch (nextError) { setError(nextError instanceof Error ? nextError.message : "阅卷详情加载失败。"); }
+  }
+
+  async function saveReview() {
+    if (!review) return;
+    setBusy(true); setError(null);
+    try {
+      const next = await request<GradeReview>(`${examId}/attempts/${review.attemptId}/grading`, {
+        method: "PUT", headers: { "X-Request-ID": `review-${crypto.randomUUID()}` },
+        body: JSON.stringify({ items: review.items.filter((item) => item.gradingMode === "MANUAL").map((item) => ({ versionQuestionId: item.versionQuestionId, awardedScore: Number(item.awardedScore), feedback: item.feedback })) })
+      });
+      setReview(next); await refresh();
+    } catch (nextError) { setError(nextError instanceof Error ? nextError.message : "阅卷保存失败。"); }
+    finally { setBusy(false); }
+  }
+
   if (frontendPreviewMode) return null;
 
   const metrics = monitor ? [
@@ -183,8 +208,10 @@ export function AdminExamOperations({ examId }: { examId: string }) {
 
     <Panel className="p-6">
       <div className="flex items-center justify-between gap-4"><div><p className="kicker">成绩</p><h2 className="mt-1 text-lg font-semibold">复核与发布</h2></div><Button onClick={() => void release()} disabled={busy || !canRelease}><Send size={14} />发布成绩</Button></div>
-      <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[640px] text-left text-sm"><thead className="border-b border-[var(--border-soft)] text-xs text-[var(--text-muted)]"><tr><th className="px-3 py-3">考生</th><th className="px-3 py-3">状态</th><th className="px-3 py-3">成绩</th><th className="px-3 py-3">风险</th><th className="px-3 py-3 text-right">证据</th></tr></thead><tbody>{grades.map((grade) => <tr key={grade.gradeId} className="border-b border-[var(--border-soft)]"><td className="px-3 py-3">{grade.nickName ?? grade.userId}</td><td className="px-3 py-3">{statusLabel(grade.status)}</td><td className="px-3 py-3 font-mono">{grade.totalScore} / {grade.maxScore}</td><td className="px-3 py-3">{grade.riskLevel ?? 0}</td><td className="px-3 py-3 text-right"><Button size="sm" variant="ghost" onClick={() => void showEvidence(grade.attemptId)}><ShieldCheck size={14} />查看</Button></td></tr>)}</tbody></table></div>
+      <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="border-b border-[var(--border-soft)] text-xs text-[var(--text-muted)]"><tr><th className="px-3 py-3">考生</th><th className="px-3 py-3">状态</th><th className="px-3 py-3">成绩</th><th className="px-3 py-3">风险</th><th className="px-3 py-3 text-right">操作</th></tr></thead><tbody>{grades.map((grade) => <tr key={grade.gradeId} className="border-b border-[var(--border-soft)]"><td className="px-3 py-3">{grade.nickName ?? grade.userId}</td><td className="px-3 py-3">{statusLabel(grade.status)}</td><td className="px-3 py-3 font-mono">{grade.totalScore} / {grade.maxScore}</td><td className="px-3 py-3">{grade.riskLevel ?? 0}</td><td className="px-3 py-3 text-right"><Button size="sm" variant="ghost" onClick={() => void openReview(grade.attemptId)}><ClipboardCheck size={14} />阅卷</Button><Button size="sm" variant="ghost" onClick={() => void showEvidence(grade.attemptId)}><ShieldCheck size={14} />证据</Button></td></tr>)}</tbody></table></div>
     </Panel>
+
+    {review ? <Panel className="p-6"><div className="flex items-center justify-between gap-4"><div><p className="kicker">人工阅卷</p><h2 className="mt-1 text-lg font-semibold">{review.candidateName}</h2></div><Button size="sm" variant="ghost" onClick={() => setReview(null)}>关闭</Button></div><div className="mt-5 space-y-6">{review.items.map((item) => <section key={item.versionQuestionId} className="border-t border-[var(--border-soft)] pt-5"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-medium">{item.questionOrder}. {item.title}</p><p className="mt-1 text-xs text-[var(--text-muted)]">{item.questionType} · {item.gradingMode === "MANUAL" ? "人工评分" : "自动评分"}</p></div><span className="font-mono text-sm">{item.awardedScore} / {item.maxScore}</span></div>{item.gradingRubric ? <div className="mt-4 border-l-2 border-[var(--accent)] pl-4"><p className="text-xs text-[var(--text-muted)]">评分标准</p><p className="mt-1 whitespace-pre-wrap text-sm leading-6">{item.gradingRubric}</p></div> : null}<pre className="mt-4 max-h-64 overflow-auto whitespace-pre-wrap border border-[var(--border-soft)] bg-[var(--surface-2)] p-4 text-sm leading-7">{item.answerContent || "未作答"}</pre>{item.gradingMode === "MANUAL" ? <div className="mt-4 grid gap-3 md:grid-cols-[160px_1fr]"><label className="space-y-2"><span className="text-xs text-[var(--text-muted)]">得分</span><Input type="number" min="0" max={item.maxScore} value={item.awardedScore} onChange={(event) => setReview((current) => current ? { ...current, items: current.items.map((candidate) => candidate.versionQuestionId === item.versionQuestionId ? { ...candidate, awardedScore: Number(event.target.value) } : candidate) } : current)} /></label><label className="space-y-2"><span className="text-xs text-[var(--text-muted)]">评语</span><Input value={item.feedback ?? ""} onChange={(event) => setReview((current) => current ? { ...current, items: current.items.map((candidate) => candidate.versionQuestionId === item.versionQuestionId ? { ...candidate, feedback: event.target.value } : candidate) } : current)} /></label></div> : null}</section>)}</div><div className="mt-6 flex justify-end"><Button disabled={busy || !review.items.some((item) => item.gradingMode === "MANUAL")} onClick={() => void saveReview()}><ClipboardCheck size={14} />保存阅卷</Button></div></Panel> : null}
 
     {selectedAttempt ? <Panel className="p-6"><div className="flex items-center justify-between"><div><p className="kicker">证据时间线</p><h2 className="mt-1 text-lg font-semibold">Attempt {selectedAttempt}</h2></div><Button size="sm" variant="ghost" onClick={() => setSelectedAttempt(null)}>关闭</Button></div><div className="mt-5 divide-y divide-[var(--border-soft)] border-y border-[var(--border-soft)]">{evidence.length ? evidence.map((item, index) => <div key={`${item.serverTime}-${index}`} className="grid gap-2 py-4 md:grid-cols-[140px_1fr_100px]"><div><Tag tone={item.category === "INTEGRITY" ? "warning" : "default"}>{item.category}</Tag></div><div><p className="font-medium">{item.eventType}</p><p className="mt-1 break-all text-xs text-[var(--text-muted)]">{item.metadataJson || "无附加数据"}</p></div><div className="text-right text-xs text-[var(--text-muted)]"><p>风险 +{item.riskPoints}</p><p className="mt-1">{item.serverTime}</p></div></div>) : <p className="py-8 text-sm text-[var(--text-muted)]">暂无证据事件。</p>}</div></Panel> : null}
   </div>;

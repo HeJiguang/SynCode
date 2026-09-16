@@ -6,6 +6,7 @@ import com.sintao.common.core.domain.R;
 import com.sintao.common.core.domain.vo.LoginUserVO;
 import com.sintao.system.domain.sysuser.dto.LoginDTO;
 import com.sintao.system.domain.sysuser.dto.SysUserSaveDTO;
+import com.sintao.system.domain.sysuser.dto.TestLoginDTO;
 import com.sintao.system.domain.sysuser.vo.SysUserVO;
 import com.sintao.system.service.sysuser.ISysUserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -41,6 +42,12 @@ public class SysUserController extends BaseController {
     @ApiResponse(responseCode = "3103", description = "用户名或密码错误")
     public R<String> login(@RequestBody LoginDTO loginDTO) {
         return sysUserService.login(loginDTO.getUserAccount(), loginDTO.getPassword());
+    }
+
+    @PostMapping("/test-login")
+    @Operation(summary = "测试教师登录", description = "仅在测试环境开启，并将白名单邮箱映射到指定管理员账号")
+    public R<String> testLogin(@RequestBody TestLoginDTO request) {
+        return sysUserService.testLogin(request.getEmail());
     }
 
     @DeleteMapping("/logout")

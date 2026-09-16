@@ -68,6 +68,8 @@ tool/load-testing/bin/
 # Keep production deploy verification scripts versioned
 !deploy/prod/scripts/
 !deploy/prod/scripts/test-sync-worker-images-hostkey.ps1
+!deploy/test/scripts/
+!deploy/test/scripts/seed-mixed-exam.sh
 !deploy/prod/scripts/test-worker-key-source.ps1
 !deploy/prod/scripts/test-oj-judge-profile.ps1
 !deploy/prod/scripts/test-cd-manual-trigger.ps1

@@ -30,6 +30,8 @@ public class ExamVersionQuestion {
     private String allowedLanguagesJson;
     private String starterCodeJson;
     private String judgeConfigJson;
+    private String answerConfigJson;
+    private String gradingConfigJson;
     private LocalDateTime sourceUpdateTime;
     private String contentHash;
 }

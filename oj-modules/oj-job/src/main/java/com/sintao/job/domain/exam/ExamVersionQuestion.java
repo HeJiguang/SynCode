@@ -15,4 +15,6 @@ public class ExamVersionQuestion {
     private Long versionId;
     private Integer questionOrder;
     private Integer score;
+    private String questionType;
+    private String gradingConfigJson;
 }

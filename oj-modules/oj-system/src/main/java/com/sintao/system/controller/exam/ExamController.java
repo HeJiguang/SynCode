@@ -11,11 +11,13 @@ import com.sintao.system.domain.exam.dto.ExamQuestionsReplaceDTO;
 import com.sintao.system.domain.exam.dto.CandidateAuthorizationDTO;
 import com.sintao.system.domain.exam.dto.CandidateRevokeDTO;
 import com.sintao.system.domain.exam.dto.ExamCancelDTO;
+import com.sintao.system.domain.exam.dto.ExamGradeReviewDTO;
 import com.sintao.system.domain.exam.vo.ExamCandidateVO;
 import com.sintao.system.domain.exam.vo.ExamDetailVO;
 import com.sintao.system.domain.exam.vo.ExamGradeVO;
 import com.sintao.system.domain.exam.vo.ExamEvidenceEventVO;
 import com.sintao.system.domain.exam.vo.ExamMonitorVO;
+import com.sintao.system.domain.exam.vo.ExamGradeReviewVO;
 import com.sintao.system.domain.exam.vo.ExamPublicationVO;
 import com.sintao.system.service.exam.IExamAdministrationService;
 import com.sintao.system.service.exam.IExamService;
@@ -233,5 +235,20 @@ public class ExamController extends BaseController {
             @PathVariable Long examId,
             @PathVariable Long attemptId) {
         return R.ok(examAdministrationService.evidence(examId, attemptId));
+    }
+
+    @GetMapping("/{examId}/attempts/{attemptId}/grading")
+    @Operation(summary = "读取阅卷详情", description = "返回不可变题目、考生答案和当前逐题得分")
+    public R<ExamGradeReviewVO> grading(@PathVariable Long examId, @PathVariable Long attemptId) {
+        return R.ok(examAdministrationService.grading(examId, attemptId));
+    }
+
+    @PutMapping("/{examId}/attempts/{attemptId}/grading")
+    @Operation(summary = "提交人工阅卷", description = "保存逐题评分和评语，全部主观题评分后成绩进入待发布")
+    public R<ExamGradeReviewVO> reviewGrade(@PathVariable Long examId,
+                                             @PathVariable Long attemptId,
+                                             @RequestBody ExamGradeReviewDTO request,
+                                             @RequestHeader(value = "X-Request-ID", required = false) String requestId) {
+        return R.ok(examAdministrationService.reviewGrade(examId, attemptId, request, requestId));
     }
 }

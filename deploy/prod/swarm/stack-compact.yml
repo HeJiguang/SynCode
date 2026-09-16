@@ -52,6 +52,7 @@ services:
       HOSTNAME: 0.0.0.0
       SYNCODE_BACKEND_BASE_URL: http://oj-runtime:19090
       SYNCODE_DEMO_LOGIN_ENABLED: ${SYNCODE_DEMO_LOGIN_ENABLED:-false}
+      SYNCODE_TEST_LOGIN_ENABLED: ${SYNCODE_TEST_LOGIN_ENABLED:-false}
     networks:
       - edge
       - backend
@@ -71,6 +72,7 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       SYNCODE_BACKEND_BASE_URL: http://oj-runtime:19090
+      SYNCODE_TEST_LOGIN_ENABLED: ${SYNCODE_TEST_LOGIN_ENABLED:-false}
     networks:
       - edge
       - backend
@@ -101,6 +103,10 @@ services:
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
       OJ_JUDGE_BASE_URL: http://oj-judge:9204
       AGENT_PUBLIC_BASE_URL: http://oj-agent:8015
+      SYNCODE_TEST_LOGIN_ENABLED: ${SYNCODE_TEST_LOGIN_ENABLED:-false}
+      SYNCODE_TEST_STUDENT_EMAIL: ${SYNCODE_TEST_STUDENT_EMAIL:-student@syncode.test}
+      SYNCODE_TEST_TEACHER_EMAIL: ${SYNCODE_TEST_TEACHER_EMAIL:-teacher@syncode.test}
+      SYNCODE_TEST_TEACHER_ACCOUNT: ${SYNCODE_TEST_TEACHER_ACCOUNT:-admin}
     networks:
       backend:
         aliases:

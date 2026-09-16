@@ -94,6 +94,14 @@ jobs:
             exit 1
           fi
           printf '%s\n' "${output}" | tail -n 1
+          output="$(mysql --batch --skip-column-names --host=127.0.0.1 --user=root bitoj_dev < deploy/migrations/mysql/verification/verify_V2026091601__mixed_question_types.sql)"
+          violations="$(printf '%s\n' "${output}" | sed '$d')"
+          if [[ -n "${violations}" ]]; then
+            echo "Mixed question migration verification returned violations:" >&2
+            echo "${violations}" >&2
+            exit 1
+          fi
+          printf '%s\n' "${output}" | tail -n 1
 
   oj-agent:
     name: Python Agent Tests

@@ -8,6 +8,7 @@ import { requireAdminAccessToken } from "../../lib/server-auth";
 export default async function AdminQuestionsPage() {
   const token = await requireAdminAccessToken();
   const [admin, questions] = await Promise.all([getAdminProfile(token), getAdminQuestionRows(token)]);
+  const typeLabels: Record<string, string> = { PROGRAMMING: "编程题", SINGLE_CHOICE: "单选题", MULTIPLE_CHOICE: "多选题", TRUE_FALSE: "判断题", FILL_BLANK: "填空题", SHORT_ANSWER: "简答题", SQL: "SQL 题", FILE: "文件题", PROJECT: "项目题" };
 
   return (
     <AdminShell
@@ -27,10 +28,11 @@ export default async function AdminQuestionsPage() {
             <a
               key={item.questionId}
               href={`/admin/questions/${item.questionId}`}
-              className="grid gap-3 px-5 py-4 transition hover:bg-[var(--surface-2)] md:grid-cols-[120px_minmax(0,1fr)_140px_180px] md:items-center"
+              className="grid gap-3 px-5 py-4 transition hover:bg-[var(--surface-2)] md:grid-cols-[120px_minmax(0,1fr)_100px_120px_180px] md:items-center"
             >
               <span className="text-sm text-[var(--text-muted)]">{item.questionId}</span>
               <span className="font-medium">{item.title}</span>
+              <Tag>{typeLabels[item.questionType] ?? item.questionType}</Tag>
               <Tag tone={item.difficulty === "Easy" ? "success" : item.difficulty === "Medium" ? "warning" : "danger"}>
                 {item.difficulty}
               </Tag>

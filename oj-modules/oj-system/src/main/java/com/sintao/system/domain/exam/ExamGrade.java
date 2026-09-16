@@ -25,4 +25,5 @@ public class ExamGrade {
     private LocalDateTime releasedTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+    private Long updateBy;
 }
