@@ -23,6 +23,10 @@ public class ExamCacheManager {
         redisService.deleteObject(getExamQuestionListKey(examId));
     }
 
+    public void deleteUserExamList(Long userId) {
+        redisService.deleteObject(CacheConstants.USER_EXAM_LIST + userId);
+    }
+
     private String getExamListKey() {
         return CacheConstants.EXAM_UNFINISHED_LIST;
     }

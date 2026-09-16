@@ -5,6 +5,7 @@ import { AlertTriangle, Ban, ClipboardCheck, RefreshCw, Send, ShieldCheck, UserP
 import { Button, Input, Panel, Tag } from "@aioj/ui";
 
 import { frontendPreviewMode } from "@aioj/config";
+import { parseDecimalIds } from "../lib/exam-form";
 import { adminApiPath } from "../lib/paths";
 
 type Candidate = {
@@ -100,8 +101,8 @@ export function AdminExamOperations({ examId }: { examId: string }) {
   React.useEffect(() => { void refresh(); }, [refresh]);
 
   async function authorize() {
-    const userIds = candidateIds.split(/[,\s]+/).filter(Boolean).map(Number).filter(Number.isFinite);
-    if (!userIds.length) return setError("请输入至少一个用户 ID。");
+    const userIds = parseDecimalIds(candidateIds);
+    if (!userIds) return setError("请输入有效的用户 ID，多个 ID 可用逗号或空格分隔。");
     setBusy(true);
     try {
       await request(`${examId}/candidates`, {

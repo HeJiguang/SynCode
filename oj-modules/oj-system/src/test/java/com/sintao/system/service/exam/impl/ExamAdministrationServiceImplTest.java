@@ -29,6 +29,7 @@ import com.sintao.system.mapper.exam.ExamMapper;
 import com.sintao.system.mapper.exam.UserExamMapper;
 import com.sintao.system.mapper.exam.IntegrityEventMapper;
 import com.sintao.system.mapper.user.UserMapper;
+import com.sintao.system.manager.ExamCacheManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,6 +68,7 @@ class ExamAdministrationServiceImplTest {
     @Mock private ExamVersionQuestionMapper versionQuestionMapper;
     @Mock private ExamAuditEventMapper auditMapper;
     @Mock private IntegrityEventMapper integrityEventMapper;
+    @Mock private ExamCacheManager examCacheManager;
 
     private ExamAdministrationServiceImpl service;
 
@@ -74,7 +76,7 @@ class ExamAdministrationServiceImplTest {
     void setUp() {
         service = new ExamAdministrationServiceImpl(examMapper, userExamMapper, userMapper,
                 attemptMapper, answerMapper, gradeMapper, gradeItemMapper, versionQuestionMapper,
-                auditMapper, integrityEventMapper,
+                auditMapper, integrityEventMapper, examCacheManager,
                 new ObjectMapper().findAndRegisterModules(), Clock.fixed(NOW, ZoneOffset.UTC));
         ThreadLocalUtil.set(Constants.USER_ID, 77L);
     }
@@ -102,6 +104,8 @@ class ExamAdministrationServiceImplTest {
         verify(userExamMapper, org.mockito.Mockito.times(2)).insert(captor.capture());
         assertEquals(List.of(1L, 2L), captor.getAllValues().stream().map(UserExam::getUserId).toList());
         verify(auditMapper).insert(any());
+        verify(examCacheManager).deleteUserExamList(1L);
+        verify(examCacheManager).deleteUserExamList(2L);
     }
 
     @Test

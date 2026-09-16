@@ -6,6 +6,7 @@ import { ArrowDown, ArrowUp, LoaderCircle, Plus, Save, Search } from "lucide-rea
 
 import { frontendPreviewMode } from "@aioj/config";
 import type { AdminExamDetail } from "../lib/admin-api";
+import { buildExamCompositionPayload, type ExamFormErrors, type ExamFormValues, toExamApiDateTime, validateExamForm } from "../lib/exam-form";
 import { adminApiPath, adminInternalPath } from "../lib/paths";
 import { Button, Input, Panel, Textarea } from "@aioj/ui";
 
@@ -23,10 +24,6 @@ const typeLabels: Record<string, string> = {
 function toInputValue(value?: string) {
   if (!value) return "";
   return value.replace(" ", "T").slice(0, 16);
-}
-
-function toApiValue(value: string) {
-  return value ? `${value.replace("T", " ")}:00` : "";
 }
 
 export function AdminExamEditor({ exam }: AdminExamEditorProps) {
@@ -52,6 +49,36 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
   const [searching, setSearching] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [notice, setNotice] = React.useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = React.useState<ExamFormErrors>({});
+
+  React.useEffect(() => {
+    if (exam) {
+      setForm((current) => ({ ...current, expectedRowVersion: exam.rowVersion }));
+    }
+  }, [exam?.rowVersion]);
+
+  function updateField<K extends keyof ExamFormValues>(key: K, value: ExamFormValues[K]) {
+    setForm((current) => ({ ...current, [key]: value }));
+    setFieldErrors((current) => ({ ...current, [key]: undefined }));
+    setNotice(null);
+  }
+
+  function applyViolations(details: unknown) {
+    if (!details || typeof details !== "object") return false;
+    const violations = (details as { violations?: unknown }).violations;
+    if (!Array.isArray(violations)) return false;
+    const next: ExamFormErrors = {};
+    for (const violation of violations) {
+      if (!violation || typeof violation !== "object") continue;
+      const { field, message } = violation as { field?: unknown; message?: unknown };
+      if (typeof field === "string" && typeof message === "string" && field in form) {
+        next[field as keyof ExamFormValues] = message;
+      }
+    }
+    setFieldErrors(next);
+    return Object.keys(next).length > 0;
+  }
 
   React.useEffect(() => {
     if (!exam || exam.status !== 0 || frontendPreviewMode) return;
@@ -62,8 +89,11 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
         if (questionQuery.trim()) query.set("title", questionQuery.trim());
         if (questionType) query.set("questionType", questionType);
         const response = await fetch(`${adminApiPath("/questions")}?${query}`);
-        const payload = await response.json() as { rows?: Array<{ questionId: string | number; title: string; difficulty: number; questionType?: string }> };
-        if (response.ok) setSearchResults((payload.rows ?? []).map((item) => ({ ...item, questionId: String(item.questionId), questionType: item.questionType ?? "PROGRAMMING" })));
+        const payload = await response.json() as { message?: string; rows?: Array<{ questionId: string | number; title: string; difficulty: number; questionType?: string }> };
+        if (!response.ok) throw new Error(payload.message ?? "题库加载失败。");
+        setSearchResults((payload.rows ?? []).map((item) => ({ ...item, questionId: String(item.questionId), questionType: item.questionType ?? "PROGRAMMING" })));
+      } catch (searchError) {
+        setError(searchError instanceof Error ? searchError.message : "题库加载失败。");
       } finally { setSearching(false); }
     }, 250);
     return () => window.clearTimeout(timer);
@@ -75,8 +105,17 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
       setError("当前是前端预览模式，考试改动不会提交到后端。");
       return;
     }
+    const nextFieldErrors = validateExamForm(form);
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors);
+      setError("请先修正标出的考试信息。");
+      const firstField = Object.keys(nextFieldErrors)[0];
+      window.requestAnimationFrame(() => document.querySelector<HTMLElement>(`[name="${firstField}"]`)?.focus());
+      return;
+    }
     setSubmitting(true);
     setError(null);
+    setNotice(null);
 
     try {
       const response = await fetch(adminApiPath("/exams"), {
@@ -84,20 +123,26 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          startTime: toApiValue(form.startTime),
-          latestStartTime: toApiValue(form.latestStartTime || form.endTime),
-          endTime: toApiValue(form.endTime),
+          title: form.title.trim(),
+          startTime: toExamApiDateTime(form.startTime),
+          latestStartTime: toExamApiDateTime(form.latestStartTime),
+          endTime: toExamApiDateTime(form.endTime),
           durationMinutes: Number(form.durationMinutes),
           maxFormalSubmissions: Number(form.maxFormalSubmissions),
-          resultReleaseTime: form.resultReleaseTime ? toApiValue(form.resultReleaseTime) : null
+          resultReleaseTime: form.resultReleaseTime ? toExamApiDateTime(form.resultReleaseTime) : null
         })
       });
-      const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+      const payload = (await response.json().catch(() => null)) as { examId?: string; message?: string; details?: unknown } | null;
       if (!response.ok) {
+        if (applyViolations(payload?.details)) throw new Error("请先修正标出的考试信息。");
         throw new Error(payload?.message ?? "考试保存失败。");
       }
-      router.push(adminInternalPath("/exams"));
-      router.refresh();
+      if (!exam && payload?.examId) {
+        router.push(adminInternalPath(`/exams/${payload.examId}`));
+      } else {
+        setNotice("考试信息已保存。");
+        router.refresh();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "考试保存失败。");
     } finally {
@@ -113,6 +158,7 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
     }
     setSubmitting(true);
     setError(null);
+    setNotice(null);
     try {
       const response = await fetch(`${adminApiPath("/exams")}?examId=${encodeURIComponent(exam.examId)}`, {
         method: "DELETE"
@@ -138,6 +184,7 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
     }
     setSubmitting(true);
     setError(null);
+    setNotice(null);
     try {
       const response = await fetch(adminApiPath("/exams/publish"), {
         method: "PUT",
@@ -148,6 +195,7 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
       if (!response.ok) {
         throw new Error(payload?.message ?? "考试状态更新失败。");
       }
+      setNotice(publish ? "考试已发布。" : "考试已撤回为草稿。");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "考试状态更新失败。");
@@ -167,25 +215,25 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
 
   async function handleSaveComposition() {
     if (!exam?.examId) return;
+    if (composition.some((item) => !Number.isFinite(Number(item.score)) || Number(item.score) <= 0)) {
+      setError("每道题的分值必须大于 0。");
+      return;
+    }
     setSubmitting(true);
     setError(null);
+    setNotice(null);
     try {
       const response = await fetch(adminApiPath("/exams/questions"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           examId: exam.examId,
-          questions: composition.map((item, index) => ({
-            questionId: Number(item.questionId),
-            questionOrder: index + 1,
-            score: Number(item.score),
-            required: item.required,
-            questionType: item.questionType
-          }))
+          questions: buildExamCompositionPayload(composition)
         })
       });
       const payload = (await response.json().catch(() => null)) as { message?: string } | null;
       if (!response.ok) throw new Error(payload?.message ?? "组卷保存失败。");
+      setNotice("题序与配分已保存。");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "组卷保存失败。");
@@ -205,11 +253,12 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
   return (
     <div className="space-y-6">
       <Panel className="p-6">
-        <form className="space-y-5" onSubmit={handleSubmit}>
+        <form className="space-y-5" onSubmit={handleSubmit} noValidate>
           <div className="grid gap-4 md:grid-cols-3">
             <label className="space-y-2 md:col-span-3">
               <span className="text-sm text-[var(--text-secondary)]">考试标题</span>
-              <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} />
+              <Input name="title" required aria-invalid={Boolean(fieldErrors.title)} aria-describedby={fieldErrors.title ? "title-error" : undefined} value={form.title} onChange={(event) => updateField("title", event.target.value)} />
+              {fieldErrors.title ? <span id="title-error" className="block text-xs text-[var(--danger)]">{fieldErrors.title}</span> : null}
             </label>
             <label className="space-y-2 md:col-span-3">
               <span className="text-sm text-[var(--text-secondary)]">考试说明</span>
@@ -217,42 +266,49 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
             </label>
             <label className="space-y-2">
               <span className="text-sm text-[var(--text-secondary)]">开始时间</span>
-              <Input type="datetime-local" value={form.startTime} onChange={(event) => setForm((current) => ({ ...current, startTime: event.target.value }))} />
+              <Input name="startTime" required type="datetime-local" aria-invalid={Boolean(fieldErrors.startTime)} value={form.startTime} onInput={(event) => updateField("startTime", event.currentTarget.value)} />
+              {fieldErrors.startTime ? <span className="block text-xs text-[var(--danger)]">{fieldErrors.startTime}</span> : null}
             </label>
             <label className="space-y-2">
               <span className="text-sm text-[var(--text-secondary)]">最晚入场时间</span>
-              <Input type="datetime-local" value={form.latestStartTime} onChange={(event) => setForm((current) => ({ ...current, latestStartTime: event.target.value }))} />
+              <Input name="latestStartTime" required type="datetime-local" aria-invalid={Boolean(fieldErrors.latestStartTime)} value={form.latestStartTime} onInput={(event) => updateField("latestStartTime", event.currentTarget.value)} />
+              {fieldErrors.latestStartTime ? <span className="block text-xs text-[var(--danger)]">{fieldErrors.latestStartTime}</span> : null}
             </label>
             <label className="space-y-2">
               <span className="text-sm text-[var(--text-secondary)]">结束时间</span>
-              <Input type="datetime-local" value={form.endTime} onChange={(event) => setForm((current) => ({ ...current, endTime: event.target.value }))} />
+              <Input name="endTime" required type="datetime-local" aria-invalid={Boolean(fieldErrors.endTime)} value={form.endTime} onInput={(event) => updateField("endTime", event.currentTarget.value)} />
+              {fieldErrors.endTime ? <span className="block text-xs text-[var(--danger)]">{fieldErrors.endTime}</span> : null}
             </label>
             <label className="space-y-2">
               <span className="text-sm text-[var(--text-secondary)]">个人作答时长（分钟）</span>
-              <Input type="number" min="1" value={form.durationMinutes} onChange={(event) => setForm((current) => ({ ...current, durationMinutes: event.target.value }))} />
+              <Input name="durationMinutes" required type="number" min="1" step="1" aria-invalid={Boolean(fieldErrors.durationMinutes)} value={form.durationMinutes} onChange={(event) => updateField("durationMinutes", event.target.value)} />
+              {fieldErrors.durationMinutes ? <span className="block text-xs text-[var(--danger)]">{fieldErrors.durationMinutes}</span> : null}
             </label>
             <label className="space-y-2">
               <span className="text-sm text-[var(--text-secondary)]">正式提交上限（每题）</span>
-              <Input type="number" min="1" value={form.maxFormalSubmissions} onChange={(event) => setForm((current) => ({ ...current, maxFormalSubmissions: event.target.value }))} />
+              <Input name="maxFormalSubmissions" required type="number" min="1" step="1" aria-invalid={Boolean(fieldErrors.maxFormalSubmissions)} value={form.maxFormalSubmissions} onChange={(event) => updateField("maxFormalSubmissions", event.target.value)} />
+              {fieldErrors.maxFormalSubmissions ? <span className="block text-xs text-[var(--danger)]">{fieldErrors.maxFormalSubmissions}</span> : null}
             </label>
             <label className="space-y-2">
               <span className="text-sm text-[var(--text-secondary)]">显示时区</span>
-              <Input value={form.timezone} onChange={(event) => setForm((current) => ({ ...current, timezone: event.target.value }))} />
+              <Input name="timezone" required aria-invalid={Boolean(fieldErrors.timezone)} value={form.timezone} onChange={(event) => updateField("timezone", event.target.value)} />
+              {fieldErrors.timezone ? <span className="block text-xs text-[var(--danger)]">{fieldErrors.timezone}</span> : null}
             </label>
             <label className="space-y-2">
               <span className="text-sm text-[var(--text-secondary)]">成绩发布策略</span>
-              <select className="h-11 w-full rounded-[8px] border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 text-sm" value={form.resultReleasePolicy} onChange={(event) => setForm((current) => ({ ...current, resultReleasePolicy: event.target.value }))}><option value="MANUAL">教师手动发布</option><option value="SCHEDULED">定时发布</option></select>
+              <select name="resultReleasePolicy" className="h-11 w-full rounded-[8px] border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 text-sm" value={form.resultReleasePolicy} onChange={(event) => updateField("resultReleasePolicy", event.target.value)}><option value="MANUAL">教师手动发布</option><option value="SCHEDULED">定时发布</option></select>
             </label>
-            {form.resultReleasePolicy === "SCHEDULED" ? <label className="space-y-2"><span className="text-sm text-[var(--text-secondary)]">成绩发布时间</span><Input type="datetime-local" value={form.resultReleaseTime} onChange={(event) => setForm((current) => ({ ...current, resultReleaseTime: event.target.value }))} /></label> : null}
+            {form.resultReleasePolicy === "SCHEDULED" ? <label className="space-y-2"><span className="text-sm text-[var(--text-secondary)]">成绩发布时间</span><Input name="resultReleaseTime" required type="datetime-local" aria-invalid={Boolean(fieldErrors.resultReleaseTime)} value={form.resultReleaseTime} onInput={(event) => updateField("resultReleaseTime", event.currentTarget.value)} />{fieldErrors.resultReleaseTime ? <span className="block text-xs text-[var(--danger)]">{fieldErrors.resultReleaseTime}</span> : null}</label> : null}
             <div className="space-y-2">
               <span className="text-sm text-[var(--text-secondary)]">发布状态</span>
               <div className="flex h-11 items-center rounded-[14px] border border-[var(--border-soft)] bg-[var(--surface-2)] px-4 text-sm text-[var(--text-primary)]">
-                {exam?.status === 0 ? "草稿" : exam?.status === 1 ? "已发布" : exam?.status === 2 ? "进行中" : exam?.status === 3 ? "已结束" : exam?.status === 4 ? "成绩已发布" : "已取消"}
+                {!exam || exam.status === 0 ? "草稿" : exam.status === 1 ? "已发布" : exam.status === 2 ? "进行中" : exam.status === 3 ? "已结束" : exam.status === 4 ? "成绩已发布" : "已取消"}
               </div>
             </div>
           </div>
 
           {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
+          {notice ? <p className="text-sm text-[var(--success)]" role="status">{notice}</p> : null}
 
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit" disabled={submitting || Boolean(exam && exam.status !== 0)}>

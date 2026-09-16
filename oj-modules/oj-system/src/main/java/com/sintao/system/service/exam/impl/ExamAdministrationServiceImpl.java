@@ -38,9 +38,14 @@ import com.sintao.system.mapper.exam.ExamMapper;
 import com.sintao.system.mapper.exam.UserExamMapper;
 import com.sintao.system.mapper.exam.IntegrityEventMapper;
 import com.sintao.system.mapper.user.UserMapper;
+import com.sintao.system.manager.ExamCacheManager;
 import com.sintao.system.service.exam.IExamAdministrationService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -56,6 +61,7 @@ import java.util.Set;
 @Service
 public class ExamAdministrationServiceImpl implements IExamAdministrationService {
 
+    private static final Logger log = LoggerFactory.getLogger(ExamAdministrationServiceImpl.class);
     private static final Set<String> AUTHORIZATION_SOURCES = Set.of("MANUAL", "IMPORT");
 
     private final ExamMapper examMapper;
@@ -68,6 +74,7 @@ public class ExamAdministrationServiceImpl implements IExamAdministrationService
     private final ExamVersionQuestionMapper versionQuestionMapper;
     private final ExamAuditEventMapper auditMapper;
     private final IntegrityEventMapper integrityEventMapper;
+    private final ExamCacheManager examCacheManager;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -81,6 +88,7 @@ public class ExamAdministrationServiceImpl implements IExamAdministrationService
                                          ExamVersionQuestionMapper versionQuestionMapper,
                                          ExamAuditEventMapper auditMapper,
                                          IntegrityEventMapper integrityEventMapper,
+                                         ExamCacheManager examCacheManager,
                                          ObjectMapper objectMapper,
                                          Clock clock) {
         this.examMapper = examMapper;
@@ -93,6 +101,7 @@ public class ExamAdministrationServiceImpl implements IExamAdministrationService
         this.versionQuestionMapper = versionQuestionMapper;
         this.auditMapper = auditMapper;
         this.integrityEventMapper = integrityEventMapper;
+        this.examCacheManager = examCacheManager;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -140,6 +149,7 @@ public class ExamAdministrationServiceImpl implements IExamAdministrationService
         }
         audit(exam.getExamId(), actorId, "CANDIDATES_AUTHORIZED", requestId,
                 Map.of("userIds", userIds, "source", source));
+        afterCommit(() -> userIds.forEach(examCacheManager::deleteUserExamList));
         return candidates(examId);
     }
 
@@ -171,6 +181,7 @@ public class ExamAdministrationServiceImpl implements IExamAdministrationService
         userExamMapper.updateById(relation);
         audit(examId, actorId, "CANDIDATE_REVOKED", requestId,
                 Map.of("userId", userId, "reason", reason.trim()));
+        afterCommit(() -> examCacheManager.deleteUserExamList(userId));
     }
 
     @Override
@@ -583,5 +594,26 @@ public class ExamAdministrationServiceImpl implements IExamAdministrationService
 
     private LocalDateTime now() {
         return LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
+    }
+
+    private void afterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            runCacheAction(action);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                runCacheAction(action);
+            }
+        });
+    }
+
+    private void runCacheAction(Runnable action) {
+        try {
+            action.run();
+        } catch (RuntimeException exception) {
+            log.warn("Exam administration transaction committed but cache invalidation failed", exception);
+        }
     }
 }
