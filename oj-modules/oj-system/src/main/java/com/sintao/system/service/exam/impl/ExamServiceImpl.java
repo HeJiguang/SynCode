@@ -13,6 +13,7 @@ import com.github.pagehelper.PageHelper;
 import com.sintao.common.core.constants.Constants;
 import com.sintao.common.core.enums.ExamStatus;
 import com.sintao.common.core.enums.ResultCode;
+import com.sintao.common.core.enums.QuestionType;
 import com.sintao.common.core.utils.ThreadLocalUtil;
 import com.sintao.common.security.exception.ServiceException;
 import com.sintao.system.domain.exam.Exam;
@@ -142,7 +143,7 @@ public class ExamServiceImpl extends ServiceImpl<ExamQuestionMapper, ExamQuestio
         if (CollectionUtil.isEmpty(questions) || questions.size() < questionIds.size()) {
             throw new ServiceException(ResultCode.EXAM_QUESTION_NOT_EXISTS);
         }
-        return saveLegacyExamQuestions(exam, questionIds);
+        return saveLegacyExamQuestions(exam, questions);
     }
 
     @Override
@@ -163,6 +164,8 @@ public class ExamServiceImpl extends ServiceImpl<ExamQuestionMapper, ExamQuestio
             throw validationException(List.of(new ValidationViolationVO(
                     "questions", "exists", "组卷中包含不存在的题目")));
         }
+        Map<Long, Question> questionsById = new HashMap<>();
+        questions.forEach(question -> questionsById.put(question.getQuestionId(), question));
         examQuestionMapper.delete(new LambdaQueryWrapper<ExamQuestion>()
                 .eq(ExamQuestion::getExamId, examId));
         for (ExamQuestionItemDTO item : items) {
@@ -172,7 +175,7 @@ public class ExamServiceImpl extends ServiceImpl<ExamQuestionMapper, ExamQuestio
             relation.setQuestionOrder(item.getQuestionOrder());
             relation.setScore(item.getScore());
             relation.setRequiredFlag(Boolean.FALSE.equals(item.getRequired()) ? 0 : 1);
-            relation.setQuestionType(PROGRAMMING);
+            relation.setQuestionType(QuestionType.from(questionsById.get(item.getQuestionId()).getQuestionType()).name());
             examQuestionMapper.insert(relation);
         }
         return true;
@@ -452,8 +455,8 @@ public class ExamServiceImpl extends ServiceImpl<ExamQuestionMapper, ExamQuestio
             if (item.getScore() == null || item.getScore() <= 0) {
                 violations.add(new ValidationViolationVO(prefix + ".score", "positive", "题目分值必须大于 0"));
             }
-            if (item.getQuestionType() != null && !PROGRAMMING.equals(item.getQuestionType())) {
-                violations.add(new ValidationViolationVO(prefix + ".questionType", "supported", "第一阶段仅支持编程题"));
+            if (item.getQuestionType() != null && !QuestionType.names().contains(item.getQuestionType())) {
+                violations.add(new ValidationViolationVO(prefix + ".questionType", "supported", "不支持该题型"));
             }
         }
         for (int order = 1; order <= items.size(); order++) {
@@ -500,12 +503,23 @@ public class ExamServiceImpl extends ServiceImpl<ExamQuestionMapper, ExamQuestio
                     || question.getContent() == null || question.getContent().isBlank()) {
                 violations.add(new ValidationViolationVO(prefix, "completeStatement", "题目缺少标题或题面"));
             }
-            if (question.getTimeLimit() == null || question.getTimeLimit() <= 0
-                    || question.getSpaceLimit() == null || question.getSpaceLimit() <= 0) {
-                violations.add(new ValidationViolationVO(prefix, "positiveLimits", "题目时间或内存限制无效"));
+            QuestionType type;
+            try {
+                type = QuestionType.from(question.getQuestionType());
+            } catch (IllegalArgumentException exception) {
+                violations.add(new ValidationViolationVO(prefix + ".questionType", "supported", "不支持该题型"));
+                continue;
             }
-            if (!isJsonArray(question.getQuestionCase())) {
-                violations.add(new ValidationViolationVO(prefix + ".judgeCases", "validNonEmptyJson", "题目缺少有效测试数据"));
+            if (type == QuestionType.PROGRAMMING) {
+                if (question.getTimeLimit() == null || question.getTimeLimit() <= 0
+                        || question.getSpaceLimit() == null || question.getSpaceLimit() <= 0) {
+                    violations.add(new ValidationViolationVO(prefix, "positiveLimits", "题目时间或内存限制无效"));
+                }
+                if (!isJsonArray(question.getQuestionCase())) {
+                    violations.add(new ValidationViolationVO(prefix + ".judgeCases", "validNonEmptyJson", "编程题缺少有效测试数据"));
+                }
+            } else if (!isJsonObject(question.getAnswerConfigJson()) || !isJsonObject(question.getGradingConfigJson())) {
+                violations.add(new ValidationViolationVO(prefix + ".config", "validJson", "题型配置或评分配置无效"));
             }
         }
         for (int order = 1; order <= relations.size(); order++) {
@@ -523,7 +537,8 @@ public class ExamServiceImpl extends ServiceImpl<ExamQuestionMapper, ExamQuestio
         snapshot.setQuestionOrder(relation.getQuestionOrder());
         snapshot.setScore(relation.getScore());
         snapshot.setRequiredFlag(relation.getRequiredFlag());
-        snapshot.setQuestionType(PROGRAMMING);
+        QuestionType type = QuestionType.from(question.getQuestionType());
+        snapshot.setQuestionType(type.name());
         snapshot.setTitle(question.getTitle());
         snapshot.setContent(question.getContent());
         snapshot.setTimeLimit(question.getTimeLimit());
@@ -531,9 +546,13 @@ public class ExamServiceImpl extends ServiceImpl<ExamQuestionMapper, ExamQuestio
         snapshot.setQuestionCase(question.getQuestionCase());
         snapshot.setDefaultCode(question.getDefaultCode());
         snapshot.setMainFuc(question.getMainFuc());
-        snapshot.setAllowedLanguagesJson(JAVA_LANGUAGES_JSON);
-        snapshot.setStarterCodeJson(writeJson(Map.of("java", nullToEmpty(question.getDefaultCode()))));
-        snapshot.setJudgeConfigJson(writeJson(Map.of("mode", "STANDARD")));
+        snapshot.setAllowedLanguagesJson(type == QuestionType.PROGRAMMING ? JAVA_LANGUAGES_JSON : "[]");
+        snapshot.setStarterCodeJson(type == QuestionType.PROGRAMMING
+                ? writeJson(Map.of("java", nullToEmpty(question.getDefaultCode()))) : "{}");
+        snapshot.setJudgeConfigJson(type == QuestionType.PROGRAMMING
+                ? writeJson(Map.of("mode", "STANDARD")) : "{}");
+        snapshot.setAnswerConfigJson(question.getAnswerConfigJson());
+        snapshot.setGradingConfigJson(question.getGradingConfigJson());
         snapshot.setSourceUpdateTime(question.getUpdateTime());
         snapshot.setContentHash(hashQuestion(snapshot));
         return snapshot;
@@ -593,6 +612,8 @@ public class ExamServiceImpl extends ServiceImpl<ExamQuestionMapper, ExamQuestio
         canonical.put("defaultCode", question.getDefaultCode());
         canonical.put("mainFuc", question.getMainFuc());
         canonical.put("allowedLanguages", question.getAllowedLanguagesJson());
+        canonical.put("answerConfig", question.getAnswerConfigJson());
+        canonical.put("gradingConfig", question.getGradingConfigJson());
         return DigestUtil.sha256Hex(writeJson(canonical));
     }
 
@@ -650,17 +671,17 @@ public class ExamServiceImpl extends ServiceImpl<ExamQuestionMapper, ExamQuestio
         return questionMapper.selectBatchIds(relations.stream().map(ExamQuestion::getQuestionId).toList());
     }
 
-    private boolean saveLegacyExamQuestions(Exam exam, Set<Long> questionIds) {
+    private boolean saveLegacyExamQuestions(Exam exam, List<Question> questions) {
         int nextOrder = Math.toIntExact(examQuestionMapper.selectCount(
                 new LambdaQueryWrapper<ExamQuestion>().eq(ExamQuestion::getExamId, exam.getExamId()))) + 1;
-        for (Long questionId : questionIds) {
+        for (Question question : questions) {
             ExamQuestion relation = new ExamQuestion();
             relation.setExamId(exam.getExamId());
-            relation.setQuestionId(questionId);
+            relation.setQuestionId(question.getQuestionId());
             relation.setQuestionOrder(nextOrder++);
             relation.setScore(100);
             relation.setRequiredFlag(1);
-            relation.setQuestionType(PROGRAMMING);
+            relation.setQuestionType(QuestionType.from(question.getQuestionType()).name());
             examQuestionMapper.insert(relation);
         }
         return true;
@@ -695,6 +716,15 @@ public class ExamServiceImpl extends ServiceImpl<ExamQuestionMapper, ExamQuestio
         try {
             JsonNode node = objectMapper.readTree(value);
             return node.isArray() && !node.isEmpty();
+        } catch (JsonProcessingException exception) {
+            return false;
+        }
+    }
+
+    private boolean isJsonObject(String value) {
+        if (value == null || value.isBlank()) return false;
+        try {
+            return objectMapper.readTree(value).isObject();
         } catch (JsonProcessingException exception) {
             return false;
         }

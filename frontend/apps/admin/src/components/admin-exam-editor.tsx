@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, LoaderCircle, Plus, Save } from "lucide-react";
+import { ArrowDown, ArrowUp, LoaderCircle, Plus, Save, Search } from "lucide-react";
 
 import { frontendPreviewMode } from "@aioj/config";
 import type { AdminExamDetail } from "../lib/admin-api";
@@ -11,6 +11,13 @@ import { Button, Input, Panel, Textarea } from "@aioj/ui";
 
 type AdminExamEditorProps = {
   exam?: AdminExamDetail;
+};
+
+type SearchQuestion = { questionId: string; title: string; difficulty: number; questionType: string };
+
+const typeLabels: Record<string, string> = {
+  PROGRAMMING: "编程题", SINGLE_CHOICE: "单选题", MULTIPLE_CHOICE: "多选题", TRUE_FALSE: "判断题",
+  FILL_BLANK: "填空题", SHORT_ANSWER: "简答题", SQL: "SQL 题", FILE: "文件题", PROJECT: "项目题"
 };
 
 function toInputValue(value?: string) {
@@ -39,9 +46,28 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
     expectedRowVersion: exam?.rowVersion ?? 0
   });
   const [composition, setComposition] = React.useState(() => exam?.examQuestionList.map((item) => ({ ...item })) ?? []);
-  const [questionIds, setQuestionIds] = React.useState("");
+  const [questionQuery, setQuestionQuery] = React.useState("");
+  const [questionType, setQuestionType] = React.useState("");
+  const [searchResults, setSearchResults] = React.useState<SearchQuestion[]>([]);
+  const [searching, setSearching] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!exam || exam.status !== 0 || frontendPreviewMode) return;
+    const timer = window.setTimeout(async () => {
+      setSearching(true);
+      try {
+        const query = new URLSearchParams();
+        if (questionQuery.trim()) query.set("title", questionQuery.trim());
+        if (questionType) query.set("questionType", questionType);
+        const response = await fetch(`${adminApiPath("/questions")}?${query}`);
+        const payload = await response.json() as { rows?: Array<{ questionId: string | number; title: string; difficulty: number; questionType?: string }> };
+        if (response.ok) setSearchResults((payload.rows ?? []).map((item) => ({ ...item, questionId: String(item.questionId), questionType: item.questionType ?? "PROGRAMMING" })));
+      } finally { setSearching(false); }
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [exam, questionQuery, questionType]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -130,69 +156,13 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
     }
   }
 
-  async function handleAddQuestions() {
-    if (!exam?.examId) return;
-    const questionIdSet = questionIds
-      .split(/[,\s]+/)
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .map((item) => Number(item))
-      .filter((item) => Number.isFinite(item));
-
-    if (questionIdSet.length === 0) {
-      setError("请至少输入一个题目 ID。");
-      return;
-    }
-
-    if (frontendPreviewMode) {
-      setError("当前是前端预览模式，题目关联操作不会提交到后端。");
-      return;
-    }
-
-    setSubmitting(true);
-    setError(null);
-    try {
-      const response = await fetch(adminApiPath("/exams/questions"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ examId: Number(exam.examId), questionIdSet })
-      });
-      const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-      if (!response.ok) {
-        throw new Error(payload?.message ?? "题目关联失败。");
-      }
-      setQuestionIds("");
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "题目关联失败。");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function handleRemoveQuestion(questionId: string) {
-    if (!exam?.examId) return;
-    if (frontendPreviewMode) {
-      setError(`当前是前端预览模式，题目 ${questionId} 的移除操作已禁用。`);
-      return;
-    }
-    setSubmitting(true);
-    setError(null);
-    try {
-      const response = await fetch(
-        `${adminApiPath("/exams/questions")}?examId=${encodeURIComponent(exam.examId)}&questionId=${encodeURIComponent(questionId)}`,
-        { method: "DELETE" }
-      );
-      const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-      if (!response.ok) {
-        throw new Error(payload?.message ?? "题目移除失败。");
-      }
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "题目移除失败。");
-    } finally {
-      setSubmitting(false);
-    }
+  function addQuestion(question: SearchQuestion) {
+    setComposition((current) => current.some((item) => item.questionId === question.questionId) ? current : [...current, {
+      questionId: question.questionId, title: question.title,
+      difficulty: question.difficulty === 1 ? "Easy" : question.difficulty === 3 ? "Hard" : "Medium",
+      questionOrder: current.length + 1, score: question.questionType === "PROGRAMMING" ? 30 : 10,
+      required: true, questionType: question.questionType
+    }]);
   }
 
   async function handleSaveComposition() {
@@ -209,7 +179,8 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
             questionId: Number(item.questionId),
             questionOrder: index + 1,
             score: Number(item.score),
-            required: item.required
+            required: item.required,
+            questionType: item.questionType
           }))
         })
       });
@@ -304,35 +275,35 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
 
       {exam ? (
         <Panel className="p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-4">
             <div>
-              <p className="kicker">Question Binding</p>
-              <h3 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">关联题目</h3>
+              <p className="kicker">试卷题目</p>
+              <h3 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">搜索并组卷</h3>
             </div>
-            <div className="flex w-full max-w-xl gap-3">
-              <Input
-                placeholder="输入题目 ID，多个用逗号分隔"
-                value={questionIds}
-                onChange={(event) => setQuestionIds(event.target.value)}
-              />
-              <Button type="button" onClick={handleAddQuestions} disabled={submitting || exam.status !== 0}>
-                <Plus size={14} />
-                {frontendPreviewMode ? "预览" : "添加"}
-              </Button>
+            {exam.status === 0 ? <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+              <div className="relative"><Search size={16} className="pointer-events-none absolute left-3 top-3.5 text-[var(--text-muted)]" /><Input className="pl-10" placeholder="按标题搜索题库" value={questionQuery} onChange={(event) => setQuestionQuery(event.target.value)} /></div>
+              <select className="h-11 rounded-[8px] border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 text-sm" value={questionType} onChange={(event) => setQuestionType(event.target.value)}><option value="">全部题型</option>{Object.entries(typeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
             </div>
+            : null}
+            {exam.status === 0 ? <div className="max-h-64 overflow-y-auto border-y border-[var(--border-soft)]">
+              {searching ? <p className="py-5 text-sm text-[var(--text-muted)]">正在搜索...</p> : searchResults.map((item) => {
+                const added = composition.some((question) => question.questionId === item.questionId);
+                return <div key={item.questionId} className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-[var(--border-soft)] py-3 last:border-0"><div><p className="text-sm font-medium">{item.title}</p><p className="mt-1 text-xs text-[var(--text-muted)]">{typeLabels[item.questionType] ?? item.questionType} · #{item.questionId}</p></div><Button type="button" size="sm" variant="ghost" disabled={added} onClick={() => addQuestion(item)}><Plus size={14} />{added ? "已加入" : "加入"}</Button></div>;
+              })}
+            </div> : null}
           </div>
 
           <div className="mt-5 space-y-3">
-            {exam.examQuestionList.length > 0 ? (
+            {composition.length > 0 ? (
               composition.map((question, index) => (
                 <div key={question.questionId} className="flex items-center justify-between gap-4 rounded-[18px] border border-[var(--border-soft)] bg-[var(--surface-2)] px-4 py-3">
                   <div>
                     <p className="text-sm font-medium text-[var(--text-primary)]">{question.title}</p>
                     <p className="mt-1 text-xs text-[var(--text-muted)]">
-                      {question.questionId} · {question.difficulty} · 第 {index + 1} 题
+                      {question.questionId} · {typeLabels[question.questionType] ?? question.questionType} · {question.difficulty} · 第 {index + 1} 题
                     </p>
                   </div>
-                  <div className="flex items-center gap-2"><Button type="button" size="sm" variant="ghost" title="上移题目" aria-label="上移题目" onClick={() => moveQuestion(index, -1)} disabled={submitting || exam.status !== 0 || index === 0}><ArrowUp size={14} /></Button><Button type="button" size="sm" variant="ghost" title="下移题目" aria-label="下移题目" onClick={() => moveQuestion(index, 1)} disabled={submitting || exam.status !== 0 || index === composition.length - 1}><ArrowDown size={14} /></Button><label className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><Input className="w-20" type="number" min="1" disabled={exam.status !== 0} value={question.score} onChange={(event) => setComposition((current) => current.map((item) => item.questionId === question.questionId ? { ...item, score: Number(event.target.value) } : item))} />分</label><label className="flex items-center gap-2 text-xs"><input type="checkbox" disabled={exam.status !== 0} checked={question.required} onChange={(event) => setComposition((current) => current.map((item) => item.questionId === question.questionId ? { ...item, required: event.target.checked } : item))} />必答</label><Button type="button" variant="ghost" onClick={() => handleRemoveQuestion(question.questionId)} disabled={submitting || exam.status !== 0}>{frontendPreviewMode ? "预览" : "移除"}</Button></div>
+                  <div className="flex items-center gap-2"><Button type="button" size="sm" variant="ghost" title="上移题目" aria-label="上移题目" onClick={() => moveQuestion(index, -1)} disabled={submitting || exam.status !== 0 || index === 0}><ArrowUp size={14} /></Button><Button type="button" size="sm" variant="ghost" title="下移题目" aria-label="下移题目" onClick={() => moveQuestion(index, 1)} disabled={submitting || exam.status !== 0 || index === composition.length - 1}><ArrowDown size={14} /></Button><label className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><Input className="w-20" type="number" min="1" disabled={exam.status !== 0} value={question.score} onChange={(event) => setComposition((current) => current.map((item) => item.questionId === question.questionId ? { ...item, score: Number(event.target.value) } : item))} />分</label><label className="flex items-center gap-2 text-xs"><input type="checkbox" disabled={exam.status !== 0} checked={question.required} onChange={(event) => setComposition((current) => current.map((item) => item.questionId === question.questionId ? { ...item, required: event.target.checked } : item))} />必答</label><Button type="button" variant="ghost" onClick={() => setComposition((current) => current.filter((item) => item.questionId !== question.questionId))} disabled={submitting || exam.status !== 0}>{frontendPreviewMode ? "预览" : "移除"}</Button></div>
                 </div>
               ))
             ) : (

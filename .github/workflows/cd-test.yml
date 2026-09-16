@@ -101,6 +101,11 @@ jobs:
           {
             echo "NEXT_PUBLIC_SYNCODE_DEMO_LOGIN=1"
             echo "SYNCODE_DEMO_LOGIN_ENABLED=true"
+            echo "NEXT_PUBLIC_SYNCODE_TEST_LOGIN=1"
+            echo "SYNCODE_TEST_LOGIN_ENABLED=true"
+            echo "SYNCODE_TEST_STUDENT_EMAIL=student@syncode.test"
+            echo "SYNCODE_TEST_TEACHER_EMAIL=teacher@syncode.test"
+            echo "SYNCODE_TEST_TEACHER_ACCOUNT=admin"
           } >> "${STACK_ENV_FILE}"
           sed -i "s#sha-REPLACE_ME#${{ steps.source.outputs.image_tag }}#g" "${STACK_ENV_FILE}"
 
@@ -123,6 +128,11 @@ jobs:
         shell: bash
         working-directory: repo
         run: deploy/test/scripts/smoke.sh
+
+      - name: Seed mixed question test exam
+        shell: bash
+        working-directory: repo
+        run: deploy/test/scripts/seed-mixed-exam.sh
 
       - name: Trusted exam end-to-end acceptance
         shell: bash

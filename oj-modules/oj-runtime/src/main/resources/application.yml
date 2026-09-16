@@ -54,13 +54,20 @@ security:
     whites:
       - /actuator/health
       - /system/sysUser/login
+      - /system/sysUser/test-login
       - /friend/user/sendCode
       - /friend/user/code/login
+      - /friend/user/test-login
       - /friend/question/semiLogin/**
       - /friend/exam/semiLogin/**
       - /friend/message/semiLogin/**
 
 syncode:
+  test-login:
+    enabled: ${SYNCODE_TEST_LOGIN_ENABLED:false}
+    student-email: ${SYNCODE_TEST_STUDENT_EMAIL:student@syncode.test}
+    teacher-email: ${SYNCODE_TEST_TEACHER_EMAIL:teacher@syncode.test}
+    teacher-account: ${SYNCODE_TEST_TEACHER_ACCOUNT:admin}
   friend:
     web-socket-path: /friend/ws/judge/result
   runtime:

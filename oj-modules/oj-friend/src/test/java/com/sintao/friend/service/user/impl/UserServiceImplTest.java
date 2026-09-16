@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -57,6 +58,8 @@ class UserServiceImplTest {
         ReflectionTestUtils.setField(userService, "isSend", false);
         ReflectionTestUtils.setField(userService, "secret", "test-secret");
         ReflectionTestUtils.setField(userService, "downloadUrl", "https://cdn.example.com/");
+        ReflectionTestUtils.setField(userService, "testLoginEnabled", false);
+        ReflectionTestUtils.setField(userService, "testStudentEmail", "student@syncode.test");
     }
 
     @Test
@@ -98,5 +101,26 @@ class UserServiceImplTest {
         User insertedUser = userCaptor.getValue();
         assertEquals(email, insertedUser.getEmail());
         assertNull(insertedUser.getPhone());
+    }
+
+    @Test
+    void testLoginShouldRequireSwitchAndExactAllowlist() {
+        assertThrows(RuntimeException.class, () -> userService.testLogin("student@syncode.test"));
+
+        ReflectionTestUtils.setField(userService, "testLoginEnabled", true);
+        assertThrows(RuntimeException.class, () -> userService.testLogin("other@syncode.test"));
+    }
+
+    @Test
+    void testLoginShouldCreateAllowlistedStudent() {
+        ReflectionTestUtils.setField(userService, "testLoginEnabled", true);
+        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(tokenService.createToken(any(), anyString(), any(), any(), any())).thenReturn("test-token");
+
+        assertEquals("test-token", userService.testLogin(" STUDENT@SYNCODE.TEST "));
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userMapper).insert(userCaptor.capture());
+        assertEquals("student@syncode.test", userCaptor.getValue().getEmail());
+        assertEquals("测试学生", userCaptor.getValue().getNickName());
     }
 }

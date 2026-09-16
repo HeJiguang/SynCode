@@ -48,6 +48,12 @@ public class UserController extends BaseController {
         return R.ok(userService.codeLogin(userDTO.getEmail(), userDTO.getCode()));
     }
 
+    @PostMapping("/test-login")
+    @Operation(summary = "测试账号登录", description = "仅在测试环境开启，并只接受配置白名单中的邮箱")
+    public R<String> testLogin(@RequestBody UserDTO userDTO) {
+        return R.ok(userService.testLogin(userDTO.getEmail()));
+    }
+
     @DeleteMapping("/logout")
     @Operation(summary = "退出登录", description = "退出登录并清除服务端 token")
     @Parameter(name = HttpConstants.AUTHENTICATION, in = ParameterIn.HEADER, description = "登录凭证", required = true)

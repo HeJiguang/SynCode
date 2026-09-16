@@ -9,6 +9,8 @@ security:
     whites:
       - /friend/user/sendCode
       - /friend/user/code/login
+      - /friend/user/test-login
+      - /system/sysUser/test-login
       - /friend/question/semiLogin/**
       - /friend/exam/semiLogin/**
       - /friend/message/semiLogin/**

@@ -80,6 +80,12 @@ public class UserServiceImpl implements IUserService {
     @Value("${file.oss.downloadUrl}")
     private String downloadUrl;
 
+    @Value("${syncode.test-login.enabled:false}")
+    private boolean testLoginEnabled;
+
+    @Value("${syncode.test-login.student-email:student@syncode.test}")
+    private String testStudentEmail;
+
     @Override
     public boolean sendCode(UserDTO userDTO) {
         String email = userDTO.getEmail();
@@ -120,10 +126,24 @@ public class UserServiceImpl implements IUserService {
     @Override
     public String codeLogin(String email, String code) {
         checkCode(email, code);
+        return loginOrCreate(email);
+    }
+
+    @Override
+    public String testLogin(String email) {
+        String normalizedEmail = email == null ? "" : email.trim().toLowerCase();
+        if (!testLoginEnabled || !normalizedEmail.equals(testStudentEmail.trim().toLowerCase())) {
+            throw new ServiceException(ResultCode.FAILED_UNAUTHORIZED);
+        }
+        return loginOrCreate(normalizedEmail);
+    }
+
+    private String loginOrCreate(String email) {
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getEmail, email));
         if (user == null) {
             user = new User();
             user.setEmail(email);
+            user.setNickName("测试学生");
             user.setStatus(UserStatus.Normal.getValue());
             user.setCreateBy(Constants.SYSTEM_USER_ID);
             userMapper.insert(user);

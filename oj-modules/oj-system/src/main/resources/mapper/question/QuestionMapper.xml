@@ -9,6 +9,7 @@
             tq.question_id,
             tq.title,
             tq.difficulty,
+            tq.question_type,
             ts.nick_name as create_name,
             tq.create_time
         FROM
@@ -23,6 +24,9 @@
             </if>
             <if test="title !=null and title !='' ">
                 AND title LIKE CONCAT('%',#{title},'%')
+            </if>
+            <if test="questionType !=null and questionType !='' ">
+                AND tq.question_type = #{questionType}
             </if>
             <if test="excludeIdSet !=null and !excludeIdSet.isEmpty()">
                 <foreach collection="excludeIdSet" open=" AND tq.question_id NOT IN( " close=" ) " item="id" separator=",">

@@ -10,6 +10,10 @@ const editor = readFileSync(
   fileURLToPath(new URL("../components/admin-exam-editor.tsx", import.meta.url)),
   "utf8"
 );
+const questionEditor = readFileSync(
+  fileURLToPath(new URL("../components/admin-question-editor.tsx", import.meta.url)),
+  "utf8"
+);
 const route = readFileSync(
   fileURLToPath(new URL("../app/api/trusted-exams/[...segments]/route.ts", import.meta.url)),
   "utf8"
@@ -21,6 +25,7 @@ for (const contract of [
   "grades",
   "results/release",
   "evidence",
+  "gradingRubric",
   "Idempotency-Key"
 ]) {
   assert.ok(operations.includes(contract), `administrator workspace lost contract: ${contract}`);
@@ -33,3 +38,5 @@ for (const contract of ["latestStartTime", "durationMinutes", "resultReleasePoli
 assert.ok(route.includes("/^[a-zA-Z0-9-]+$/"), "administrator BFF must reject unsafe path segments");
 assert.ok(route.includes('"idempotency-key"'), "administrator BFF must forward idempotency keys");
 assert.ok(operations.includes("Array.isArray(nextEvidence)"), "evidence panel must tolerate an empty backend payload");
+assert.ok(operations.includes("评分标准"), "manual grading must show the frozen grading rubric");
+assert.ok(questionEditor.includes("nextOptionId(items)"), "choice editor must not reuse an existing option id");

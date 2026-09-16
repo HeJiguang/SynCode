@@ -14,6 +14,8 @@ public class QuestionQueryDTO extends PageQueryDTO {
 
     private String title;
 
+    private String questionType;
+
     private String excludeIdStr;       //  ;
 
     private Set<Long> excludeIdSet;

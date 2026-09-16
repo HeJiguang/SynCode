@@ -15,6 +15,10 @@ public class ExamAnswer {
     @TableId(value = "answer_id", type = IdType.ASSIGN_ID)
     private Long answerId;
     private Long attemptId;
+    private Long versionQuestionId;
+    private String answerType;
+    private String languageCode;
+    private String answerContent;
     private LocalDateTime frozenTime;
     private LocalDateTime updateTime;
 }

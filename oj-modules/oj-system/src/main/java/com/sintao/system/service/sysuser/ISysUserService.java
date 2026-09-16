@@ -9,6 +9,8 @@ public interface ISysUserService {
 
     R<String> login(String userAccount, String password);
 
+    R<String> testLogin(String email);
+
     boolean logout(String token);
 
     R<LoginUserVO> info(String token);

@@ -16,18 +16,24 @@ import com.sintao.system.domain.exam.ExamAnswer;
 import com.sintao.system.domain.exam.ExamAttempt;
 import com.sintao.system.domain.exam.ExamAuditEvent;
 import com.sintao.system.domain.exam.ExamGrade;
+import com.sintao.system.domain.exam.ExamGradeItem;
+import com.sintao.system.domain.exam.ExamVersionQuestion;
 import com.sintao.system.domain.exam.UserExam;
 import com.sintao.system.domain.exam.IntegrityEvent;
 import com.sintao.system.domain.exam.dto.CandidateAuthorizationDTO;
+import com.sintao.system.domain.exam.dto.ExamGradeReviewDTO;
 import com.sintao.system.domain.exam.vo.ExamCandidateVO;
 import com.sintao.system.domain.exam.vo.ExamGradeVO;
 import com.sintao.system.domain.exam.vo.ExamEvidenceEventVO;
 import com.sintao.system.domain.exam.vo.ExamMonitorVO;
+import com.sintao.system.domain.exam.vo.ExamGradeReviewVO;
 import com.sintao.system.domain.user.User;
 import com.sintao.system.mapper.exam.ExamAnswerMapper;
 import com.sintao.system.mapper.exam.ExamAttemptMapper;
 import com.sintao.system.mapper.exam.ExamAuditEventMapper;
 import com.sintao.system.mapper.exam.ExamGradeMapper;
+import com.sintao.system.mapper.exam.ExamGradeItemMapper;
+import com.sintao.system.mapper.exam.ExamVersionQuestionMapper;
 import com.sintao.system.mapper.exam.ExamMapper;
 import com.sintao.system.mapper.exam.UserExamMapper;
 import com.sintao.system.mapper.exam.IntegrityEventMapper;
@@ -58,6 +64,8 @@ public class ExamAdministrationServiceImpl implements IExamAdministrationService
     private final ExamAttemptMapper attemptMapper;
     private final ExamAnswerMapper answerMapper;
     private final ExamGradeMapper gradeMapper;
+    private final ExamGradeItemMapper gradeItemMapper;
+    private final ExamVersionQuestionMapper versionQuestionMapper;
     private final ExamAuditEventMapper auditMapper;
     private final IntegrityEventMapper integrityEventMapper;
     private final ObjectMapper objectMapper;
@@ -69,6 +77,8 @@ public class ExamAdministrationServiceImpl implements IExamAdministrationService
                                          ExamAttemptMapper attemptMapper,
                                          ExamAnswerMapper answerMapper,
                                          ExamGradeMapper gradeMapper,
+                                         ExamGradeItemMapper gradeItemMapper,
+                                         ExamVersionQuestionMapper versionQuestionMapper,
                                          ExamAuditEventMapper auditMapper,
                                          IntegrityEventMapper integrityEventMapper,
                                          ObjectMapper objectMapper,
@@ -79,6 +89,8 @@ public class ExamAdministrationServiceImpl implements IExamAdministrationService
         this.attemptMapper = attemptMapper;
         this.answerMapper = answerMapper;
         this.gradeMapper = gradeMapper;
+        this.gradeItemMapper = gradeItemMapper;
+        this.versionQuestionMapper = versionQuestionMapper;
         this.auditMapper = auditMapper;
         this.integrityEventMapper = integrityEventMapper;
         this.objectMapper = objectMapper;
@@ -310,6 +322,135 @@ public class ExamAdministrationServiceImpl implements IExamAdministrationService
         examMapper.updateById(exam);
         audit(examId, currentActorId(), "RESULTS_RELEASED", requestId,
                 Map.of("gradeCount", grades.size(), "idempotencyKey", idempotencyKey));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ExamGradeReviewVO grading(Long examId, Long attemptId) {
+        requireExam(examId);
+        ExamAttempt attempt = attemptMapper.selectById(attemptId);
+        if (attempt == null || !Objects.equals(attempt.getExamId(), examId)) {
+            throw new ServiceException(ResultCode.EXAM_ATTEMPT_NOT_FOUND);
+        }
+        ExamGrade grade = gradeMapper.selectOne(new LambdaQueryWrapper<ExamGrade>()
+                .eq(ExamGrade::getAttemptId, attemptId)
+                .eq(ExamGrade::getCurrentFlag, 1));
+        if (grade == null) throw new ServiceException(ResultCode.EXAM_GRADE_NOT_READY);
+
+        List<ExamVersionQuestion> questions = versionQuestionMapper.selectList(
+                new LambdaQueryWrapper<ExamVersionQuestion>()
+                        .eq(ExamVersionQuestion::getVersionId, attempt.getVersionId())
+                        .orderByAsc(ExamVersionQuestion::getQuestionOrder));
+        Map<Long, ExamAnswer> answers = new HashMap<>();
+        answerMapper.selectList(new LambdaQueryWrapper<ExamAnswer>()
+                        .eq(ExamAnswer::getAttemptId, attemptId))
+                .forEach(answer -> answers.put(answer.getVersionQuestionId(), answer));
+        Map<Long, ExamGradeItem> gradeItems = new HashMap<>();
+        gradeItemMapper.selectList(new LambdaQueryWrapper<ExamGradeItem>()
+                        .eq(ExamGradeItem::getGradeId, grade.getGradeId()))
+                .forEach(item -> gradeItems.put(item.getVersionQuestionId(), item));
+
+        ExamGradeReviewVO result = new ExamGradeReviewVO();
+        result.setAttemptId(attemptId);
+        User user = userMapper.selectById(attempt.getUserId());
+        result.setCandidateName(user == null ? String.valueOf(attempt.getUserId())
+                : (user.getNickName() == null ? user.getEmail() : user.getNickName()));
+        result.setStatus(ExamGradeStatus.fromCode(grade.getStatus()).name());
+        result.setTotalScore(grade.getTotalScore());
+        result.setMaxScore(grade.getMaxScore());
+        result.setItems(questions.stream().map(question -> reviewItem(question,
+                answers.get(question.getVersionQuestionId()), gradeItems.get(question.getVersionQuestionId()))).toList());
+        return result;
+    }
+
+    @Override
+    @Transactional
+    public ExamGradeReviewVO reviewGrade(Long examId, Long attemptId, ExamGradeReviewDTO request, String requestId) {
+        requireExam(examId);
+        ExamAttempt attempt = attemptMapper.selectById(attemptId);
+        if (attempt == null || !Objects.equals(attempt.getExamId(), examId)
+                || ExamAttemptStatus.fromCode(attempt.getStatus()) == ExamAttemptStatus.IN_PROGRESS) {
+            throw new ServiceException(ResultCode.EXAM_ATTEMPT_NOT_FOUND);
+        }
+        ExamGrade grade = gradeMapper.selectOne(new LambdaQueryWrapper<ExamGrade>()
+                .eq(ExamGrade::getAttemptId, attemptId).eq(ExamGrade::getCurrentFlag, 1));
+        if (grade == null || ExamGradeStatus.fromCode(grade.getStatus()) == ExamGradeStatus.RELEASED) {
+            throw new ServiceException(ResultCode.EXAM_STATE_CONFLICT);
+        }
+        List<ExamGradeItem> items = gradeItemMapper.selectList(new LambdaQueryWrapper<ExamGradeItem>()
+                .eq(ExamGradeItem::getGradeId, grade.getGradeId()));
+        Map<Long, ExamGradeReviewDTO.Item> submitted = new HashMap<>();
+        if (request != null && request.getItems() != null) {
+            request.getItems().forEach(item -> {
+                if (item != null && item.getVersionQuestionId() != null) submitted.put(item.getVersionQuestionId(), item);
+            });
+        }
+        LocalDateTime now = now();
+        long actorId = currentActorId();
+        for (ExamGradeItem item : items) {
+            if (!"MANUAL".equals(item.getGradingMode())) continue;
+            ExamGradeReviewDTO.Item reviewed = submitted.get(item.getVersionQuestionId());
+            if (reviewed == null || reviewed.getAwardedScore() == null || reviewed.getAwardedScore() < 0
+                    || reviewed.getAwardedScore() > item.getMaxScore()) {
+                throw new ServiceException(ResultCode.FAILED_PARAMS_VALIDATE);
+            }
+            item.setAwardedScore(reviewed.getAwardedScore());
+            item.setFeedback(trimTo(reviewed.getFeedback(), 1000));
+            item.setAdjustmentReason("MANUAL_REVIEW");
+            item.setUpdateBy(actorId);
+            item.setUpdateTime(now);
+            gradeItemMapper.updateById(item);
+        }
+        int total = items.stream().mapToInt(item -> item.getAwardedScore() == null ? 0 : item.getAwardedScore()).sum();
+        grade.setTotalScore(total);
+        grade.setStatus(ExamGradeStatus.READY.getCode());
+        grade.setCalculationSource(items.stream().anyMatch(item -> "AUTO".equals(item.getGradingMode())) ? "MIXED" : "MANUAL");
+        grade.setCalculatedTime(now);
+        grade.setUpdateBy(actorId);
+        grade.setUpdateTime(now);
+        gradeMapper.updateById(grade);
+        audit(examId, actorId, "GRADE_REVIEWED", requestId,
+                Map.of("attemptId", attemptId, "totalScore", total, "maxScore", grade.getMaxScore()));
+        return grading(examId, attemptId);
+    }
+
+    private ExamGradeReviewVO.Item reviewItem(ExamVersionQuestion question, ExamAnswer answer, ExamGradeItem gradeItem) {
+        ExamGradeReviewVO.Item result = new ExamGradeReviewVO.Item();
+        result.setVersionQuestionId(question.getVersionQuestionId());
+        result.setQuestionOrder(question.getQuestionOrder());
+        result.setTitle(question.getTitle());
+        result.setQuestionType(question.getQuestionType());
+        result.setMaxScore(question.getScore());
+        result.setGradingRubric(gradingRubric(question.getGradingConfigJson()));
+        if (answer != null) {
+            result.setAnswerType(answer.getAnswerType());
+            result.setLanguage(answer.getLanguageCode());
+            result.setAnswerContent(answer.getAnswerContent());
+        }
+        if (gradeItem != null) {
+            result.setAwardedScore(gradeItem.getAwardedScore());
+            result.setGradingMode(gradeItem.getGradingMode());
+            result.setFeedback(gradeItem.getFeedback());
+        } else {
+            result.setAwardedScore(0);
+            result.setGradingMode("MANUAL");
+        }
+        return result;
+    }
+
+    private String gradingRubric(String gradingConfigJson) {
+        if (gradingConfigJson == null || gradingConfigJson.isBlank()) return null;
+        try {
+            String rubric = objectMapper.readTree(gradingConfigJson).path("rubric").asText().trim();
+            return rubric.isEmpty() ? null : rubric;
+        } catch (Exception exception) {
+            return null;
+        }
+    }
+
+    private String trimTo(String value, int maxLength) {
+        if (value == null) return null;
+        return value.substring(0, Math.min(maxLength, value.length()));
     }
 
     @Override

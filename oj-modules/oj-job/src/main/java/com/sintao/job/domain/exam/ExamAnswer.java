@@ -16,6 +16,7 @@ public class ExamAnswer {
     private Long answerId;
     private Long attemptId;
     private Long versionQuestionId;
+    private String answerContent;
     private Long latestAcceptedSubmitId;
     private LocalDateTime frozenTime;
     private LocalDateTime updateTime;

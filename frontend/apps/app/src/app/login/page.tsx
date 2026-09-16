@@ -4,7 +4,7 @@ import * as React from "react";
 import { CheckCircle2, Database } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import { frontendDemoLoginEnabled, frontendPreviewMode } from "@aioj/config";
+import { frontendDemoLoginEnabled, frontendPreviewMode, frontendTestLoginEnabled, testStudentEmail } from "@aioj/config";
 import { clearBrowserAccessToken, setBrowserAccessToken } from "@aioj/api";
 import { Button, Input, Panel } from "@aioj/ui";
 import { appApiPath, appInternalPath } from "../../lib/paths";
@@ -970,6 +970,27 @@ export default function LoginPage() {
     }
   }
 
+  async function testLogin() {
+    setLoading(true);
+    setStatus(null);
+    try {
+      const response = await fetch(appApiPath("/auth/test-login"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message ?? "测试账号登录失败。");
+      setBrowserAccessToken(payload.token);
+      router.push(appInternalPath("/"));
+      router.refresh();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "测试账号登录失败。");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function enterDemo() {
     setLoading(true);
     setStatus(null);
@@ -1059,6 +1080,21 @@ export default function LoginPage() {
                 <Button className="w-full" disabled={loading || !email || !code} size="lg" onClick={login}>
                   登录并进入工作台
                 </Button>
+
+                {frontendTestLoginEnabled ? (
+                  <div className="flex flex-col gap-2 border-t border-[var(--border-soft)] pt-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+                    <button
+                      type="button"
+                      className="text-left text-[var(--text-muted)] underline decoration-[var(--border-strong)] underline-offset-4"
+                      onClick={() => setEmail(testStudentEmail)}
+                    >
+                      测试学生：{testStudentEmail}
+                    </button>
+                    <Button size="sm" variant="ghost" disabled={loading || !email} onClick={() => void testLogin()}>
+                      邮箱直登
+                    </Button>
+                  </div>
+                ) : null}
 
                 {frontendDemoLoginEnabled ? (
                   <>

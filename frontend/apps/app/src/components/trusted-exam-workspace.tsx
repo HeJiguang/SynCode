@@ -27,17 +27,26 @@ export type Question = {
   questionOrder: number;
   score: number;
   required: boolean;
+  questionType?: string;
   title: string;
   content: string;
   timeLimit: number;
   spaceLimit: number;
   allowedLanguages: string[];
   starterCode: Record<string, string>;
+  answerConfig?: {
+    options?: Array<{ id: string; label: string }>;
+    blankCount?: number;
+    acceptedFormats?: string[];
+    maxSizeKb?: number;
+    requireRepositoryUrl?: boolean;
+  };
 };
 
 export type Answer = {
   answerId?: string;
   versionQuestionId: string;
+  answerType?: string;
   language: string;
   content: string;
   answerVersion: number;
@@ -65,6 +74,65 @@ type ExamResult = {
 };
 
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "offline" | "conflict";
+
+const questionTypeLabels: Record<string, string> = {
+  PROGRAMMING: "编程题", SINGLE_CHOICE: "单选题", MULTIPLE_CHOICE: "多选题", TRUE_FALSE: "判断题",
+  FILL_BLANK: "填空题", SHORT_ANSWER: "简答题", SQL: "SQL 题", FILE: "文件题", PROJECT: "项目题"
+};
+
+function answerTypeFor(questionType = "PROGRAMMING") {
+  if (questionType === "PROGRAMMING") return "CODE";
+  if (["SINGLE_CHOICE", "MULTIPLE_CHOICE"].includes(questionType)) return "CHOICE";
+  if (questionType === "TRUE_FALSE") return "BOOLEAN";
+  if (questionType === "SQL") return "SQL";
+  if (questionType === "FILE") return "FILE";
+  if (questionType === "PROJECT") return "PROJECT";
+  return "TEXT";
+}
+
+function initialAnswerContent(question: Question) {
+  const type = question.questionType ?? "PROGRAMMING";
+  if (type === "PROGRAMMING") return question.starterCode.java ?? "";
+  if (["SINGLE_CHOICE", "MULTIPLE_CHOICE", "FILL_BLANK"].includes(type)) return "[]";
+  if (type === "TRUE_FALSE") return JSON.stringify("true");
+  if (["FILE", "PROJECT"].includes(type)) return "{}";
+  return "";
+}
+
+function parseAnswer<T>(content: string | undefined, fallback: T): T {
+  try { return content ? JSON.parse(content) as T : fallback; } catch { return fallback; }
+}
+
+function MixedAnswerEditor({ question, answer, disabled, onChange }: {
+  question: Question; answer?: Answer; disabled: boolean; onChange: (content: string) => void;
+}) {
+  const type = question.questionType ?? "PROGRAMMING";
+  const content = answer?.content ?? initialAnswerContent(question);
+  if (type === "PROGRAMMING") return <textarea aria-label="代码编辑器" spellCheck={false} readOnly={disabled} value={content} onChange={(event) => onChange(event.target.value)} className="min-h-[360px] w-full resize-none bg-[#101418] p-5 font-mono text-sm leading-7 text-[#e8edf2] outline-none" />;
+  if (["SINGLE_CHOICE", "MULTIPLE_CHOICE"].includes(type)) {
+    const selected = parseAnswer<string[]>(content, []);
+    return <div className="space-y-2 overflow-auto p-5">{(question.answerConfig?.options ?? []).map((option) => <label key={option.id} className="flex cursor-pointer items-start gap-3 border-b border-[var(--border-soft)] py-4"><input className="mt-1" type={type === "SINGLE_CHOICE" ? "radio" : "checkbox"} name={`answer-${question.versionQuestionId}`} disabled={disabled} checked={selected.includes(option.id)} onChange={() => onChange(JSON.stringify(type === "SINGLE_CHOICE" ? [option.id] : selected.includes(option.id) ? selected.filter((id) => id !== option.id) : [...selected, option.id]))} /><span><strong className="mr-2 font-mono text-sm">{option.id}</strong>{option.label}</span></label>)}</div>;
+  }
+  if (type === "TRUE_FALSE") {
+    const selected = parseAnswer<string>(content, "true");
+    return <div className="grid gap-3 p-5 sm:grid-cols-2">{[["true", "正确"], ["false", "错误"]].map(([value, label]) => <label key={value} className="flex cursor-pointer items-center gap-3 border border-[var(--border-soft)] p-4"><input type="radio" name={`answer-${question.versionQuestionId}`} checked={selected === value} disabled={disabled} onChange={() => onChange(JSON.stringify(value))} />{label}</label>)}</div>;
+  }
+  if (type === "FILL_BLANK") {
+    const values = parseAnswer<string[]>(content, []);
+    const count = Math.max(1, Number(question.answerConfig?.blankCount ?? 1));
+    return <div className="space-y-4 overflow-auto p-5">{Array.from({ length: count }, (_, index) => <label key={index} className="block space-y-2"><span className="text-sm text-[var(--text-secondary)]">第 {index + 1} 空</span><input className="h-11 w-full border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 outline-none" disabled={disabled} value={values[index] ?? ""} onChange={(event) => { const next = Array.from({ length: count }, (_, itemIndex) => values[itemIndex] ?? ""); next[index] = event.target.value; onChange(JSON.stringify(next)); }} /></label>)}</div>;
+  }
+  if (type === "FILE") {
+    const file = parseAnswer<{ name?: string; size?: number; dataUrl?: string }>(content, {});
+    const maxSizeKb = Number(question.answerConfig?.maxSizeKb ?? 200);
+    return <div className="space-y-4 p-5"><input type="file" disabled={disabled} accept={(question.answerConfig?.acceptedFormats ?? []).join(",")} onChange={(event) => { const selected = event.target.files?.[0]; if (!selected) return; if (selected.size > maxSizeKb * 1024) { event.target.value = ""; return; } const reader = new FileReader(); reader.onload = () => onChange(JSON.stringify({ name: selected.name, size: selected.size, type: selected.type, dataUrl: reader.result })); reader.readAsDataURL(selected); }} /><p className="text-sm text-[var(--text-muted)]">{file.name ? `已选择 ${file.name} (${Math.ceil((file.size ?? 0) / 1024)} KB)` : `文件上限 ${maxSizeKb} KB`}</p></div>;
+  }
+  if (type === "PROJECT") {
+    const value = parseAnswer<{ repositoryUrl?: string; description?: string }>(content, {});
+    return <div className="space-y-4 p-5"><label className="block space-y-2"><span className="text-sm text-[var(--text-secondary)]">代码仓库或作品地址</span><input className="h-11 w-full border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 outline-none" type="url" disabled={disabled} value={value.repositoryUrl ?? ""} onChange={(event) => onChange(JSON.stringify({ ...value, repositoryUrl: event.target.value }))} /></label><label className="block space-y-2"><span className="text-sm text-[var(--text-secondary)]">项目说明</span><textarea className="min-h-56 w-full resize-y border border-[var(--border-soft)] bg-[var(--surface-2)] p-4 outline-none" disabled={disabled} value={value.description ?? ""} onChange={(event) => onChange(JSON.stringify({ ...value, description: event.target.value }))} /></label></div>;
+  }
+  return <textarea aria-label={type === "SQL" ? "SQL 答案" : "文本答案"} spellCheck={type !== "SQL"} readOnly={disabled} value={content} onChange={(event) => onChange(event.target.value)} className={`min-h-[360px] w-full resize-none bg-[var(--surface-2)] p-5 text-sm leading-7 outline-none ${type === "SQL" ? "font-mono" : ""}`} placeholder={type === "SQL" ? "输入 SQL 语句" : "输入你的答案"} />;
+}
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -173,8 +241,9 @@ export function TrustedExamWorkspace({ examId, demoMode = false }: { examId: str
       const local = window.localStorage.getItem(`syncode-exam-draft:${next.attemptId}:${question.versionQuestionId}`);
       const base = serverAnswer ?? {
         versionQuestionId: question.versionQuestionId,
+        answerType: answerTypeFor(question.questionType),
         language: question.allowedLanguages[0] ?? "java",
-        content: question.starterCode.java ?? "",
+        content: initialAnswerContent(question),
         answerVersion: 0,
         frozen: false
       };
@@ -295,7 +364,7 @@ export function TrustedExamWorkspace({ examId, demoMode = false }: { examId: str
         : await api<Answer>(`attempts/${attemptId}/answers/${questionId}`, {
             method: "PUT",
             body: JSON.stringify({
-              answerType: "CODE",
+              answerType: answer.answerType ?? "CODE",
               language: answer.language,
               content: answer.content,
               expectedVersion: answer.answerVersion
@@ -366,7 +435,7 @@ export function TrustedExamWorkspace({ examId, demoMode = false }: { examId: str
     }
   }
 
-  function updateCode(content: string) {
+  function updateAnswer(content: string) {
     if (!attempt || !activeQuestion || !activeAnswer) return;
     draftsRef.current = {
       ...draftsRef.current,
@@ -493,14 +562,14 @@ export function TrustedExamWorkspace({ examId, demoMode = false }: { examId: str
 
   return <div className="grid h-full min-h-0 grid-rows-[auto_1fr] bg-[var(--bg)]">
     <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-soft)] bg-[var(--surface-2)] px-4 py-3 md:px-6">
-      <div className="min-w-0"><div className="flex items-center gap-2"><p className="truncate text-sm font-semibold">{attempt.title}</p>{demoMode ? <Tag>体验卷</Tag> : null}</div><p className="mt-1 text-xs text-[var(--text-muted)]">{demoMode ? "本地体验计时" : "服务端计时"} · {attempt.questions.length} 题 · 100 分</p></div>
+      <div className="min-w-0"><div className="flex items-center gap-2"><p className="truncate text-sm font-semibold">{attempt.title}</p>{demoMode ? <Tag>体验卷</Tag> : null}</div><p className="mt-1 text-xs text-[var(--text-muted)]">{demoMode ? "本地体验计时" : "服务端计时"} · {attempt.questions.length} 题 · {attempt.questions.reduce((sum, question) => sum + question.score, 0)} 分</p></div>
       <div className="flex items-center gap-2"><div className="flex h-9 items-center gap-2 rounded-[8px] border border-[var(--border-soft)] bg-[var(--surface-3)] px-3 font-mono text-sm"><Clock3 size={15} />{formatRemaining(remaining)}</div><Button size="sm" variant="secondary" onClick={() => void finalize()} disabled={busy || terminal}><Send size={14} />交卷</Button></div>
     </header>
     {terminal ? <div className="flex items-center justify-center overflow-auto p-6"><Panel className="w-full max-w-xl p-8 text-center"><CheckCircle2 size={36} className="mx-auto text-[var(--success)]" /><h1 className="mt-4 text-2xl font-semibold">交卷已确认</h1><p className="mt-3 text-sm text-[var(--text-secondary)]">{formatDateTime(attempt.submittedAt)}</p>{demoMode ? <div className="mt-5"><p className="text-sm leading-7 text-[var(--text-muted)]">体验流程已经完成。本次作答只保存在当前浏览器，没有执行真实判题，也不会计入成绩。</p><Button className="mt-4" size="sm" variant="secondary" onClick={resetDemo}><RefreshCw size={14} />重新体验</Button></div> : result ? <div className="mt-6 border-t border-[var(--border-soft)] pt-6"><p className="text-sm text-[var(--text-muted)]">最终成绩</p><p className="mt-2 text-4xl font-semibold">{result.totalScore}<span className="text-lg text-[var(--text-muted)]"> / {result.maxScore}</span></p></div> : <div className="mt-5"><p className="text-sm text-[var(--text-muted)]">成绩将在教师发布后显示。</p><Button className="mt-4" size="sm" variant="secondary" onClick={() => void loadResult(attempt.attemptId)}><RefreshCw size={14} />刷新成绩</Button></div>}</Panel></div> :
       <div className="grid min-h-0 overflow-auto lg:grid-cols-[220px_minmax(0,0.85fr)_minmax(420px,1.15fr)] lg:overflow-hidden">
         <aside className="border-b border-[var(--border-soft)] bg-[var(--surface-2)] p-3 lg:overflow-auto lg:border-b-0 lg:border-r"><p className="px-2 py-2 text-xs font-semibold text-[var(--text-muted)]">题目导航</p><div className="flex gap-1 overflow-x-auto lg:block lg:space-y-1">{attempt.questions.map((question) => { const answer = drafts[question.versionQuestionId]; const selected = question.versionQuestionId === activeQuestion?.versionQuestionId; return <button key={question.versionQuestionId} aria-current={selected ? "step" : undefined} onClick={() => setActiveId(question.versionQuestionId)} className={`flex min-w-[190px] items-center gap-3 rounded-[8px] px-3 py-3 text-left text-sm lg:w-full lg:min-w-0 ${selected ? "bg-[var(--surface-1)]" : "text-[var(--text-secondary)] hover:bg-[var(--surface-3)]"}`}><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--border-soft)] font-mono text-xs">{answer?.answerVersion > 0 ? <Check size={13} /> : question.questionOrder}</span><span className="min-w-0 flex-1 truncate">{question.title}</span><span className="text-xs text-[var(--text-muted)]">{question.score}</span></button>; })}</div></aside>
-        <main className="border-b border-[var(--border-soft)] p-5 md:p-6 lg:overflow-auto lg:border-b-0 lg:border-r"><div className="flex flex-wrap gap-2"><Tag tone="accent">第 {activeQuestion?.questionOrder} 题</Tag><Tag>{activeQuestion?.score} 分</Tag>{activeQuestion?.required ? <Tag tone="warning">必答</Tag> : null}</div><h1 className="mt-4 text-2xl font-semibold">{activeQuestion?.title}</h1><div className="mt-6 whitespace-pre-wrap text-sm leading-8 text-[var(--text-secondary)]">{activeQuestion?.content}</div><div className="mt-8 flex gap-4 border-t border-[var(--border-soft)] pt-4 text-xs text-[var(--text-muted)]"><span>时间 {activeQuestion?.timeLimit} ms</span><span>内存 {activeQuestion?.spaceLimit} KB</span></div></main>
-        <section className="grid min-h-[520px] grid-rows-[auto_1fr_auto] bg-[var(--surface-1)] lg:min-h-0"><div className="flex items-center justify-between border-b border-[var(--border-soft)] px-4 py-3"><div className="flex items-center gap-2 text-sm font-medium"><FileCode2 size={15} />Java</div><div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">{saveState === "saving" ? <LoaderCircle size={13} className="animate-spin" /> : saveState === "offline" || saveState === "conflict" ? <CloudOff size={13} /> : <Cloud size={13} />}{saveState === "dirty" ? "待保存" : saveState === "saving" ? "保存中" : saveState === "offline" ? "网络异常" : saveState === "conflict" ? "版本冲突" : demoMode ? "已保存到本机" : "已保存"}</div></div><textarea aria-label="代码编辑器" spellCheck={false} readOnly={busy} value={activeAnswer?.content ?? ""} onChange={(event) => updateCode(event.target.value)} className="min-h-[360px] w-full resize-none bg-[#101418] p-5 font-mono text-sm leading-7 text-[#e8edf2] outline-none" /><div className="border-t border-[var(--border-soft)] p-4">{error ? <p className="mb-3 flex items-center gap-2 text-sm text-[var(--danger)]"><AlertTriangle size={14} />{error}</p> : null}{notice ? <p className="mb-3 text-sm text-[var(--success)]">{notice}</p> : null}<div className="flex flex-wrap justify-between gap-3"><div className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><LockKeyhole size={13} />{demoMode ? "体验操作不会发送到判题服务" : "正式提交使用当前已保存版本"}</div><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={busy} onClick={() => void submit("RUN")}><Play size={14} />运行</Button><Button size="sm" disabled={busy} onClick={() => void submit("FORMAL")}><Send size={14} />提交</Button></div></div></div></section>
+        <main className="border-b border-[var(--border-soft)] p-5 md:p-6 lg:overflow-auto lg:border-b-0 lg:border-r"><div className="flex flex-wrap gap-2"><Tag tone="accent">第 {activeQuestion?.questionOrder} 题</Tag><Tag>{activeQuestion?.score} 分</Tag>{activeQuestion ? <Tag>{questionTypeLabels[activeQuestion.questionType ?? "PROGRAMMING"]}</Tag> : null}{activeQuestion?.required ? <Tag tone="warning">必答</Tag> : null}</div><h1 className="mt-4 text-2xl font-semibold">{activeQuestion?.title}</h1><div className="mt-6 whitespace-pre-wrap text-sm leading-8 text-[var(--text-secondary)]">{activeQuestion?.content}</div>{(activeQuestion?.questionType ?? "PROGRAMMING") === "PROGRAMMING" ? <div className="mt-8 flex gap-4 border-t border-[var(--border-soft)] pt-4 text-xs text-[var(--text-muted)]"><span>时间 {activeQuestion?.timeLimit} ms</span><span>内存 {activeQuestion?.spaceLimit} KB</span></div> : null}</main>
+        <section className="grid min-h-[520px] grid-rows-[auto_1fr_auto] bg-[var(--surface-1)] lg:min-h-0"><div className="flex items-center justify-between border-b border-[var(--border-soft)] px-4 py-3"><div className="flex items-center gap-2 text-sm font-medium"><FileCode2 size={15} />{activeQuestion ? questionTypeLabels[activeQuestion.questionType ?? "PROGRAMMING"] : "作答"}</div><div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">{saveState === "saving" ? <LoaderCircle size={13} className="animate-spin" /> : saveState === "offline" || saveState === "conflict" ? <CloudOff size={13} /> : <Cloud size={13} />}{saveState === "dirty" ? "待保存" : saveState === "saving" ? "保存中" : saveState === "offline" ? "网络异常" : saveState === "conflict" ? "版本冲突" : demoMode ? "已保存到本机" : "已保存"}</div></div>{activeQuestion ? <MixedAnswerEditor question={activeQuestion} answer={activeAnswer} disabled={busy} onChange={updateAnswer} /> : null}<div className="border-t border-[var(--border-soft)] p-4">{error ? <p className="mb-3 flex items-center gap-2 text-sm text-[var(--danger)]"><AlertTriangle size={14} />{error}</p> : null}{notice ? <p className="mb-3 text-sm text-[var(--success)]">{notice}</p> : null}<div className="flex flex-wrap justify-between gap-3"><div className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><LockKeyhole size={13} />{(activeQuestion?.questionType ?? "PROGRAMMING") === "PROGRAMMING" ? demoMode ? "体验操作不会发送到判题服务" : "正式提交使用当前已保存版本" : "答案会自动保存，交卷后进入统一评分"}</div>{(activeQuestion?.questionType ?? "PROGRAMMING") === "PROGRAMMING" ? <div className="flex gap-2"><Button size="sm" variant="secondary" disabled={busy} onClick={() => void submit("RUN")}><Play size={14} />运行</Button><Button size="sm" disabled={busy} onClick={() => void submit("FORMAL")}><Send size={14} />提交</Button></div> : <Button size="sm" variant="secondary" disabled={busy || saveState !== "dirty"} onClick={() => void saveActive()}><Cloud size={14} />保存答案</Button>}</div></div></section>
       </div>}
   </div>;
 }

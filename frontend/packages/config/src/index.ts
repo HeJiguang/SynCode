@@ -2,6 +2,9 @@ export const productName = "SynCode";
 export const productTagline = "编程训练与题库平台";
 export const frontendPreviewMode = process.env.NEXT_PUBLIC_SYNCODE_PREVIEW_MODE === "1";
 export const frontendDemoLoginEnabled = process.env.NEXT_PUBLIC_SYNCODE_DEMO_LOGIN === "1";
+export const frontendTestLoginEnabled = process.env.NEXT_PUBLIC_SYNCODE_TEST_LOGIN === "1";
+export const testStudentEmail = "student@syncode.test";
+export const testTeacherEmail = "teacher@syncode.test";
 export const frontendPreviewLabel = "Preview Mode";
 
 export const githubUrl = "https://github.com/HeJiguang/SynCode";

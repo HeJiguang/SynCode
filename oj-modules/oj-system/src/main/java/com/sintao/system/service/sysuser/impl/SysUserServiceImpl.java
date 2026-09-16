@@ -41,6 +41,15 @@ public class SysUserServiceImpl implements ISysUserService {
     @Value("${jwt.secret}")
     private String secret;
 
+    @Value("${syncode.test-login.enabled:false}")
+    private boolean testLoginEnabled;
+
+    @Value("${syncode.test-login.teacher-email:teacher@syncode.test}")
+    private String testTeacherEmail;
+
+    @Value("${syncode.test-login.teacher-account:admin}")
+    private String testTeacherAccount;
+
     @Override
     public R<String> login(String userAccount, String password) {
         LambdaQueryWrapper<SysUser> queryWrapper = new LambdaQueryWrapper<>();
@@ -60,6 +69,21 @@ public class SysUserServiceImpl implements ISysUserService {
             ));
         }
         return R.fail(ResultCode.FAILED_LOGIN);
+    }
+
+    @Override
+    public R<String> testLogin(String email) {
+        String normalizedEmail = email == null ? "" : email.trim().toLowerCase();
+        if (!testLoginEnabled || !normalizedEmail.equals(testTeacherEmail.trim().toLowerCase())) {
+            return R.fail(ResultCode.FAILED_UNAUTHORIZED);
+        }
+        SysUser sysUser = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getUserAccount, testTeacherAccount));
+        if (sysUser == null) {
+            return R.fail(ResultCode.FAILED_USER_NOT_EXISTS);
+        }
+        return R.ok(tokenService.createToken(
+                sysUser.getUserId(), secret, UserIdentity.ADMIN.getValue(), sysUser.getNickName(), null));
     }
 
     @Override
