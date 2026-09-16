@@ -19,6 +19,8 @@ for (const contract of [
   "attempts/${attempt.attemptId}/integrity-events",
   "attempts/${attempt.attemptId}/finalize",
   "window.localStorage",
+  "runtimeCrypto?.getRandomValues",
+  "createClientId()",
   "for (const question of attempt.questions)"
 ]) {
   assert.ok(workspace.includes(contract), `candidate workspace lost contract: ${contract}`);

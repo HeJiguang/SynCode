@@ -116,6 +116,10 @@ jobs:
           mvn --batch-mode -f deploy/migrations/pom.xml flyway:migrate
           mvn --batch-mode -f deploy/migrations/pom.xml flyway:validate
 
+      - name: Reclaim dangling Docker images
+        shell: bash
+        run: docker image prune --force
+
       - name: Build and deploy test stack
         shell: bash
         working-directory: repo
