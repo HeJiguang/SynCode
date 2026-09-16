@@ -10,6 +10,7 @@
             e.title,
             e.start_time,
             e.end_time,
+            e.timezone,
             e.duration_minutes,
             e.status,
             CASE

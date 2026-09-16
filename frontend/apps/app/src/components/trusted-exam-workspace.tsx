@@ -6,6 +6,7 @@ import {
   LoaderCircle, LockKeyhole, Play, RefreshCw, Send, ShieldCheck
 } from "lucide-react";
 import { Button, Panel, Tag } from "@aioj/ui";
+import { formatUtcDateTimeInZone } from "@aioj/api";
 
 import { createDemoExamAccess, createDemoExamAttempt, type DemoExamLifecycle } from "./demo-trusted-exam";
 import { appApiPath } from "../lib/paths";
@@ -16,6 +17,7 @@ export type Access = {
   serverNow: string;
   startAt: string;
   latestStartAt: string;
+  timezone: string;
   durationMinutes: number;
   privacyNotice: string;
   canStart: boolean;
@@ -62,6 +64,7 @@ export type Attempt = {
   serverNow: string;
   deadlineAt: string;
   submittedAt?: string;
+  timezone: string;
   questions: Question[];
   answers: Answer[];
 };
@@ -185,17 +188,8 @@ function formatRemaining(milliseconds: number) {
     .join(":");
 }
 
-function formatDateTime(value?: string) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false
-  }).format(date);
+function formatDateTime(value: string | undefined, timezone = "Asia/Shanghai") {
+  return formatUtcDateTimeInZone(value, timezone, { includeYear: false });
 }
 
 function demoStateKey(examId: string) {
@@ -561,8 +555,8 @@ export function TrustedExamWorkspace({ examId, demoMode = false }: { examId: str
             <div className="min-w-0"><p className="kicker">考试进入检查</p><h1 className="mt-2 text-3xl font-semibold">{access?.title ?? "无法进入考试"}</h1><p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">{access?.description}</p></div>
           </div>
           {access ? <div className="mt-7 grid gap-3 md:grid-cols-3">
-            <div className="border-t border-[var(--border-soft)] pt-4"><p className="text-xs text-[var(--text-muted)]">开始时间</p><p className="mt-2 text-sm">{demoMode ? "现在可进入" : formatDateTime(access.startAt)}</p></div>
-            <div className="border-t border-[var(--border-soft)] pt-4"><p className="text-xs text-[var(--text-muted)]">最晚入场</p><p className="mt-2 text-sm">{demoMode ? "今日体验时段内" : formatDateTime(access.latestStartAt)}</p></div>
+            <div className="border-t border-[var(--border-soft)] pt-4"><p className="text-xs text-[var(--text-muted)]">开始时间</p><p className="mt-2 text-sm">{demoMode ? "现在可进入" : formatDateTime(access.startAt, access.timezone)}</p></div>
+            <div className="border-t border-[var(--border-soft)] pt-4"><p className="text-xs text-[var(--text-muted)]">最晚入场</p><p className="mt-2 text-sm">{demoMode ? "今日体验时段内" : formatDateTime(access.latestStartAt, access.timezone)}</p></div>
             <div className="border-t border-[var(--border-soft)] pt-4"><p className="text-xs text-[var(--text-muted)]">作答时长</p><p className="mt-2 text-sm">{access.durationMinutes} 分钟</p></div>
           </div> : null}
           <div className="mt-7 border-l-2 border-[var(--warning)] pl-4 text-sm leading-7 text-[var(--text-secondary)]">{access?.privacyNotice}</div>
@@ -578,7 +572,7 @@ export function TrustedExamWorkspace({ examId, demoMode = false }: { examId: str
       <div className="min-w-0"><div className="flex items-center gap-2"><p className="truncate text-sm font-semibold">{attempt.title}</p>{demoMode ? <Tag>体验卷</Tag> : null}</div><p className="mt-1 text-xs text-[var(--text-muted)]">{demoMode ? "本地体验计时" : "服务端计时"} · {attempt.questions.length} 题 · {attempt.questions.reduce((sum, question) => sum + question.score, 0)} 分</p></div>
       <div className="flex items-center gap-2"><div className="flex h-9 items-center gap-2 rounded-[8px] border border-[var(--border-soft)] bg-[var(--surface-3)] px-3 font-mono text-sm"><Clock3 size={15} />{formatRemaining(remaining)}</div><Button size="sm" variant="secondary" onClick={() => void finalize()} disabled={busy || terminal}><Send size={14} />交卷</Button></div>
     </header>
-    {terminal ? <div className="flex items-center justify-center overflow-auto p-6"><Panel className="w-full max-w-xl p-8 text-center"><CheckCircle2 size={36} className="mx-auto text-[var(--success)]" /><h1 className="mt-4 text-2xl font-semibold">交卷已确认</h1><p className="mt-3 text-sm text-[var(--text-secondary)]">{formatDateTime(attempt.submittedAt)}</p>{demoMode ? <div className="mt-5"><p className="text-sm leading-7 text-[var(--text-muted)]">体验流程已经完成。本次作答只保存在当前浏览器，没有执行真实判题，也不会计入成绩。</p><Button className="mt-4" size="sm" variant="secondary" onClick={resetDemo}><RefreshCw size={14} />重新体验</Button></div> : result ? <div className="mt-6 border-t border-[var(--border-soft)] pt-6"><p className="text-sm text-[var(--text-muted)]">最终成绩</p><p className="mt-2 text-4xl font-semibold">{result.totalScore}<span className="text-lg text-[var(--text-muted)]"> / {result.maxScore}</span></p></div> : <div className="mt-5"><p className="text-sm text-[var(--text-muted)]">成绩将在教师发布后显示。</p><Button className="mt-4" size="sm" variant="secondary" onClick={() => void loadResult(attempt.attemptId)}><RefreshCw size={14} />刷新成绩</Button></div>}</Panel></div> :
+    {terminal ? <div className="flex items-center justify-center overflow-auto p-6"><Panel className="w-full max-w-xl p-8 text-center"><CheckCircle2 size={36} className="mx-auto text-[var(--success)]" /><h1 className="mt-4 text-2xl font-semibold">交卷已确认</h1><p className="mt-3 text-sm text-[var(--text-secondary)]">{formatDateTime(attempt.submittedAt, attempt.timezone)}</p>{demoMode ? <div className="mt-5"><p className="text-sm leading-7 text-[var(--text-muted)]">体验流程已经完成。本次作答只保存在当前浏览器，没有执行真实判题，也不会计入成绩。</p><Button className="mt-4" size="sm" variant="secondary" onClick={resetDemo}><RefreshCw size={14} />重新体验</Button></div> : result ? <div className="mt-6 border-t border-[var(--border-soft)] pt-6"><p className="text-sm text-[var(--text-muted)]">最终成绩</p><p className="mt-2 text-4xl font-semibold">{result.totalScore}<span className="text-lg text-[var(--text-muted)]"> / {result.maxScore}</span></p></div> : <div className="mt-5"><p className="text-sm text-[var(--text-muted)]">成绩将在教师发布后显示。</p><Button className="mt-4" size="sm" variant="secondary" onClick={() => void loadResult(attempt.attemptId)}><RefreshCw size={14} />刷新成绩</Button></div>}</Panel></div> :
       <div className="grid min-h-0 overflow-auto lg:grid-cols-[220px_minmax(0,0.85fr)_minmax(420px,1.15fr)] lg:overflow-hidden">
         <aside className="border-b border-[var(--border-soft)] bg-[var(--surface-2)] p-3 lg:overflow-auto lg:border-b-0 lg:border-r"><p className="px-2 py-2 text-xs font-semibold text-[var(--text-muted)]">题目导航</p><div className="flex gap-1 overflow-x-auto lg:block lg:space-y-1">{attempt.questions.map((question) => { const answer = drafts[question.versionQuestionId]; const selected = question.versionQuestionId === activeQuestion?.versionQuestionId; return <button key={question.versionQuestionId} aria-current={selected ? "step" : undefined} onClick={() => setActiveId(question.versionQuestionId)} className={`flex min-w-[190px] items-center gap-3 rounded-[8px] px-3 py-3 text-left text-sm lg:w-full lg:min-w-0 ${selected ? "bg-[var(--surface-1)]" : "text-[var(--text-secondary)] hover:bg-[var(--surface-3)]"}`}><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--border-soft)] font-mono text-xs">{answer?.answerVersion > 0 ? <Check size={13} /> : question.questionOrder}</span><span className="min-w-0 flex-1 truncate">{question.title}</span><span className="text-xs text-[var(--text-muted)]">{question.score}</span></button>; })}</div></aside>
         <main className="border-b border-[var(--border-soft)] p-5 md:p-6 lg:overflow-auto lg:border-b-0 lg:border-r"><div className="flex flex-wrap gap-2"><Tag tone="accent">第 {activeQuestion?.questionOrder} 题</Tag><Tag>{activeQuestion?.score} 分</Tag>{activeQuestion ? <Tag>{questionTypeLabels[activeQuestion.questionType ?? "PROGRAMMING"]}</Tag> : null}{activeQuestion?.required ? <Tag tone="warning">必答</Tag> : null}</div><h1 className="mt-4 text-2xl font-semibold">{activeQuestion?.title}</h1><div className="mt-6 whitespace-pre-wrap text-sm leading-8 text-[var(--text-secondary)]">{activeQuestion?.content}</div>{(activeQuestion?.questionType ?? "PROGRAMMING") === "PROGRAMMING" ? <div className="mt-8 flex gap-4 border-t border-[var(--border-soft)] pt-4 text-xs text-[var(--text-muted)]"><span>时间 {activeQuestion?.timeLimit} ms</span><span>内存 {activeQuestion?.spaceLimit} KB</span></div> : null}</main>

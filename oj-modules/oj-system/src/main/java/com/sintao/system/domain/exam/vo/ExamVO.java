@@ -30,6 +30,8 @@ public class ExamVO {
 
     private Integer durationMinutes;
 
+    private String timezone;
+
     @JsonSerialize(using = ToStringSerializer.class)
     private Long currentVersionId;
 

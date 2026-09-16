@@ -25,6 +25,7 @@ import { fetchLiveUserProfile, getUserMockFallback } from "./live/user";
 export * from "./contracts";
 export * from "./auth";
 export * from "./client";
+export * from "./date-time";
 export * from "./runtime";
 
 type DataSourceOptions = {

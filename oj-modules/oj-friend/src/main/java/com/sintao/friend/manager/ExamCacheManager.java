@@ -162,6 +162,7 @@ public class ExamCacheManager {
         return exam == null
                 || exam.getDurationMinutes() == null
                 || exam.getQuestionCount() == null
+                || exam.getTimezone() == null
                 || exam.getStatus() == null;
     }
 

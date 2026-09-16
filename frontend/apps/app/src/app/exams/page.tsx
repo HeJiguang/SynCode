@@ -1,6 +1,6 @@
 import * as React from "react";
 import { ArrowRight, CalendarClock, CalendarX2, Clock3, ListOrdered } from "lucide-react";
-import { getExamList, getPublicMessages } from "@aioj/api";
+import { formatUtcDateTimeInZone, getExamList, getPublicMessages } from "@aioj/api";
 
 import { AnnouncementCenter } from "../../components/announcement-center";
 import { AppShell } from "../../components/app-shell";
@@ -89,7 +89,7 @@ export default async function ExamsPage() {
                     <div className="mt-5 grid gap-3 text-sm text-[var(--text-secondary)] md:grid-cols-3">
                       <div className="flex items-center gap-2 rounded-[16px] border border-[var(--border-soft)] bg-[var(--surface-3)] px-3 py-3">
                         <CalendarClock size={15} className="text-[var(--text-muted)]" />
-                        <span>{exam.startTime}</span>
+                        <span>{demoMode ? exam.startTime : formatUtcDateTimeInZone(exam.startTime, exam.timezone)}</span>
                       </div>
                       <div className="flex items-center gap-2 rounded-[16px] border border-[var(--border-soft)] bg-[var(--surface-3)] px-3 py-3">
                         <Clock3 size={15} className="text-[var(--text-muted)]" />

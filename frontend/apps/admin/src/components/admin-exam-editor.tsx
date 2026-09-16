@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, LoaderCircle, Plus, Save, Search } from "lucide-react";
 
 import { frontendPreviewMode } from "@aioj/config";
+import { utcDateTimeToZonedInput } from "@aioj/api";
 import type { AdminExamDetail } from "../lib/admin-api";
 import { buildExamCompositionPayload, type ExamFormErrors, type ExamFormValues, toExamApiDateTime, validateExamForm } from "../lib/exam-form";
 import { adminApiPath, adminInternalPath } from "../lib/paths";
@@ -21,25 +22,27 @@ const typeLabels: Record<string, string> = {
   FILL_BLANK: "填空题", SHORT_ANSWER: "简答题", SQL: "SQL 题", FILE: "文件题", PROJECT: "项目题"
 };
 
-function toInputValue(value?: string) {
+function toInputValue(value: string | undefined, timezone: string) {
   if (!value) return "";
+  if (!frontendPreviewMode) return utcDateTimeToZonedInput(value, timezone);
   return value.replace(" ", "T").slice(0, 16);
 }
 
 export function AdminExamEditor({ exam }: AdminExamEditorProps) {
   const router = useRouter();
+  const initialTimezone = exam?.timezone ?? "Asia/Shanghai";
   const [form, setForm] = React.useState({
     examId: exam?.examId,
     title: exam?.title ?? "",
     description: exam?.description ?? "",
-    startTime: toInputValue(exam?.startTime),
-    latestStartTime: toInputValue(exam?.latestStartTime),
-    endTime: toInputValue(exam?.endTime),
+    startTime: toInputValue(exam?.startTime, initialTimezone),
+    latestStartTime: toInputValue(exam?.latestStartTime, initialTimezone),
+    endTime: toInputValue(exam?.endTime, initialTimezone),
     durationMinutes: String(exam?.durationMinutes ?? 90),
-    timezone: exam?.timezone ?? "Asia/Shanghai",
+    timezone: initialTimezone,
     maxFormalSubmissions: String(exam?.maxFormalSubmissions ?? 10),
     resultReleasePolicy: exam?.resultReleasePolicy ?? "MANUAL",
-    resultReleaseTime: toInputValue(exam?.resultReleaseTime),
+    resultReleaseTime: toInputValue(exam?.resultReleaseTime, initialTimezone),
     expectedRowVersion: exam?.rowVersion ?? 0
   });
   const [composition, setComposition] = React.useState(() => exam?.examQuestionList.map((item) => ({ ...item })) ?? []);
@@ -124,12 +127,12 @@ export function AdminExamEditor({ exam }: AdminExamEditorProps) {
         body: JSON.stringify({
           ...form,
           title: form.title.trim(),
-          startTime: toExamApiDateTime(form.startTime),
-          latestStartTime: toExamApiDateTime(form.latestStartTime),
-          endTime: toExamApiDateTime(form.endTime),
+          startTime: toExamApiDateTime(form.startTime, form.timezone),
+          latestStartTime: toExamApiDateTime(form.latestStartTime, form.timezone),
+          endTime: toExamApiDateTime(form.endTime, form.timezone),
           durationMinutes: Number(form.durationMinutes),
           maxFormalSubmissions: Number(form.maxFormalSubmissions),
-          resultReleaseTime: form.resultReleaseTime ? toExamApiDateTime(form.resultReleaseTime) : null
+          resultReleaseTime: form.resultReleaseTime ? toExamApiDateTime(form.resultReleaseTime, form.timezone) : null
         })
       });
       const payload = (await response.json().catch(() => null)) as { examId?: string; message?: string; details?: unknown } | null;

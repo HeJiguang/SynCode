@@ -76,6 +76,7 @@ class ExamCacheManagerTest {
         enriched.setDurationMinutes(90);
         enriched.setQuestionCount(9);
         enriched.setStatus(2);
+        enriched.setTimezone("Asia/Shanghai");
         ExamQueryDTO query = new ExamQueryDTO();
         query.setType(ExamListType.USER_EXAM_LIST.getValue());
 
@@ -88,6 +89,7 @@ class ExamCacheManagerTest {
         assertEquals(1, result.size());
         assertEquals(90, result.get(0).getDurationMinutes());
         assertEquals(9, result.get(0).getQuestionCount());
+        assertEquals("Asia/Shanghai", result.get(0).getTimezone());
         verify(userExamMapper, times(2)).selectUserExamList(userId);
         verify(redisService).multiSet(anyMap());
     }

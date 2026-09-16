@@ -15,7 +15,7 @@ const valid = {
 };
 
 assert.deepEqual(validateExamForm(valid, new Date("2026-09-16T10:00:00+08:00")), {});
-assert.equal(toExamApiDateTime(valid.startTime), "2026-09-17 09:00:00");
+assert.equal(toExamApiDateTime(valid.startTime, valid.timezone), "2026-09-17 01:00:00");
 assert.equal(buildExamCompositionPayload([{
   questionId: "2100059118632513538",
   score: 10,
@@ -31,12 +31,23 @@ const invalid = validateExamForm({
   latestStartTime: "2026-09-17T08:30",
   endTime: "2026-09-17T08:00",
   durationMinutes: "0",
-  timezone: "invalid/timezone",
+  timezone: "Asia/Shanghai",
   maxFormalSubmissions: "1.5",
   resultReleasePolicy: "SCHEDULED",
   resultReleaseTime: ""
 }, new Date("2026-09-16T10:00:00+08:00"));
 
-for (const field of ["title", "latestStartTime", "endTime", "durationMinutes", "timezone", "maxFormalSubmissions", "resultReleaseTime"] as const) {
+for (const field of ["title", "latestStartTime", "endTime", "durationMinutes", "maxFormalSubmissions", "resultReleaseTime"] as const) {
   assert.ok(invalid[field], `${field} should be rejected`);
 }
+
+assert.ok(validateExamForm({ ...valid, timezone: "invalid/timezone" }).timezone);
+
+const nonexistentDstTime = validateExamForm({
+  ...valid,
+  startTime: "2026-03-08T02:30",
+  latestStartTime: "2026-03-08T03:30",
+  endTime: "2026-03-08T04:30",
+  timezone: "America/New_York"
+}, new Date("2026-01-01T00:00:00Z"));
+assert.match(nonexistentDstTime.startTime ?? "", /无效/);

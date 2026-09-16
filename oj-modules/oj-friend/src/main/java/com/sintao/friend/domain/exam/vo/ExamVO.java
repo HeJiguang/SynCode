@@ -23,6 +23,8 @@ public class ExamVO {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime endTime;
 
+    private String timezone;
+
     private Integer durationMinutes;
 
     private Integer questionCount;

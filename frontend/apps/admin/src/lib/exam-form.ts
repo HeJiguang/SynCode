@@ -1,3 +1,5 @@
+import { isValidTimeZone, toUtcApiDateTime, zonedDateTimeToUtc } from "@aioj/api";
+
 export type ExamFormValues = {
   title: string;
   startTime: string;
@@ -12,8 +14,8 @@ export type ExamFormValues = {
 
 export type ExamFormErrors = Partial<Record<keyof ExamFormValues, string>>;
 
-export function toExamApiDateTime(value: string) {
-  return value ? `${value.replace("T", " ")}:00` : "";
+export function toExamApiDateTime(value: string, timezone: string) {
+  return value ? toUtcApiDateTime(value, timezone) : "";
 }
 
 export function buildExamCompositionPayload(items: Array<{
@@ -39,16 +41,20 @@ export function parseDecimalIds(value: string) {
 
 export function validateExamForm(values: ExamFormValues, now = new Date()): ExamFormErrors {
   const errors: ExamFormErrors = {};
-  const start = parseDate(values.startTime);
-  const latestStart = parseDate(values.latestStartTime);
-  const end = parseDate(values.endTime);
-  const release = parseDate(values.resultReleaseTime);
+  const validTimezone = isValidTimeZone(values.timezone);
+  const start = validTimezone ? zonedDateTimeToUtc(values.startTime, values.timezone) : null;
+  const latestStart = validTimezone ? zonedDateTimeToUtc(values.latestStartTime, values.timezone) : null;
+  const end = validTimezone ? zonedDateTimeToUtc(values.endTime, values.timezone) : null;
+  const release = validTimezone ? zonedDateTimeToUtc(values.resultReleaseTime, values.timezone) : null;
 
   if (!values.title.trim()) errors.title = "请输入考试标题。";
-  if (!start) errors.startTime = "请选择考试开始时间。";
-  else if (start.getTime() <= now.getTime()) errors.startTime = "考试开始时间必须晚于当前时间。";
-  if (!latestStart) errors.latestStartTime = "请选择最晚入场时间。";
-  if (!end) errors.endTime = "请选择考试结束时间。";
+  if (!values.startTime) errors.startTime = "请选择考试开始时间。";
+  else if (validTimezone && !start) errors.startTime = "开始时间在当前时区中无效。";
+  else if (start && start.getTime() <= now.getTime()) errors.startTime = "考试开始时间必须晚于当前时间。";
+  if (!values.latestStartTime) errors.latestStartTime = "请选择最晚入场时间。";
+  else if (validTimezone && !latestStart) errors.latestStartTime = "最晚入场时间在当前时区中无效。";
+  if (!values.endTime) errors.endTime = "请选择考试结束时间。";
+  else if (validTimezone && !end) errors.endTime = "结束时间在当前时区中无效。";
   if (start && latestStart && latestStart.getTime() <= start.getTime()) {
     errors.latestStartTime = "最晚入场时间必须晚于开始时间。";
   }
@@ -60,30 +66,16 @@ export function validateExamForm(values: ExamFormValues, now = new Date()): Exam
   }
   if (!isPositiveInteger(values.durationMinutes)) errors.durationMinutes = "个人作答时长必须是正整数。";
   if (!isPositiveInteger(values.maxFormalSubmissions)) errors.maxFormalSubmissions = "正式提交上限必须是正整数。";
-  if (!isValidTimezone(values.timezone)) errors.timezone = "请输入有效的 IANA 时区，例如 Asia/Shanghai。";
+  if (!validTimezone) errors.timezone = "请输入有效的 IANA 时区，例如 Asia/Shanghai。";
   if (values.resultReleasePolicy === "SCHEDULED") {
-    if (!release) errors.resultReleaseTime = "请选择成绩发布时间。";
-    else if (end && release.getTime() < end.getTime()) errors.resultReleaseTime = "成绩发布时间不能早于考试结束时间。";
+    if (!values.resultReleaseTime) errors.resultReleaseTime = "请选择成绩发布时间。";
+    else if (validTimezone && !release) errors.resultReleaseTime = "成绩发布时间在当前时区中无效。";
+    else if (end && release && release.getTime() < end.getTime()) errors.resultReleaseTime = "成绩发布时间不能早于考试结束时间。";
   }
   return errors;
-}
-
-function parseDate(value: string) {
-  if (!value) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function isPositiveInteger(value: string) {
   const number = Number(value);
   return Number.isInteger(number) && number > 0;
-}
-
-function isValidTimezone(value: string) {
-  try {
-    new Intl.DateTimeFormat("zh-CN", { timeZone: value }).format();
-    return true;
-  } catch {
-    return false;
-  }
 }
