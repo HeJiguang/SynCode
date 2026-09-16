@@ -14,7 +14,7 @@ on:
         type: string
 
 concurrency:
-  group: cd-test
+  group: cd-test-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
   cancel-in-progress: true
 
 permissions:
@@ -116,9 +116,12 @@ jobs:
           mvn --batch-mode -f deploy/migrations/pom.xml flyway:migrate
           mvn --batch-mode -f deploy/migrations/pom.xml flyway:validate
 
-      - name: Reclaim dangling Docker images
+      - name: Reclaim old Docker artifacts
         shell: bash
-        run: docker image prune --force
+        run: |
+          docker container prune --force --filter "until=4h"
+          docker image prune --all --force --filter "until=4h"
+          docker builder prune --all --force --filter "until=4h"
 
       - name: Build and deploy test stack
         shell: bash
