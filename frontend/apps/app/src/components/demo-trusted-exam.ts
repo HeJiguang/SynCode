@@ -154,6 +154,7 @@ export function createDemoExamAccess(examId: string, canResume = false): Access 
     serverNow: now.toISOString(),
     startAt: now.toISOString(),
     latestStartAt: latestStart.toISOString(),
+    timezone: "Asia/Shanghai",
     durationMinutes: DEMO_DURATION_MINUTES,
     privacyNotice: "体验卷只在当前浏览器保存草稿与进度，不创建真实考试记录，不调用判题服务，也不采集诚信事件。",
     canStart: !canResume,
@@ -176,6 +177,7 @@ export function createDemoExamAttempt(examId: string, lifecycle?: DemoExamLifecy
     serverNow: state.serverNow,
     deadlineAt: state.deadlineAt,
     submittedAt: state.submittedAt,
+    timezone: "Asia/Shanghai",
     questions,
     answers: []
   };

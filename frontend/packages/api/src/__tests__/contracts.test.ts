@@ -224,6 +224,7 @@ async function main() {
             title: "Mixed exam",
             startTime: "2026-09-16 09:00:00",
             endTime: "2026-09-16 18:00:00",
+            timezone: "Asia/Shanghai",
             durationMinutes: 90,
             questionCount: 9,
             status: 2
@@ -238,6 +239,7 @@ async function main() {
       assert.equal(exams.length, 1);
       assert.equal(exams[0]?.durationMinutes, 90);
       assert.equal(exams[0]?.questionCount, 9);
+      assert.equal(exams[0]?.timezone, "Asia/Shanghai");
       assert.equal(exams[0]?.status, "进行中");
     }
   );

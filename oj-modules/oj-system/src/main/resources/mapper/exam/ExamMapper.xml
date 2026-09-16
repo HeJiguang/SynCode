@@ -13,6 +13,7 @@
             te.latest_start_time,
             te.end_time,
             te.duration_minutes,
+            te.timezone,
             te.current_version_id,
             te.version_no,
             te.create_time,

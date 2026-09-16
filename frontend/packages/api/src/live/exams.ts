@@ -2,6 +2,7 @@ import type { ApiEnvelope, TableEnvelope } from "../client";
 import { requestJson, unwrapData, unwrapTable } from "../client";
 import type { ExamDetail, ExamSummary } from "../contracts";
 import { examDetails } from "../mock/training";
+import { parseUtcDateTime } from "../date-time";
 
 type BackendExamRow = {
   examId?: string | number | null;
@@ -12,6 +13,7 @@ type BackendExamRow = {
   examEndTime?: string | null;
   durationMinutes?: number | null;
   questionCount?: number | null;
+  timezone?: string | null;
   status?: number | string | null;
 };
 
@@ -28,8 +30,8 @@ function normalizeExamStatus(
   if (status === 3 || status === "3" || status === 4 || status === "4"
       || status === 5 || status === "5" || status === FINISHED_EXAM_STATUS) return FINISHED_EXAM_STATUS;
   const now = Date.now();
-  const startsAt = startTime ? Date.parse(startTime.replace(" ", "T")) : Number.NaN;
-  const endsAt = endTime ? Date.parse(endTime.replace(" ", "T")) : Number.NaN;
+  const startsAt = parseUtcDateTime(startTime)?.getTime() ?? Number.NaN;
+  const endsAt = parseUtcDateTime(endTime)?.getTime() ?? Number.NaN;
   if (Number.isFinite(endsAt) && endsAt <= now) return FINISHED_EXAM_STATUS;
   if (Number.isFinite(startsAt) && startsAt <= now) return ACTIVE_EXAM_STATUS;
   return UPCOMING_EXAM_STATUS;
@@ -42,6 +44,7 @@ function mapExamRow(row: BackendExamRow): ExamSummary {
     status: normalizeExamStatus(row.status, row.startTime ?? row.examStartTime, row.endTime ?? row.examEndTime),
     startTime: row.startTime ?? row.examStartTime ?? "--",
     endTime: row.endTime ?? row.examEndTime ?? "--",
+    timezone: row.timezone ?? "Asia/Shanghai",
     durationMinutes: row.durationMinutes ?? 0,
     questionCount: row.questionCount ?? 0
   };
@@ -54,6 +57,7 @@ function buildLiveFallbackExamDetail(examId: string): ExamDetail {
     status: UPCOMING_EXAM_STATUS,
     startTime: "--",
     endTime: "--",
+    timezone: "Asia/Shanghai",
     durationMinutes: 0,
     questionCount: 0,
     firstQuestionId: undefined

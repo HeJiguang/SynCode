@@ -120,6 +120,7 @@ export type ExamSummary = {
   status: ExamStatus;
   startTime: string;
   endTime: string;
+  timezone: string;
   durationMinutes: number;
   questionCount: number;
 };

@@ -1,4 +1,4 @@
-import { normalizeDifficulty, requestJson, type ApiEnvelope, type TableEnvelope, unwrapData, unwrapTable } from "@aioj/api";
+import { formatUtcDateTimeInZone, normalizeDifficulty, requestJson, type ApiEnvelope, type TableEnvelope, unwrapData, unwrapTable } from "@aioj/api";
 import { frontendPreviewMode } from "@aioj/config";
 
 import {
@@ -49,6 +49,7 @@ type BackendExamRow = {
   title?: string | null;
   status?: number | string | null;
   startTime?: string | null;
+  timezone?: string | null;
   createTime?: string | null;
 };
 
@@ -288,7 +289,7 @@ export async function getAdminExamRows(token?: string | null) {
     examId: item.examId ? String(item.examId) : "--",
     title: item.title ?? "未命名考试",
     status: normalizeExamPublishStatus(item.status),
-    startTime: item.startTime ?? item.createTime ?? "--",
+    startTime: formatUtcDateTimeInZone(item.startTime ?? item.createTime ?? undefined, item.timezone ?? "Asia/Shanghai"),
     participantCount: 0
   }));
 }

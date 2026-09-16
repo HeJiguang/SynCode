@@ -56,6 +56,7 @@ export const examDetails: Record<string, ExamDetail> = {
     status: EXAM_STATUS_ACTIVE,
     startTime: "现在可进入",
     endTime: "进入后 90 分钟",
+    timezone: "Asia/Shanghai",
     durationMinutes: 90,
     questionCount: 3,
     firstQuestionId: "two-sum"
@@ -66,6 +67,7 @@ export const examDetails: Record<string, ExamDetail> = {
     status: EXAM_STATUS_UPCOMING,
     startTime: "2026-09-18 19:00",
     endTime: "2026-09-18 20:00",
+    timezone: "Asia/Shanghai",
     durationMinutes: 60,
     questionCount: 2,
     firstQuestionId: "merge-intervals"
@@ -76,6 +78,7 @@ export const examDetails: Record<string, ExamDetail> = {
     status: EXAM_STATUS_FINISHED,
     startTime: "2026-09-12 19:00",
     endTime: "2026-09-12 20:00",
+    timezone: "Asia/Shanghai",
     durationMinutes: 60,
     questionCount: 2,
     firstQuestionId: "n-queens"
