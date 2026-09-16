@@ -145,15 +145,28 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return payload as T;
 }
 
+function createClientId() {
+  const runtimeCrypto = globalThis.crypto;
+  if (typeof runtimeCrypto?.randomUUID === "function") return runtimeCrypto.randomUUID();
+  if (typeof runtimeCrypto?.getRandomValues === "function") {
+    const bytes = runtimeCrypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const value = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`;
+  }
+  return `legacy-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 function idempotencyKey(prefix: string) {
-  return `${prefix}-${crypto.randomUUID()}`;
+  return `${prefix}-${createClientId()}`;
 }
 
 function getSessionId(examId: string) {
   const key = `syncode-exam-session:${examId}`;
   const existing = window.localStorage.getItem(key);
   if (existing) return existing;
-  const created = crypto.randomUUID();
+  const created = createClientId();
   window.localStorage.setItem(key, created);
   return created;
 }
