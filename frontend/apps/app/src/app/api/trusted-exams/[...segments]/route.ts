@@ -11,11 +11,12 @@ async function proxy(request: Request, context: RouteContext, method: "GET" | "P
     return NextResponse.json({ message: "请先登录后进入考试。" }, { status: 401 });
   }
   const { segments } = await context.params;
-  if (!segments?.length || segments.some((item) => !/^[a-zA-Z0-9-]+$/.test(item))) {
+  const backendSegments = segments?.[0] === "exams" ? segments.slice(1) : segments;
+  if (!backendSegments?.length || backendSegments.some((item) => !/^[a-zA-Z0-9-]+$/.test(item))) {
     return NextResponse.json({ message: "考试接口路径无效。" }, { status: 400 });
   }
   const sourceUrl = new URL(request.url);
-  const path = `/friend/exam/${segments.join("/")}${sourceUrl.search}`;
+  const path = `/friend/exam/${backendSegments.join("/")}${sourceUrl.search}`;
   const headers: Record<string, string> = {};
   for (const name of ["idempotency-key", "x-request-id"]) {
     const value = request.headers.get(name);
