@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requestJson, type ApiEnvelope, unwrapData } from "@aioj/api";
 
 import { getAdminAccessToken } from "../../../../lib/server-auth";
+import { resolveAdminApiError } from "../../../../lib/api-route-error";
 
 export async function PUT(request: Request) {
   const token = await getAdminAccessToken();
@@ -25,12 +26,8 @@ export async function PUT(request: Request) {
       headers: body.publish ? { "Idempotency-Key": `publish-${crypto.randomUUID()}` } : undefined
     }).then(unwrapData);
   } catch (error) {
-    return NextResponse.json(
-      {
-        message: error instanceof Error && error.message ? error.message : "考试状态更新失败。"
-      },
-      { status: 400 }
-    );
+    const resolved = resolveAdminApiError(error, "考试状态更新失败。");
+    return NextResponse.json(resolved.body, { status: resolved.status });
   }
 
   return NextResponse.json({ ok: true });

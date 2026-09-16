@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requestJson, type ApiEnvelope, unwrapData } from "@aioj/api";
 
 import { getAdminAccessToken } from "../../../lib/server-auth";
+import { resolveAdminApiError } from "../../../lib/api-route-error";
 
 async function requireToken() {
   const token = await getAdminAccessToken();
@@ -20,39 +21,52 @@ export async function GET(request: Request) {
   const questionType = searchParams.get("questionType")?.trim();
   if (title) query.set("title", title);
   if (questionType) query.set("questionType", questionType);
-  const payload = await requestJson<{
-    code: number; msg: string; total: number;
-    rows: Array<{ questionId: string | number; title: string; difficulty: number; questionType?: string }>;
-  }>(`/system/question/list?${query}`, { token });
-  return NextResponse.json({ rows: payload.rows ?? [], total: payload.total ?? 0 });
+  try {
+    const payload = await requestJson<{
+      code: number; msg: string; total: number;
+      rows: Array<{ questionId: string | number; title: string; difficulty: number; questionType?: string }>;
+    }>(`/system/question/list?${query}`, { token });
+    return NextResponse.json({ rows: payload.rows ?? [], total: payload.total ?? 0 });
+  } catch (error) {
+    const resolved = resolveAdminApiError(error, "题库加载失败。");
+    return NextResponse.json(resolved.body, { status: resolved.status });
+  }
 }
 
 export async function POST(request: Request) {
   const token = await requireToken();
   if (token instanceof NextResponse) return token;
 
-  const body = await request.json();
-  await requestJson<ApiEnvelope<null>>("/system/question/add", {
-    method: "POST",
-    token,
-    body: JSON.stringify(body)
-  }).then(unwrapData);
-
-  return NextResponse.json({ ok: true });
+  try {
+    const body = await request.json();
+    await requestJson<ApiEnvelope<null>>("/system/question/add", {
+      method: "POST",
+      token,
+      body: JSON.stringify(body)
+    }).then(unwrapData);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const resolved = resolveAdminApiError(error, "题目保存失败。");
+    return NextResponse.json(resolved.body, { status: resolved.status });
+  }
 }
 
 export async function PUT(request: Request) {
   const token = await requireToken();
   if (token instanceof NextResponse) return token;
 
-  const body = await request.json();
-  await requestJson<ApiEnvelope<null>>("/system/question/edit", {
-    method: "PUT",
-    token,
-    body: JSON.stringify(body)
-  }).then(unwrapData);
-
-  return NextResponse.json({ ok: true });
+  try {
+    const body = await request.json();
+    await requestJson<ApiEnvelope<null>>("/system/question/edit", {
+      method: "PUT",
+      token,
+      body: JSON.stringify(body)
+    }).then(unwrapData);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const resolved = resolveAdminApiError(error, "题目保存失败。");
+    return NextResponse.json(resolved.body, { status: resolved.status });
+  }
 }
 
 export async function DELETE(request: Request) {
@@ -65,10 +79,14 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ message: "questionId 不能为空。" }, { status: 400 });
   }
 
-  await requestJson<ApiEnvelope<null>>(`/system/question/delete?questionId=${encodeURIComponent(questionId)}`, {
-    method: "DELETE",
-    token
-  }).then(unwrapData);
-
-  return NextResponse.json({ ok: true });
+  try {
+    await requestJson<ApiEnvelope<null>>(`/system/question/delete?questionId=${encodeURIComponent(questionId)}`, {
+      method: "DELETE",
+      token
+    }).then(unwrapData);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const resolved = resolveAdminApiError(error, "题目删除失败。");
+    return NextResponse.json(resolved.body, { status: resolved.status });
+  }
 }

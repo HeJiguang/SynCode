@@ -67,7 +67,22 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
 
   const text = await response.text();
   if (!response.ok) {
-    throw new ApiError(text || response.statusText, response.status);
+    let payload: unknown;
+    try {
+      payload = text ? JSON.parse(text) : undefined;
+    } catch {
+      payload = undefined;
+    }
+    const errorPayload = payload && typeof payload === "object"
+      ? payload as { code?: unknown; msg?: unknown; message?: unknown }
+      : undefined;
+    const message = typeof errorPayload?.msg === "string"
+      ? errorPayload.msg
+      : typeof errorPayload?.message === "string"
+        ? errorPayload.message
+        : text || response.statusText;
+    const code = typeof errorPayload?.code === "number" ? errorPayload.code : response.status;
+    throw new ApiError(message, code, payload);
   }
   return JSON.parse(text) as T;
 }
