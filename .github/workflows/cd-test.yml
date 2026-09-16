@@ -105,7 +105,7 @@ jobs:
             echo "SYNCODE_TEST_LOGIN_ENABLED=true"
             echo "SYNCODE_TEST_STUDENT_EMAIL=student@syncode.test"
             echo "SYNCODE_TEST_TEACHER_EMAIL=teacher@syncode.test"
-            echo "SYNCODE_TEST_TEACHER_ACCOUNT=admin"
+            echo "SYNCODE_TEST_TEACHER_ACCOUNT=${TEST_ADMIN_ACCOUNT}"
           } >> "${STACK_ENV_FILE}"
           sed -i "s#sha-REPLACE_ME#${{ steps.source.outputs.image_tag }}#g" "${STACK_ENV_FILE}"
 
