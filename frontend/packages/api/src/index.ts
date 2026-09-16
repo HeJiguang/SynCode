@@ -29,6 +29,7 @@ export * from "./runtime";
 
 type DataSourceOptions = {
   forceMock?: boolean;
+  token?: string | null;
 };
 
 export async function getProblemList(options: DataSourceOptions = {}): Promise<QuestionListItem[]> {
@@ -79,7 +80,7 @@ export async function getTrainingSnapshot(token?: string | null): Promise<Traini
 export async function getExamList(options: DataSourceOptions = {}): Promise<ExamSummary[]> {
   if (options.forceMock) return exams;
   try {
-    return await fetchLiveExamList();
+    return await fetchLiveExamList(options.token);
   } catch {
     return exams;
   }
