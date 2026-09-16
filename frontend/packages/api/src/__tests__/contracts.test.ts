@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import * as api from "../index";
+import { fetchLiveExamList } from "../live/exams";
 import { fetchLiveMessages } from "../live/messages";
 import { fetchLiveUserProfile } from "../live/user";
 
@@ -210,6 +211,36 @@ async function main() {
       /network down/
     );
   });
+
+  await withMockFetch(
+    (url) => {
+      assert.match(url, /\/friend\/user\/exam\/list/);
+      return {
+        code: 1000,
+        msg: "ok",
+        rows: [
+          {
+            examId: "2100059119853056001",
+            title: "Mixed exam",
+            startTime: "2026-09-16 09:00:00",
+            endTime: "2026-09-16 18:00:00",
+            durationMinutes: 90,
+            questionCount: 9,
+            status: 2
+          }
+        ],
+        total: 1
+      };
+    },
+    async () => {
+      const exams = await fetchLiveExamList("student-token");
+
+      assert.equal(exams.length, 1);
+      assert.equal(exams[0]?.durationMinutes, 90);
+      assert.equal(exams[0]?.questionCount, 9);
+      assert.equal(exams[0]?.status, "进行中");
+    }
+  );
 
   await withMockFetch(
     (url) => {

@@ -9,7 +9,21 @@
             e.exam_id,
             e.title,
             e.start_time,
-            e.end_time
+            e.end_time,
+            e.duration_minutes,
+            e.status,
+            CASE
+                WHEN e.current_version_id IS NOT NULL THEN (
+                    SELECT COUNT(*)
+                    FROM tb_exam_version_question evq
+                    WHERE evq.version_id = e.current_version_id
+                )
+                ELSE (
+                    SELECT COUNT(*)
+                    FROM tb_exam_question eq
+                    WHERE eq.exam_id = e.exam_id
+                )
+            END AS question_count
         FROM
             tb_user_exam ue
         JOIN

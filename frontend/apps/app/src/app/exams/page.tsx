@@ -30,7 +30,7 @@ function isActiveExam(status: string) {
 export default async function ExamsPage() {
   const { token, demoMode } = await getServerAuthSession();
   const [exams, messages] = await Promise.all([
-    getExamList({ forceMock: demoMode }),
+    getExamList({ forceMock: demoMode, token }),
     getPublicMessages(token, { forceMock: demoMode })
   ]);
 

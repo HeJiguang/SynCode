@@ -9,11 +9,25 @@
             te.exam_id,
             te.title,
             te.start_time,
-            te.end_time
+            te.end_time,
+            te.duration_minutes,
+            te.status,
+            CASE
+                WHEN te.current_version_id IS NOT NULL THEN (
+                    SELECT COUNT(*)
+                    FROM tb_exam_version_question tevq
+                    WHERE tevq.version_id = te.current_version_id
+                )
+                ELSE (
+                    SELECT COUNT(*)
+                    FROM tb_exam_question teq
+                    WHERE teq.exam_id = te.exam_id
+                )
+            END AS question_count
         FROM
             tb_exam te
         where
-            status = 1
+            te.status IN (1, 2, 3, 4)
             <if test="title !=null and title !='' ">
                 AND te.title LIKE CONCAT('%',#{title},'%')
             </if>
@@ -24,10 +38,10 @@
                 AND te.end_time &lt;= #{endTime}
             </if>
             <if test="type == 0">
-                And te.end_time > NOW()
+                AND te.end_time > NOW()
             </if>
             <if test="type == 1">
-                And te.end_time &lt;= NOW()
+                AND te.end_time &lt;= NOW()
             </if>
         ORDER BY
             te.create_time DESC

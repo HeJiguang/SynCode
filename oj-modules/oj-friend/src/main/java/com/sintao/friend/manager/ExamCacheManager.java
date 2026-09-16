@@ -1,17 +1,14 @@
 package com.sintao.friend.manager;
 
-import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.collection.CollectionUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.github.pagehelper.PageHelper;
 import com.sintao.common.core.constants.CacheConstants;
-import com.sintao.common.core.constants.Constants;
 import com.sintao.common.core.enums.ExamListType;
 import com.sintao.common.core.enums.ResultCode;
 import com.sintao.common.redis.service.RedisService;
 import com.sintao.common.security.exception.ServiceException;
-import com.sintao.friend.domain.exam.Exam;
 import com.sintao.friend.domain.exam.ExamQuestion;
 import com.sintao.friend.domain.exam.dto.ExamQueryDTO;
 import com.sintao.friend.domain.exam.dto.ExamRankDTO;
@@ -68,7 +65,7 @@ public class ExamCacheManager {
         String examListKey = getExamListKey(examQueryDTO.getType(), userId);
         List<Long> examIdList = redisService.getCacheListByRange(examListKey, start, end, Long.class);
         List<ExamVO> examVOList = assembleExamVOList(examIdList);
-        if (CollectionUtil.isEmpty(examVOList)) {
+        if (CollectionUtil.isEmpty(examVOList) || examVOList.stream().anyMatch(this::isLegacySummary)) {
             examVOList = getExamListByDB(examQueryDTO, userId);
             refreshCache(examQueryDTO.getType(), userId);
         }
@@ -134,36 +131,38 @@ public class ExamCacheManager {
     }
 
     public void refreshCache(Integer examListType, Long userId) {
-        List<Exam> examList = new ArrayList<>();
+        List<ExamVO> examList = new ArrayList<>();
         if (ExamListType.EXAM_UN_FINISH_LIST.getValue().equals(examListType)) {
-            examList = examMapper.selectList(new LambdaQueryWrapper<Exam>()
-                    .select(Exam::getExamId, Exam::getTitle, Exam::getStartTime, Exam::getEndTime)
-                    .gt(Exam::getEndTime, LocalDateTime.now())
-                    .eq(Exam::getStatus, Constants.TRUE)
-                    .orderByDesc(Exam::getCreateTime));
+            ExamQueryDTO query = new ExamQueryDTO();
+            query.setType(ExamListType.EXAM_UN_FINISH_LIST.getValue());
+            examList = examMapper.selectExamList(query);
         } else if (ExamListType.EXAM_HISTORY_LIST.getValue().equals(examListType)) {
-            examList = examMapper.selectList(new LambdaQueryWrapper<Exam>()
-                    .select(Exam::getExamId, Exam::getTitle, Exam::getStartTime, Exam::getEndTime)
-                    .le(Exam::getEndTime, LocalDateTime.now())
-                    .eq(Exam::getStatus, Constants.TRUE)
-                    .orderByDesc(Exam::getCreateTime));
+            ExamQueryDTO query = new ExamQueryDTO();
+            query.setType(ExamListType.EXAM_HISTORY_LIST.getValue());
+            examList = examMapper.selectExamList(query);
         } else if (ExamListType.USER_EXAM_LIST.getValue().equals(examListType)) {
-            List<ExamVO> examVOList = userExamMapper.selectUserExamList(userId);
-            examList = BeanUtil.copyToList(examVOList, Exam.class);
+            examList = userExamMapper.selectUserExamList(userId);
         }
         if (CollectionUtil.isEmpty(examList)) {
             return;
         }
 
-        Map<String, Exam> examMap = new HashMap<>();
+        Map<String, ExamVO> examMap = new HashMap<>();
         List<Long> examIdList = new ArrayList<>();
-        for (Exam exam : examList) {
+        for (ExamVO exam : examList) {
             examMap.put(getDetailKey(exam.getExamId()), exam);
             examIdList.add(exam.getExamId());
         }
         redisService.multiSet(examMap);
         redisService.deleteObject(getExamListKey(examListType, userId));
         redisService.rightPushAll(getExamListKey(examListType, userId), examIdList);
+    }
+
+    private boolean isLegacySummary(ExamVO exam) {
+        return exam == null
+                || exam.getDurationMinutes() == null
+                || exam.getQuestionCount() == null
+                || exam.getStatus() == null;
     }
 
     public void refreshExamQuestionCache(Long examId) {
