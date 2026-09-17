@@ -136,6 +136,11 @@ jobs:
         working-directory: repo
         run: deploy/test/scripts/smoke.sh
 
+      - name: Import LeetCode Hot 100 catalog
+        shell: bash
+        working-directory: repo
+        run: deploy/test/scripts/import-leetcode-hot-100.sh
+
       - name: Seed mixed question test exam
         shell: bash
         working-directory: repo

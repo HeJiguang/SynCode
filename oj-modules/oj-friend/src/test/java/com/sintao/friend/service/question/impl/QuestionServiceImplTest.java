@@ -7,6 +7,7 @@ import com.sintao.friend.domain.question.Question;
 import com.sintao.friend.domain.question.dto.QuestionQueryDTO;
 import com.sintao.friend.domain.question.es.QuestionES;
 import com.sintao.friend.domain.question.vo.QuestionDetailVO;
+import com.sintao.friend.domain.question.vo.QuestionVO;
 import com.sintao.friend.elasticsearch.FriendQuestionRepository;
 import com.sintao.friend.manager.QuestionCacheManager;
 import com.sintao.friend.mapper.question.QuestionMapper;
@@ -62,6 +63,10 @@ class QuestionServiceImplTest {
         questionES.setQuestionId(101L);
         questionES.setTitle("Only Cloud Question");
         questionES.setDifficulty(1);
+        questionES.setAlgorithmTag("hash");
+        questionES.setKnowledgeTags("array,hash");
+        questionES.setEstimatedMinutes(15);
+        questionES.setTrainingEnabled(1);
 
         when(questionRepository.count()).thenThrow(new NoSuchIndexException("idx_question"));
         when(questionMapper.selectList(any())).thenReturn(List.of(question));
@@ -72,6 +77,11 @@ class QuestionServiceImplTest {
 
         assertEquals(1L, result.getTotal());
         assertEquals(1, result.getRows().size());
+        QuestionVO row = (QuestionVO) result.getRows().get(0);
+        assertEquals("hash", row.getAlgorithmTag());
+        assertEquals("array,hash", row.getKnowledgeTags());
+        assertEquals(15, row.getEstimatedMinutes());
+        assertEquals(1, row.getTrainingEnabled());
         verify(questionRepository).saveAll(any());
     }
 

@@ -197,6 +197,7 @@ jobs:
           docker stack config --compose-file deploy/prod/swarm/stack-compact.yml > /dev/null
           docker stack config --compose-file deploy/test/swarm/infra.yml > /dev/null
           bash -n deploy/prod/scripts/*.sh deploy/test/scripts/*.sh
+          TEST_BASE_URL=http://127.0.0.1 SYNCODE_IMPORT_DRY_RUN=1 deploy/test/scripts/import-leetcode-hot-100.sh
           deploy/prod/scripts/test-wait-for-stack.sh
 
       - name: Create source bundle

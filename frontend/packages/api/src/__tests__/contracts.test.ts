@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as api from "../index";
 import { fetchLiveExamList } from "../live/exams";
 import { fetchLiveMessages } from "../live/messages";
+import { fetchLiveProblemList } from "../live/questions";
 import { fetchLiveUserProfile } from "../live/user";
 
 async function withMockFetch(
@@ -211,6 +212,46 @@ async function main() {
       /network down/
     );
   });
+
+  await withMockFetch(
+    (url) => {
+      assert.match(url, /pageSize=100/);
+      return {
+        code: 1000,
+        msg: "ok",
+        rows: [
+          { questionId: "3", title: "Existing question", difficulty: 1 },
+          {
+            questionId: "2",
+            title: "[Hot100-002] 字母异位词分组",
+            difficulty: 2,
+            algorithmTag: "哈希表",
+            knowledgeTags: "字符串,哈希表,排序",
+            estimatedMinutes: 25,
+            trainingEnabled: 1
+          },
+          {
+            questionId: "1",
+            title: "[Hot100-001] 两数之和",
+            difficulty: 1,
+            algorithmTag: "哈希表",
+            knowledgeTags: "数组,哈希表",
+            estimatedMinutes: 15,
+            trainingEnabled: 1
+          }
+        ],
+        total: 3
+      };
+    },
+    async () => {
+      const liveProblems = await fetchLiveProblemList();
+
+      assert.deepEqual(liveProblems.map((item) => item.questionId), ["1", "2", "3"]);
+      assert.deepEqual(liveProblems[0]?.tags, ["数组", "哈希表"]);
+      assert.equal(liveProblems[0]?.estimatedMinutes, 15);
+      assert.equal(liveProblems[0]?.trainingRecommended, true);
+    }
+  );
 
   await withMockFetch(
     (url) => {
