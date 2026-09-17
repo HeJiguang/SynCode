@@ -8,6 +8,10 @@ type BackendQuestionRow = {
   questionId?: string | number | null;
   title: string;
   difficulty?: number | string | null;
+  algorithmTag?: string | null;
+  knowledgeTags?: string | null;
+  estimatedMinutes?: number | null;
+  trainingEnabled?: number | null;
 };
 
 type BackendExampleCase = {
@@ -68,14 +72,17 @@ function normalizeQuestionId(row: BackendQuestionRow, fallbackId?: string) {
 
 function mapQuestionRow(row: BackendQuestionRow, fallbackId?: string): QuestionListItem {
   const preset = presetByTitle.get(row.title) ?? presetById.get(fallbackId ?? "");
+  const knowledgeTags = splitTags(row.knowledgeTags);
 
   return {
     questionId: normalizeQuestionId(row, fallbackId ?? preset?.questionId),
     title: row.title,
     difficulty: normalizeDifficulty(row.difficulty),
-    tags: preset?.tags ?? [preset?.algorithmTag ?? "算法"],
-    estimatedMinutes: preset?.estimatedMinutes ?? 20,
-    trainingRecommended: preset?.trainingRecommended ?? false,
+    tags: knowledgeTags.length > 0
+      ? knowledgeTags
+      : preset?.tags ?? [row.algorithmTag ?? preset?.algorithmTag ?? "算法"],
+    estimatedMinutes: row.estimatedMinutes ?? preset?.estimatedMinutes ?? 20,
+    trainingRecommended: row.trainingEnabled === 1 || preset?.trainingRecommended === true,
     acceptanceRate: preset?.acceptanceRate ?? "--",
     status: preset?.status ?? "未开始",
     heat: preset?.heat ?? 0
@@ -116,8 +123,17 @@ function mapQuestionDetail(row: BackendQuestionDetail, tokenQuestionId?: string)
 }
 
 export async function fetchLiveProblemList() {
-  const payload = await requestJson<TableEnvelope<BackendQuestionRow>>("/friend/question/semiLogin/list?pageNum=1&pageSize=20");
-  return unwrapTable(payload).rows.map((item) => mapQuestionRow(item));
+  const payload = await requestJson<TableEnvelope<BackendQuestionRow>>("/friend/question/semiLogin/list?pageNum=1&pageSize=100");
+  return unwrapTable(payload).rows
+    .map((item) => mapQuestionRow(item))
+    .sort((left, right) => {
+      const leftRank = /^\[Hot100-(\d{3})]/.exec(left.title)?.[1];
+      const rightRank = /^\[Hot100-(\d{3})]/.exec(right.title)?.[1];
+      if (leftRank && rightRank) return Number(leftRank) - Number(rightRank);
+      if (leftRank) return -1;
+      if (rightRank) return 1;
+      return 0;
+    });
 }
 
 export async function fetchLiveHotProblemList() {

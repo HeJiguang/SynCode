@@ -15,5 +15,13 @@ public class QuestionVO {
     private String title;
 
     private Integer difficulty;
+
+    private String algorithmTag;
+
+    private String knowledgeTags;
+
+    private Integer estimatedMinutes;
+
+    private Integer trainingEnabled;
 }
 
