@@ -42,6 +42,7 @@ async function main() {
   const editorSource = fs.readFileSync(path.resolve(testDir, "../components/editor-panel.tsx"), "utf8");
   const aiSource = fs.readFileSync(path.resolve(testDir, "../components/ai-panel.tsx"), "utf8");
   const appShellSource = fs.readFileSync(path.resolve(testDir, "../components/app-shell.tsx"), "utf8");
+  const logoutButtonSource = fs.readFileSync(path.resolve(testDir, "../components/logout-button.tsx"), "utf8");
   const aiRouteSources = [
     fs.readFileSync(path.resolve(testDir, "../app/api/ai/runs/route.ts"), "utf8"),
     fs.readFileSync(path.resolve(testDir, "../app/api/ai/runs/[runId]/events/route.ts"), "utf8"),
@@ -60,7 +61,12 @@ async function main() {
   assert.match(editorSource, /frontendPreviewMode \|\| demoMode/);
   assert.match(aiSource, /frontendPreviewMode \|\| demoMode/);
   assert.match(appShellSource, /当前使用测试数据/);
+  assert.match(appShellSource, /LogoutButton demoMode=\{demoMode\}/);
   assert.doesNotMatch(appShellSource, /当前为测试体验模式：页面使用内置测试数据/);
+  assert.match(logoutButtonSource, /退出体验/);
+  assert.match(logoutButtonSource, /退出登录/);
+  assert.match(logoutButtonSource, /\/auth\/logout/);
+  assert.match(logoutButtonSource, /clearBrowserAccessToken/);
   for (const routeSource of aiRouteSources) {
     assert.match(routeSource, /if \(!token\)/);
     assert.match(routeSource, /status: 401/);

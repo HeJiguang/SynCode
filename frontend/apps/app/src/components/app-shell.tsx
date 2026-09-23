@@ -1,10 +1,11 @@
 import * as React from "react";
 import type { ReactNode } from "react";
-import { BellDot, Database, LogIn, Settings, Sparkles } from "lucide-react";
+import { BellDot, Database, Settings, Sparkles } from "lucide-react";
 
 import { appNav, frontendPreviewLabel, frontendPreviewMode, productName, productTagline } from "@aioj/config";
 import { Button } from "@aioj/ui";
 import { appPublicPath } from "../lib/paths";
+import { LogoutButton } from "./logout-button";
 import { ThemeToggle } from "./theme-toggle";
 
 type AppShellProps = {
@@ -49,22 +50,16 @@ export function AppShell({ children, rail, immersive, demoMode = false }: AppShe
               </Button>
             </a>
             {demoMode && !frontendPreviewMode ? (
-              <>
-                <div
-                  aria-label="当前使用测试数据"
-                  title="当前使用测试数据"
-                  className="hidden items-center gap-1.5 px-2 text-xs text-[var(--text-faint)] sm:flex"
-                >
-                  <Database size={13} />
-                  <span>体验</span>
-                </div>
-                <a href={appPublicPath("/login")} aria-label="登录正式账号" title="登录正式账号">
-                  <Button size="sm" variant="ghost" className="w-9 px-0">
-                    <LogIn size={14} className="text-[var(--text-muted)]" />
-                  </Button>
-                </a>
-              </>
+              <div
+                aria-label="当前使用测试数据"
+                title="当前使用测试数据"
+                className="hidden items-center gap-1.5 px-2 text-xs text-[var(--text-faint)] sm:flex"
+              >
+                <Database size={13} />
+                <span>体验</span>
+              </div>
             ) : null}
+            {!frontendPreviewMode ? <LogoutButton demoMode={demoMode} /> : null}
             {frontendPreviewMode ? (
               <div className="hidden rounded-full border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)] sm:block">
                 {frontendPreviewLabel}
