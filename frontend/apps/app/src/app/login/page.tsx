@@ -970,39 +970,31 @@ export default function LoginPage() {
     }
   }
 
-  async function testLogin() {
-    setLoading(true);
-    setStatus(null);
-    try {
-      const response = await fetch(appApiPath("/auth/test-login"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.message ?? "测试账号登录失败。");
-      setBrowserAccessToken(payload.token);
-      router.push(appInternalPath("/"));
-      router.refresh();
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "测试账号登录失败。");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function enterDemo() {
     setLoading(true);
     setStatus(null);
 
     try {
-      const response = await fetch(appApiPath("/auth/demo"), { method: "POST" });
-      const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+      const useTestAccount = frontendTestLoginEnabled;
+      const response = await fetch(appApiPath(useTestAccount ? "/auth/test-login" : "/auth/demo"), {
+        method: "POST",
+        ...(useTestAccount
+          ? {
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: testStudentEmail })
+            }
+          : {})
+      });
+      const payload = (await response.json().catch(() => null)) as { message?: string; token?: string } | null;
       if (!response.ok) {
         throw new Error(payload?.message ?? "进入测试体验失败。");
       }
 
-      clearBrowserAccessToken();
+      if (useTestAccount && payload?.token) {
+        setBrowserAccessToken(payload.token);
+      } else {
+        clearBrowserAccessToken();
+      }
       router.push(appInternalPath("/"));
       router.refresh();
     } catch (error) {
@@ -1081,22 +1073,7 @@ export default function LoginPage() {
                   登录并进入工作台
                 </Button>
 
-                {frontendTestLoginEnabled ? (
-                  <div className="flex flex-col gap-2 border-t border-[var(--border-soft)] pt-4 text-sm sm:flex-row sm:items-center sm:justify-between">
-                    <button
-                      type="button"
-                      className="text-left text-[var(--text-muted)] underline decoration-[var(--border-strong)] underline-offset-4"
-                      onClick={() => setEmail(testStudentEmail)}
-                    >
-                      测试学生：{testStudentEmail}
-                    </button>
-                    <Button size="sm" variant="ghost" disabled={loading || !email} onClick={() => void testLogin()}>
-                      邮箱直登
-                    </Button>
-                  </div>
-                ) : null}
-
-                {frontendDemoLoginEnabled ? (
+                {frontendTestLoginEnabled || frontendDemoLoginEnabled ? (
                   <>
                     <div className="flex items-center gap-3 py-1 text-xs text-[var(--text-muted)]">
                       <span className="h-px flex-1 bg-[var(--border-soft)]" />
@@ -1105,10 +1082,10 @@ export default function LoginPage() {
                     </div>
                     <Button className="w-full" variant="secondary" size="lg" disabled={loading} onClick={() => void enterDemo()}>
                       <Database size={16} />
-                      使用测试数据体验
+                      立即体验 Demo（无需注册）
                     </Button>
                     <p className="text-center text-xs leading-6 text-[var(--text-muted)]">
-                      可浏览题库、训练和体验考试；测试操作只保存在当前浏览器，不会进入正式考试数据。
+                      一键进入测试账号，可直接体验题库、训练和考试流程。
                     </p>
                   </>
                 ) : null}

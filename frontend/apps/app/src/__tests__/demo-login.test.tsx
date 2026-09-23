@@ -48,8 +48,11 @@ async function main() {
     fs.readFileSync(path.resolve(testDir, "../app/api/ai/runs/[runId]/artifacts/route.ts"), "utf8")
   ];
 
-  assert.match(loginSource, /使用测试数据体验/);
-  assert.match(loginSource, /题库、训练和体验考试/);
+  assert.match(loginSource, /立即体验 Demo（无需注册）/);
+  assert.match(loginSource, /一键进入测试账号/);
+  assert.match(loginSource, /JSON\.stringify\(\{ email: testStudentEmail \}\)/);
+  assert.doesNotMatch(loginSource, /邮箱直登/);
+  assert.doesNotMatch(loginSource, /测试学生：/);
   assert.match(loginSource, /clearBrowserAccessToken/);
   assert.match(middlewareSource, /syncode_demo_session|DEMO_SESSION_KEY/);
   assert.match(middlewareSource, /SYNCODE_DEMO_LOGIN_ENABLED/);
