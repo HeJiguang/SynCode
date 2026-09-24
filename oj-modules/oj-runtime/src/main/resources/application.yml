@@ -37,6 +37,22 @@ spring:
             oj-agent:
               - uri: ${AGENT_PUBLIC_BASE_URL:http://127.0.0.1:8015}
 
+mail:
+  host: ${MAIL_HOST:}
+  port: ${MAIL_PORT:587}
+  username: ${MAIL_USERNAME:}
+  password: ${MAIL_PASSWORD:}
+  from: ${MAIL_FROM:${MAIL_USERNAME:}}
+  subject: ${MAIL_SUBJECT:SynCode 登录验证码}
+  auth: ${MAIL_AUTH:true}
+  starttls: ${MAIL_STARTTLS:true}
+  starttls-required: ${MAIL_STARTTLS_REQUIRED:true}
+  ssl-enable: ${MAIL_SSL_ENABLE:false}
+  ssl-protocols: ${MAIL_SSL_PROTOCOLS:TLSv1.2}
+  code-expiration: ${MAIL_CODE_EXPIRATION:5}
+  send-limit: ${MAIL_SEND_LIMIT:3}
+  is-send: ${MAIL_IS_SEND:false}
+
 file:
   max-time: ${FILE_UPLOAD_DAILY_LIMIT:20}
   test: ${FILE_UPLOAD_TEST_MODE:false}

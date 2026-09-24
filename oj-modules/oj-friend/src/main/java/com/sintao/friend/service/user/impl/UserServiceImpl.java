@@ -107,9 +107,14 @@ public class UserServiceImpl implements IUserService {
 
         String code = isSend ? mailService.generateCode() : Constants.DEFAULT_CODE;
         redisService.setCacheObject(emailCodeKey, code, emailCodeExpiration, TimeUnit.MINUTES);
-        log.info("[email-code] email={}, code={}", email, code);
+        if (isSend) {
+            log.info("[email-code] sending login code to email={}", email);
+        } else {
+            log.warn("[email-code] delivery disabled; email={}, localCode={}", email, code);
+        }
 
         if (isSend && !mailService.sendLoginCode(email, code)) {
+            redisService.deleteObject(emailCodeKey);
             throw new ServiceException(ResultCode.FAILED_SEND_CODE);
         }
 

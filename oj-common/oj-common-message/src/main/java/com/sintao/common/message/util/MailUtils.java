@@ -8,33 +8,19 @@ import javax.mail.Session;
 import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
-import java.util.Arrays;
-import java.util.Collections;
+import java.security.SecureRandom;
 import java.util.Date;
-import java.util.List;
 import java.util.Properties;
 
 public final class MailUtils {
 
-    private static final String[] CODE_SOURCE = {
-            "2", "3", "4", "5", "6", "7", "8", "9",
-            "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N",
-            "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
-            "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "m", "n", "p",
-            "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"
-    };
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private MailUtils() {
     }
 
     public static String achieveCode() {
-        List<String> codeList = Arrays.asList(CODE_SOURCE.clone());
-        Collections.shuffle(codeList);
-        StringBuilder builder = new StringBuilder();
-        for (String codeChar : codeList) {
-            builder.append(codeChar);
-        }
-        return builder.substring(3, 8);
+        return Integer.toString(SECURE_RANDOM.nextInt(900_000) + 100_000);
     }
 
     public static void sendMail(
@@ -47,6 +33,7 @@ public final class MailUtils {
             boolean auth,
             boolean startTls,
             boolean startTlsRequired,
+            boolean sslEnable,
             String sslProtocols,
             String email,
             String code
@@ -57,6 +44,7 @@ public final class MailUtils {
         props.put("mail.smtp.port", String.valueOf(port));
         props.put("mail.smtp.starttls.enable", String.valueOf(startTls));
         props.put("mail.smtp.starttls.required", String.valueOf(startTlsRequired));
+        props.put("mail.smtp.ssl.enable", String.valueOf(sslEnable));
         props.put("mail.smtp.ssl.protocols", sslProtocols);
         props.put("mail.user", username);
         props.put("mail.password", password);

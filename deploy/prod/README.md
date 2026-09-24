@@ -76,6 +76,18 @@ For compact deployment, set `DEPLOYMENT_MODE=compact`, `RUNTIME_IMAGE`, and `BAC
 
 `STACK_WAIT_TIMEOUT_SECONDS` controls the rollout timeout (default `600`), and `STACK_WAIT_POLL_SECONDS` controls its polling interval (default `5`). A paused, rolling-back, or timed-out service update fails the deployment before acceptance tests begin.
 
+## Production Login Email
+
+The official production deploy and recovery workflows reuse the configured
+`DEPLOY_NOTIFY_SMTP_*` GitHub secrets for user login verification emails. They
+run `scripts/configure-login-mail.sh`, enable real delivery, and stop before
+deployment if the SMTP host, port, username, or authorization code is missing.
+
+QQ Mail normally uses port `465` with implicit TLS. Port `587` and other SMTP
+submission ports use STARTTLS. Use an SMTP authorization code rather than the
+mailbox login password. After each initial setup or credential rotation, request
+a verification code from the production login page and confirm delivery.
+
 ## Notes
 
 - This pipeline assumes the worker services remain constrained to the worker node.
