@@ -83,6 +83,22 @@ class UserServiceImplTest {
     }
 
     @Test
+    void sendCodeShouldRemoveCachedCodeWhenDeliveryFails() {
+        UserDTO userDTO = new UserDTO();
+        userDTO.setEmail("user@example.com");
+        ReflectionTestUtils.setField(userService, "isSend", true);
+
+        when(redisService.getExpire(anyString(), eq(TimeUnit.SECONDS))).thenReturn(null);
+        when(redisService.getCacheObject(anyString(), eq(Long.class))).thenReturn(null);
+        when(mailService.generateCode()).thenReturn("654321");
+        when(mailService.sendLoginCode("user@example.com", "654321")).thenReturn(false);
+
+        assertThrows(RuntimeException.class, () -> userService.sendCode(userDTO));
+
+        verify(redisService).deleteObject(anyString());
+    }
+
+    @Test
     void codeLoginShouldCreateUserWithEmailWhenUserDoesNotExist() {
         String email = "user@example.com";
         String code = "123456";

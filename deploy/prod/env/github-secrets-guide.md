@@ -136,7 +136,9 @@ Keep these judge-related values unless you have a deliberate alternative:
 
 ### `DEPLOY_NOTIFY_SMTP_HOST`
 
-Used by `deploy-notify.yml`.
+Used by `deploy-notify.yml`, `cd.yml`, and `prod-recover.yml`. The production
+login service deliberately reuses this SMTP account, so releases fail before
+deployment when the SMTP configuration is missing.
 
 For QQ Mail, this is typically:
 
@@ -146,7 +148,8 @@ smtp.qq.com
 
 ### `DEPLOY_NOTIFY_SMTP_PORT`
 
-Used by `deploy-notify.yml`.
+Used by deployment notifications and production login verification emails.
+Port `465` selects implicit TLS; other ports, including `587`, select STARTTLS.
 
 For QQ Mail SSL SMTP, this is typically:
 
@@ -156,15 +159,18 @@ For QQ Mail SSL SMTP, this is typically:
 
 ### `DEPLOY_NOTIFY_SMTP_USERNAME`
 
-Used by `deploy-notify.yml`.
+Used as the authenticated sender for deployment notifications and production
+login verification emails.
 
 Set this to the QQ mailbox account that will send the approval email.
 
 ### `DEPLOY_NOTIFY_SMTP_PASSWORD`
 
-Used by `deploy-notify.yml`.
+Used by deployment notifications and production login verification emails.
 
 Set this to the QQ Mail SMTP authorization code, not the normal mailbox login password.
+The value is injected into the ephemeral production runtime env file during CD;
+it is not baked into an image or committed to the repository.
 
 ### `DEPLOY_NOTIFY_TO`
 
@@ -180,7 +186,7 @@ your-name@qq.com
 
 Optional.
 
-Used by `deploy-notify.yml`.
+Used by deployment notifications and production login verification emails.
 
 If unset, the workflow uses `DEPLOY_NOTIFY_SMTP_USERNAME` as the sender address.
 
@@ -195,3 +201,5 @@ If unset, the workflow uses `DEPLOY_NOTIFY_SMTP_USERNAME` as the sender address.
 7. Wait for the `syncode-prod` runner to show up in GitHub.
 8. Push to `main` and confirm that `deploy-notify.yml` sends the approval email.
 9. After you receive the email, trigger `cd.yml` manually with the `source_run_id` from the email.
+10. On the production login page, request a code for a mailbox you control and
+    confirm receipt before announcing email registration as available.
