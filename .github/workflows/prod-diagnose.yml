@@ -57,6 +57,7 @@ jobs:
         shell: bash
         env:
           WORKER_SSH_KEY: ${{ secrets.WORKER_SSH_KEY }}
+          WORKER_SSH_KEY_FALLBACK: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
           chmod +x deploy/prod/scripts/prepare-worker-ssh-key.sh
           deploy/prod/scripts/prepare-worker-ssh-key.sh \
