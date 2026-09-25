@@ -105,17 +105,13 @@ jobs:
       - name: Prepare worker SSH key
         if: ${{ github.event.inputs.sync_worker_images == 'true' }}
         shell: bash
+        env:
+          WORKER_SSH_KEY: ${{ secrets.WORKER_SSH_KEY }}
         run: |
-          mkdir -p repo/.cd-tmp
-          if [[ -f "${RUNNER_WORKER_SSH_KEY_FILE}" ]]; then
-            install -m 600 "${RUNNER_WORKER_SSH_KEY_FILE}" repo/.cd-tmp/worker_id_ed25519
-          elif [[ -n "${{ secrets.WORKER_SSH_KEY }}" ]]; then
-            printf '%s\n' "${{ secrets.WORKER_SSH_KEY }}" > repo/.cd-tmp/worker_id_ed25519
-          else
-            echo "worker ssh key is not available on runner or in GitHub secrets" >&2
-            exit 1
-          fi
-          chmod 600 repo/.cd-tmp/worker_id_ed25519
+          chmod +x repo/deploy/prod/scripts/prepare-worker-ssh-key.sh
+          repo/deploy/prod/scripts/prepare-worker-ssh-key.sh \
+            repo/.cd-tmp/worker_id_ed25519 \
+            "${RUNNER_WORKER_SSH_KEY_FILE}"
 
       - name: Redeploy locally
         shell: bash
