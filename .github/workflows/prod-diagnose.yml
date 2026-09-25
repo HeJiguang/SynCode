@@ -16,6 +16,9 @@ jobs:
       - x64
       - syncode-prod
     steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
       - name: Collect manager diagnostics
         shell: bash
         run: |
@@ -55,18 +58,10 @@ jobs:
         env:
           WORKER_SSH_KEY: ${{ secrets.WORKER_SSH_KEY }}
         run: |
-          if [[ -f "${RUNNER_WORKER_SSH_KEY_FILE}" ]]; then
-            mkdir -p .cd-tmp
-            install -m 600 "${RUNNER_WORKER_SSH_KEY_FILE}" .cd-tmp/worker_id_ed25519
-            exit 0
-          fi
-          if [[ -z "${WORKER_SSH_KEY}" ]]; then
-            echo "WORKER_SSH_KEY is empty, skip worker diagnostics bootstrap"
-            exit 0
-          fi
-          mkdir -p .cd-tmp
-          printf '%s\n' "${WORKER_SSH_KEY}" > .cd-tmp/worker_id_ed25519
-          chmod 600 .cd-tmp/worker_id_ed25519
+          chmod +x deploy/prod/scripts/prepare-worker-ssh-key.sh
+          deploy/prod/scripts/prepare-worker-ssh-key.sh \
+            .cd-tmp/worker_id_ed25519 \
+            "${RUNNER_WORKER_SSH_KEY_FILE}"
 
       - name: Collect worker diagnostics
         shell: bash
