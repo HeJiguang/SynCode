@@ -124,6 +124,7 @@ jobs:
           docker builder prune --all --force --filter "until=4h"
 
       - name: Build and deploy test stack
+        id: deploy_test
         shell: bash
         working-directory: repo
         run: |
@@ -150,3 +151,36 @@ jobs:
         shell: bash
         working-directory: repo
         run: deploy/test/scripts/trusted-exam-e2e.sh
+
+      - name: Restore live login email delivery
+        if: ${{ always() && steps.deploy_test.outcome == 'success' }}
+        shell: bash
+        working-directory: repo
+        env:
+          LOGIN_MAIL_HOST: ${{ secrets.DEPLOY_NOTIFY_SMTP_HOST }}
+          LOGIN_MAIL_PORT: ${{ secrets.DEPLOY_NOTIFY_SMTP_PORT }}
+          LOGIN_MAIL_USERNAME: ${{ secrets.DEPLOY_NOTIFY_SMTP_USERNAME }}
+          LOGIN_MAIL_PASSWORD: ${{ secrets.DEPLOY_NOTIFY_SMTP_PASSWORD }}
+          LOGIN_MAIL_FROM: ${{ secrets.DEPLOY_NOTIFY_FROM }}
+        run: |
+          chmod +x deploy/prod/scripts/configure-login-mail.sh
+          deploy/prod/scripts/configure-login-mail.sh "${RUNTIME_ENV_FILE}"
+
+          mail_args=()
+          while IFS= read -r line || [[ -n "${line}" ]]; do
+            line="${line%$'\r'}"
+            [[ "${line}" == MAIL_*=* ]] || continue
+            mail_args+=(--env-add "${line}")
+          done < "${RUNTIME_ENV_FILE}"
+
+          if (( ${#mail_args[@]} < 10 )); then
+            echo "live login mail configuration is incomplete" >&2
+            exit 1
+          fi
+
+          docker service update \
+            --detach=false \
+            --update-order start-first \
+            --update-failure-action rollback \
+            "${mail_args[@]}" \
+            "${STACK_NAME}_oj-runtime"
