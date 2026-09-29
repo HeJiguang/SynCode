@@ -124,6 +124,29 @@ class UserQuestionServiceImplTest {
         assertEquals(readField(submitCaptor.getValue(), "requestId"), readField(messageCaptor.getValue(), "requestId"));
     }
 
+    @Test
+    void cppSubmissionShouldKeepCompleteProgramUnchanged() {
+        ThreadLocalUtil.set(Constants.USER_ID, 99L);
+        String source = "#include <iostream>\nint main(){std::cout << 3;}";
+        UserSubmitDTO submitDTO = new UserSubmitDTO();
+        submitDTO.setQuestionId(1L);
+        submitDTO.setProgramType(ProgramType.CPP.getValue());
+        submitDTO.setUserCode(source);
+        QuestionES questionES = new QuestionES();
+        questionES.setQuestionId(1L);
+        questionES.setQuestionCase("[{\"input\":\"1 2\",\"output\":\"3\"}]");
+        questionES.setMainFuc("public static void main(String[] args){}");
+        when(questionRepository.findById(1L)).thenReturn(Optional.of(questionES));
+        when(userSubmitMapper.insert(any(UserSubmit.class))).thenReturn(1);
+
+        userQuestionService.rabbitSubmit(submitDTO);
+
+        ArgumentCaptor<JudgeSubmitDTO> messageCaptor = ArgumentCaptor.forClass(JudgeSubmitDTO.class);
+        verify(judgeProducer).produceMsg(messageCaptor.capture());
+        assertEquals(ProgramType.CPP.getValue(), messageCaptor.getValue().getProgramType());
+        assertEquals(source, messageCaptor.getValue().getUserCode());
+    }
+
     private Object readField(Object target, String fieldName) {
         try {
             Field field = target.getClass().getDeclaredField(fieldName);

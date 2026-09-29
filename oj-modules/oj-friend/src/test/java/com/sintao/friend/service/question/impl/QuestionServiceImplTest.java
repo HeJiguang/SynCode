@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
@@ -117,5 +118,113 @@ class QuestionServiceImplTest {
 
         assertEquals("100", previousQuestionId);
         verify(questionCacheManager).refreshCache();
+    }
+
+    @Test
+    void detailShouldExpandLegacyJavaStarterToAllJudgeLanguages() {
+        Question question = new Question();
+        question.setQuestionId(102L);
+        question.setTitle("Legacy Java Question");
+        question.setDifficulty(1);
+        question.setContent("from db");
+        question.setDefaultCode("import java.util.*;");
+
+        when(questionRepository.findById(102L)).thenReturn(Optional.empty());
+        when(questionMapper.selectById(102L)).thenReturn(question);
+        when(questionMapper.selectList(any())).thenReturn(List.of(question));
+
+        QuestionDetailVO detail = questionService.detail(102L);
+
+        assertNotNull(detail);
+        assertNotNull(detail.getStarterCode());
+        assertEquals(4, detail.getStarterCode().size());
+        assertEquals("import java.util.*;", detail.getStarterCode().get("java"));
+        assertNotNull(detail.getStarterCode().get("cpp"));
+        assertNotNull(detail.getStarterCode().get("python"));
+        assertNotNull(detail.getStarterCode().get("go"));
+    }
+
+    @Test
+    void detailShouldExpandInvalidStarterJsonToAllJudgeLanguages() {
+        QuestionES questionES = new QuestionES();
+        questionES.setQuestionId(103L);
+        questionES.setTitle("Broken Starter JSON");
+        questionES.setDifficulty(1);
+        questionES.setContent("from es");
+        questionES.setStarterCodeJson("{not-json");
+        questionES.setDefaultCode("class Legacy {}");
+
+        when(questionRepository.findById(103L)).thenReturn(Optional.of(questionES));
+
+        QuestionDetailVO detail = questionService.detail(103L);
+
+        assertNotNull(detail);
+        assertEquals(4, detail.getStarterCode().size());
+        assertEquals("class Legacy {}", detail.getStarterCode().get("java"));
+    }
+
+    @Test
+    void detailShouldKeepAuthoredStartersAndFillMissingJavaFromLegacyCode() {
+        QuestionES questionES = new QuestionES();
+        questionES.setQuestionId(104L);
+        questionES.setTitle("Partial Starter JSON");
+        questionES.setDifficulty(1);
+        questionES.setContent("from es");
+        questionES.setStarterCodeJson("{\"cpp\":\"int main(){}\",\"python\":\"pass\",\"go\":\"x\"}");
+        questionES.setDefaultCode("class LegacyMain {}");
+
+        when(questionRepository.findById(104L)).thenReturn(Optional.of(questionES));
+
+        QuestionDetailVO detail = questionService.detail(104L);
+
+        assertNotNull(detail);
+        assertEquals("int main(){}", detail.getStarterCode().get("cpp"));
+        assertEquals("class LegacyMain {}", detail.getStarterCode().get("java"));
+    }
+
+    @Test
+    void detailShouldExpandJavaOnlyStarterJsonToAllJudgeLanguages() {
+        QuestionES questionES = new QuestionES();
+        questionES.setQuestionId(106L);
+        questionES.setTitle("Legacy Java Only Starter");
+        questionES.setDifficulty(1);
+        questionES.setContent("from es");
+        questionES.setStarterCodeJson("{\"java\":\"class AuthoredMain {}\"}");
+        questionES.setDefaultCode("class AuthoredMain {}");
+
+        when(questionRepository.findById(106L)).thenReturn(Optional.of(questionES));
+
+        QuestionDetailVO detail = questionService.detail(106L);
+
+        assertNotNull(detail);
+        assertEquals(4, detail.getStarterCode().size());
+        assertEquals("class AuthoredMain {}", detail.getStarterCode().get("java"));
+        assertFalse(detail.getStarterCode().get("cpp").isBlank());
+        assertFalse(detail.getStarterCode().get("python").isBlank());
+        assertFalse(detail.getStarterCode().get("go").isBlank());
+    }
+
+    @Test
+    void detailShouldHealStaleIndexDocumentFromDatabase() {
+        QuestionES questionES = new QuestionES();
+        questionES.setQuestionId(105L);
+        questionES.setTitle("Stale Index Document");
+        questionES.setDifficulty(1);
+        questionES.setContent("from es");
+        questionES.setDefaultCode("class LegacyMain {}");
+
+        Question question = new Question();
+        question.setQuestionId(105L);
+        question.setStarterCodeJson("{\"java\":\"class Authored {}\",\"cpp\":\"int main(){}\"}");
+
+        when(questionRepository.findById(105L)).thenReturn(Optional.of(questionES));
+        when(questionMapper.selectById(105L)).thenReturn(question);
+
+        QuestionDetailVO detail = questionService.detail(105L);
+
+        assertNotNull(detail);
+        assertEquals("class Authored {}", detail.getStarterCode().get("java"));
+        assertEquals("int main(){}", detail.getStarterCode().get("cpp"));
+        verify(questionRepository).save(questionES);
     }
 }

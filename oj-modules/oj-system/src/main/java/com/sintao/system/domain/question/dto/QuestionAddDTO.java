@@ -35,6 +35,8 @@ public class QuestionAddDTO {
 
     private String defaultCode;
 
+    private String starterCodeJson;
+
     private String mainFuc;
 }
 

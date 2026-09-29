@@ -41,6 +41,7 @@ type BackendQuestionDetail = {
   content?: string | null;
   questionCase?: string | null;
   defaultCode?: string | null;
+  starterCodeJson?: string | null;
   mainFuc?: string | null;
 };
 
@@ -127,6 +128,7 @@ export type AdminQuestionDetail = {
   content: string;
   questionCase: string;
   defaultCode: string;
+  starterCodeJson: string;
   mainFuc: string;
 };
 
@@ -249,7 +251,8 @@ export async function getAdminQuestionDetail(token: string | null | undefined, q
       ...previewQuestion,
       questionType: "PROGRAMMING",
       answerConfigJson: "{}",
-      gradingConfigJson: "{}"
+      gradingConfigJson: "{}",
+      starterCodeJson: JSON.stringify({ java: previewQuestion.defaultCode })
     } satisfies AdminQuestionDetail;
   }
   const payload = await requestJson<ApiEnvelope<BackendQuestionDetail>>(`/system/question/detail?questionId=${encodeURIComponent(questionId)}`, { token });
@@ -270,6 +273,7 @@ export async function getAdminQuestionDetail(token: string | null | undefined, q
     content: data.content ?? "",
     questionCase: data.questionCase ?? "[]",
     defaultCode: data.defaultCode ?? "",
+    starterCodeJson: data.starterCodeJson ?? JSON.stringify({ java: data.defaultCode ?? "" }),
     mainFuc: data.mainFuc ?? ""
   } satisfies AdminQuestionDetail;
 }

@@ -5,6 +5,7 @@ import com.sintao.api.domain.dto.JudgeSubmitDTO;
 import com.sintao.common.core.constants.Constants;
 import com.sintao.common.core.enums.ExamAttemptStatus;
 import com.sintao.common.core.enums.ExamStatus;
+import com.sintao.common.core.enums.ProgramType;
 import com.sintao.common.core.enums.ResultCode;
 import com.sintao.common.core.utils.ThreadLocalUtil;
 import com.sintao.common.redis.service.JudgeRuntimeStateService;
@@ -217,6 +218,37 @@ class TrustedExamServiceImplTest {
     }
 
     @Test
+    void pythonSubmissionShouldKeepLanguageInJudgePayloadAndSubmission() {
+        ExamAttempt attempt = inProgressAttempt(NOW_UTC.plusMinutes(30));
+        ExamAnswer answer = answer(3);
+        answer.setLanguageCode("python");
+        when(userSubmitMapper.selectOne(any())).thenReturn(null);
+        when(attemptMapper.selectByIdForUpdate(900L)).thenReturn(attempt);
+        when(versionMapper.selectById(800L)).thenReturn(version());
+        when(versionQuestionMapper.selectById(801L)).thenReturn(question());
+        when(answerMapper.selectOne(any())).thenReturn(answer);
+        when(userSubmitMapper.selectCount(any())).thenReturn(0L);
+        doAnswer(invocation -> {
+            ((UserSubmit) invocation.getArgument(0)).setSubmitId(920L);
+            return 1;
+        }).when(userSubmitMapper).insert(any(UserSubmit.class));
+        ExamSubmissionDTO request = new ExamSubmissionDTO();
+        request.setVersionQuestionId(801L);
+        request.setAnswerVersion(3);
+        request.setSubmitKind("RUN");
+
+        service.submit(900L, request, "judge-python-1");
+
+        ArgumentCaptor<UserSubmit> submitCaptor = ArgumentCaptor.forClass(UserSubmit.class);
+        ArgumentCaptor<JudgeSubmitDTO> payloadCaptor = ArgumentCaptor.forClass(JudgeSubmitDTO.class);
+        InOrder order = inOrder(userSubmitMapper, judgeProducer);
+        order.verify(userSubmitMapper).insert(submitCaptor.capture());
+        order.verify(judgeProducer).produceMsg(payloadCaptor.capture());
+        assertEquals(ProgramType.PYTHON.getValue(), submitCaptor.getValue().getProgramType());
+        assertEquals(ProgramType.PYTHON.getValue(), payloadCaptor.getValue().getProgramType());
+    }
+
+    @Test
     void finalizeShouldFreezeAnswersAndCreateWaitingGrade() {
         ExamAttempt attempt = inProgressAttempt(NOW_UTC.plusMinutes(30));
         when(commandMapper.selectOne(any())).thenReturn(null);
@@ -332,8 +364,9 @@ class TrustedExamServiceImplTest {
         question.setTimeLimit(1000L);
         question.setSpaceLimit(131072L);
         question.setQuestionCase("[{\"input\":\"1 2\",\"output\":\"3\"}]");
-        question.setAllowedLanguagesJson("[\"java\"]");
-        question.setStarterCodeJson("{\"java\":\"class Main {}\"}");
+        question.setAllowedLanguagesJson("[\"java\",\"cpp\",\"python\",\"go\"]");
+        question.setStarterCodeJson("{\"java\":\"class Main {}\",\"cpp\":\"int main(){}\","
+                + "\"python\":\"print(3)\",\"go\":\"package main\"}");
         return question;
     }
 

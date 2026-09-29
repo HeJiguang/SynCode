@@ -11,6 +11,7 @@ import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFacto
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -35,6 +36,11 @@ public class RabbitConfig {
     }
 
     @Bean
+    public Queue batchQueue() {
+        return QueueBuilder.durable(RabbitMQConstants.OJ_BATCH_QUEUE).build();
+    }
+
+    @Bean
     public Queue retryQueue() {
         return QueueBuilder.durable(RabbitMQConstants.OJ_RETRY_QUEUE)
                 .ttl(RETRY_DELAY_MILLIS)
@@ -44,26 +50,54 @@ public class RabbitConfig {
     }
 
     @Bean
+    public Queue batchRetryQueue() {
+        return QueueBuilder.durable(RabbitMQConstants.OJ_BATCH_RETRY_QUEUE)
+                .ttl(RETRY_DELAY_MILLIS)
+                .deadLetterExchange(RabbitMQConstants.OJ_JUDGE_EXCHANGE)
+                .deadLetterRoutingKey(RabbitMQConstants.JUDGE_BATCH_KEY)
+                .build();
+    }
+
+    @Bean
     public Queue deadQueue() {
         return QueueBuilder.durable(RabbitMQConstants.OJ_DEAD_QUEUE).build();
     }
 
     @Bean
-    public Binding workQueueBinding(Queue workQueue, DirectExchange judgeExchange) {
+    public Binding workQueueBinding(@Qualifier("workQueue") Queue workQueue,
+                                    @Qualifier("judgeExchange") DirectExchange judgeExchange) {
         return BindingBuilder.bind(workQueue)
                 .to(judgeExchange)
                 .with(RabbitMQConstants.JUDGE_SUBMIT_KEY);
     }
 
     @Bean
-    public Binding retryQueueBinding(Queue retryQueue, DirectExchange judgeDeadLetterExchange) {
+    public Binding batchQueueBinding(@Qualifier("batchQueue") Queue batchQueue,
+                                     @Qualifier("judgeExchange") DirectExchange judgeExchange) {
+        return BindingBuilder.bind(batchQueue)
+                .to(judgeExchange)
+                .with(RabbitMQConstants.JUDGE_BATCH_KEY);
+    }
+
+    @Bean
+    public Binding retryQueueBinding(@Qualifier("retryQueue") Queue retryQueue,
+                                     @Qualifier("judgeDeadLetterExchange") DirectExchange judgeDeadLetterExchange) {
         return BindingBuilder.bind(retryQueue)
                 .to(judgeDeadLetterExchange)
                 .with(RabbitMQConstants.JUDGE_RETRY_KEY);
     }
 
     @Bean
-    public Binding deadQueueBinding(Queue deadQueue, DirectExchange judgeDeadLetterExchange) {
+    public Binding batchRetryQueueBinding(@Qualifier("batchRetryQueue") Queue batchRetryQueue,
+                                          @Qualifier("judgeDeadLetterExchange") DirectExchange judgeDeadLetterExchange) {
+        return BindingBuilder.bind(batchRetryQueue)
+                .to(judgeDeadLetterExchange)
+                .with(RabbitMQConstants.JUDGE_BATCH_RETRY_KEY);
+    }
+
+    @Bean
+    public Binding deadQueueBinding(@Qualifier("deadQueue") Queue deadQueue,
+                                    @Qualifier("judgeDeadLetterExchange") DirectExchange judgeDeadLetterExchange) {
         return BindingBuilder.bind(deadQueue)
                 .to(judgeDeadLetterExchange)
                 .with(RabbitMQConstants.JUDGE_DEAD_KEY);

@@ -20,6 +20,8 @@ class _CamelCaseModel(BaseModel):
             "questionTitle": "question_title",
             "questionContent": "question_content",
             "userCode": "user_code",
+            "selectedCode": "selected_code",
+            "language": "language",
             "judgeResult": "judge_result",
             "submissionId": "submission_id",
             "userMessage": "user_message",
@@ -35,9 +37,13 @@ class RunContextPayload(_CamelCaseModel):
     question_title: str | None = Field(default=None)
     question_content: str | None = Field(default=None)
     user_code: str | None = Field(default=None)
+    selected_code: str | None = Field(default=None)
+    language: str | None = Field(default=None)
     judge_result: str | None = Field(default=None)
     submission_id: str | None = Field(default=None)
     user_message: str | None = Field(default=None)
+    approved_memories: list[str] = Field(default_factory=list)
+    approved_tool_context: list[dict[str, Any]] = Field(default_factory=list)
 
 
 # 创建run的请求体

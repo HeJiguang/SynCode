@@ -59,6 +59,7 @@ _EVENT_TYPE_LABELS = {
     "run.accepted": "运行已创建",
     "run.queued": "运行已入队",
     "run.started": "开始执行",
+    "resource.limit_rejected": "资源限制已拒绝",
     "graph.node_started": "节点开始执行",
     "graph.node_completed": "节点已完成",
     "retrieval.query_planned": "检索计划已生成",
@@ -66,6 +67,7 @@ _EVENT_TYPE_LABELS = {
     "tool.called": "已调用工具",
     "tool.succeeded": "工具执行成功",
     "tool.failed": "工具执行失败",
+    "tool.approval_requested": "等待工具授权",
     "guardrail.triggered": "触发安全校验",
     "artifact.created": "结果卡片已生成",
     "write.intent_created": "写入意图已生成",
@@ -95,6 +97,8 @@ _NODE_LABELS = {
     "response_packaging": "结果封装",
     "training_plan_llm": "训练计划生成",
     "runtime_execution": "运行时执行",
+    "run_admission": "运行准入",
+    "run_execution_slot": "执行资源等待",
 }
 
 

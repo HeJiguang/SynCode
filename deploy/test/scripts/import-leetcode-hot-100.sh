@@ -19,6 +19,38 @@ public class Main {
         // TODO: parse the input, implement the algorithm, and print the answer.
     }
 }'
+cpp_default_code='#include <bits/stdc++.h>
+using namespace std;
+
+int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+    // TODO: parse stdin, implement the algorithm, and print the answer.
+    return 0;
+}'
+python_default_code='import sys
+
+def solve():
+    # TODO: parse stdin, implement the algorithm, and print the answer.
+    pass
+
+if __name__ == "__main__":
+    solve()'
+go_default_code='package main
+
+import (
+    "bufio"
+    "fmt"
+    "os"
+)
+
+func main() {
+    in := bufio.NewReader(os.Stdin)
+    out := bufio.NewWriter(os.Stdout)
+    defer out.Flush()
+    _, _ = in, fmt.Fprint
+    // TODO: parse stdin, implement the algorithm, and print the answer.
+}'
 
 api() {
   local response
@@ -86,6 +118,9 @@ while IFS= read -r entry; do
     --arg title "$title" \
     --arg content "$content" \
     --arg default_code "$default_code" \
+    --arg cpp_default_code "$cpp_default_code" \
+    --arg python_default_code "$python_default_code" \
+    --arg go_default_code "$go_default_code" \
     --arg source_id "$source_id" \
     --arg source_url "$source_url" '
       {
@@ -96,13 +131,14 @@ while IFS= read -r entry; do
         estimatedMinutes: .estimatedMinutes,
         trainingEnabled: 1,
         questionType: "PROGRAMMING",
-        answerConfigJson: ({language:"java",entry:"stdin-stdout",sourceUrl:$source_url} | tojson),
+        answerConfigJson: ({languages:["java","cpp","python","go"],entry:"stdin-stdout",sourceUrl:$source_url} | tojson),
         gradingConfigJson: ({mode:"STANDARD",source:"leetcode-hot-100",sourceId:$source_id} | tojson),
         timeLimit: 2000,
         spaceLimit: 262144,
         content: $content,
         questionCase: (.cases | tojson),
         defaultCode: $default_code,
+        starterCodeJson: ({java:$default_code,cpp:$cpp_default_code,python:$python_default_code,go:$go_default_code} | tojson),
         mainFuc: ""
       }
     ' <<<"$entry")"

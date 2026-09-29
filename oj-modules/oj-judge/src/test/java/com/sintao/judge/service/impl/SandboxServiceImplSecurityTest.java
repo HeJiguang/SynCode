@@ -25,5 +25,6 @@ class SandboxServiceImplSecurityTest {
         assertEquals(64L, hostConfig.getPidsLimit());
         assertEquals("none", hostConfig.getNetworkMode());
         assertTrue(hostConfig.getReadonlyRootfs());
+        assertEquals("rw,noexec,nosuid,size=64m", hostConfig.getTmpFs().get("/tmp"));
     }
 }

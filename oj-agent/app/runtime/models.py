@@ -17,7 +17,13 @@ class RequestContext(BaseModel):
     question_title: str | None = None
     question_content: str | None = None
     user_code: str | None = None
+    selected_code: str | None = None
+    language: str | None = None
     judge_result: str | None = None
+    approved_memories: list[str] = Field(default_factory=list)
+    approved_tool_context: list[dict[str, Any]] = Field(default_factory=list)
+    learning_context: dict[str, Any] = Field(default_factory=dict)
+    learning_tool_calls: list[dict[str, str]] = Field(default_factory=list)
     exam_id: str | None = None
     plan_id: str | None = None
 

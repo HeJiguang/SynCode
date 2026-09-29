@@ -122,3 +122,28 @@ def test_load_settings_reads_qdrant_settings_from_nacos_bootstrap(monkeypatch):
     assert settings.qdrant_collection == "oj-agent-knowledge"
     assert settings.qdrant_top_k == 5
     assert settings.qdrant_chunk_size == 240
+
+
+def test_load_settings_reads_hermes_runtime_configuration(monkeypatch):
+    monkeypatch.setattr("app.core.config._resolve_default_nacos_ip", lambda: "127.0.0.1")
+    monkeypatch.setenv("OJ_AGENT_RUNTIME_PROVIDER", "hermes")
+    monkeypatch.setenv("OJ_AGENT_RUNTIME_FALLBACK_TO_DIRECT", "false")
+    monkeypatch.setenv("OJ_AGENT_HERMES_BASE_URL", "http://hermes:8642")
+    monkeypatch.setenv("OJ_AGENT_HERMES_API_KEY", "sidecar-key")
+    monkeypatch.setenv("OJ_AGENT_HERMES_PROVIDER", "deepseek")
+    monkeypatch.setenv("OJ_AGENT_HERMES_CHAT_MODEL", "deepseek-v4-pro")
+    monkeypatch.setenv("OJ_AGENT_HERMES_TRAINING_MODEL", "deepseek-v4-pro")
+    monkeypatch.setenv("OJ_AGENT_HERMES_RUN_TIMEOUT_SECONDS", "120")
+    monkeypatch.setenv("OJ_AGENT_HERMES_POLL_INTERVAL_SECONDS", "0.5")
+
+    settings = load_settings()
+
+    assert settings.agent_runtime_provider == "hermes"
+    assert settings.agent_runtime_fallback_to_direct is False
+    assert settings.hermes_base_url == "http://hermes:8642"
+    assert settings.hermes_api_key == "sidecar-key"
+    assert settings.hermes_provider == "deepseek"
+    assert settings.hermes_chat_model == "deepseek-v4-pro"
+    assert settings.hermes_training_model == "deepseek-v4-pro"
+    assert settings.hermes_run_timeout_seconds == 120.0
+    assert settings.hermes_poll_interval_seconds == 0.5

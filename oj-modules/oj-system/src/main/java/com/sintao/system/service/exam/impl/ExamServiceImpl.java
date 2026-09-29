@@ -14,6 +14,7 @@ import com.sintao.common.core.constants.Constants;
 import com.sintao.common.core.enums.ExamStatus;
 import com.sintao.common.core.enums.ResultCode;
 import com.sintao.common.core.enums.QuestionType;
+import com.sintao.common.core.utils.MultiLanguageStarterCodes;
 import com.sintao.common.core.utils.ThreadLocalUtil;
 import com.sintao.common.security.exception.ServiceException;
 import com.sintao.system.domain.exam.Exam;
@@ -73,7 +74,7 @@ public class ExamServiceImpl extends ServiceImpl<ExamQuestionMapper, ExamQuestio
     private static final String DEFAULT_TIMEZONE = "Asia/Shanghai";
     private static final String DEFAULT_RESULT_POLICY = "MANUAL";
     private static final String PROGRAMMING = "PROGRAMMING";
-    private static final String JAVA_LANGUAGES_JSON = "[\"java\"]";
+    private static final List<String> SUPPORTED_LANGUAGES = List.of("java", "cpp", "python", "go");
 
     private final ExamMapper examMapper;
     private final QuestionMapper questionMapper;
@@ -546,9 +547,10 @@ public class ExamServiceImpl extends ServiceImpl<ExamQuestionMapper, ExamQuestio
         snapshot.setQuestionCase(question.getQuestionCase());
         snapshot.setDefaultCode(question.getDefaultCode());
         snapshot.setMainFuc(question.getMainFuc());
-        snapshot.setAllowedLanguagesJson(type == QuestionType.PROGRAMMING ? JAVA_LANGUAGES_JSON : "[]");
-        snapshot.setStarterCodeJson(type == QuestionType.PROGRAMMING
-                ? writeJson(Map.of("java", nullToEmpty(question.getDefaultCode()))) : "{}");
+        Map<String, String> starterCodes = type == QuestionType.PROGRAMMING
+                ? supportedStarterCodes(question) : Map.of();
+        snapshot.setAllowedLanguagesJson(writeJson(new ArrayList<>(starterCodes.keySet())));
+        snapshot.setStarterCodeJson(writeJson(starterCodes));
         snapshot.setJudgeConfigJson(type == QuestionType.PROGRAMMING
                 ? writeJson(Map.of("mode", "STANDARD")) : "{}");
         snapshot.setAnswerConfigJson(question.getAnswerConfigJson());
@@ -612,6 +614,7 @@ public class ExamServiceImpl extends ServiceImpl<ExamQuestionMapper, ExamQuestio
         canonical.put("defaultCode", question.getDefaultCode());
         canonical.put("mainFuc", question.getMainFuc());
         canonical.put("allowedLanguages", question.getAllowedLanguagesJson());
+        canonical.put("starterCode", question.getStarterCodeJson());
         canonical.put("answerConfig", question.getAnswerConfigJson());
         canonical.put("gradingConfig", question.getGradingConfigJson());
         return DigestUtil.sha256Hex(writeJson(canonical));
@@ -728,6 +731,27 @@ public class ExamServiceImpl extends ServiceImpl<ExamQuestionMapper, ExamQuestio
         } catch (JsonProcessingException exception) {
             return false;
         }
+    }
+
+    private Map<String, String> supportedStarterCodes(Question question) {
+        Map<String, String> starters = new LinkedHashMap<>();
+        if (question.getStarterCodeJson() != null && !question.getStarterCodeJson().isBlank()) {
+            try {
+                JsonNode root = objectMapper.readTree(question.getStarterCodeJson());
+                for (String language : SUPPORTED_LANGUAGES) {
+                    JsonNode source = root.get(language);
+                    if (source != null && source.isTextual() && !source.asText().isBlank()) {
+                        starters.put(language, source.asText());
+                    }
+                }
+            } catch (JsonProcessingException exception) {
+                log.warn("Invalid starter code JSON for question {}", question.getQuestionId(), exception);
+            }
+        }
+        if (starters.isEmpty() || starters.get("java") == null || starters.get("java").isBlank()) {
+            starters.put("java", nullToEmpty(question.getDefaultCode()));
+        }
+        return MultiLanguageStarterCodes.expandStarterMap(starters);
     }
 
     private String writeJson(Object value) {

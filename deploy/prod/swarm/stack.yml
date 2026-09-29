@@ -43,6 +43,7 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       SYNCODE_BACKEND_BASE_URL: http://oj-gateway:19090
+      AGENT_PUBLIC_BASE_URL: http://oj-agent:8015
       SYNCODE_DEMO_LOGIN_ENABLED: ${SYNCODE_DEMO_LOGIN_ENABLED:-false}
     networks:
       - edge
@@ -85,6 +86,12 @@ services:
     image: ${SYSTEM_IMAGE}
     env_file:
       - ../env/runtime.env
+    environment:
+      SYNCODE_ID_LOGICAL_CLOCK_ENABLED: "true"
+      SYNCODE_ID_LOGICAL_CLOCK_WORKER_ID: "11"
+      SYNCODE_ID_LOGICAL_CLOCK_STATE_FILE: /app/id-state/high-watermark.properties
+    volumes:
+      - system_id_state:/app/id-state
     networks:
       - backend
     deploy:
@@ -96,6 +103,12 @@ services:
     image: ${FRIEND_IMAGE}
     env_file:
       - ../env/runtime.env
+    environment:
+      SYNCODE_ID_LOGICAL_CLOCK_ENABLED: "true"
+      SYNCODE_ID_LOGICAL_CLOCK_WORKER_ID: "12"
+      SYNCODE_ID_LOGICAL_CLOCK_STATE_FILE: /app/id-state/high-watermark.properties
+    volumes:
+      - friend_id_state:/app/id-state
     networks:
       - backend
     deploy:
@@ -107,6 +120,12 @@ services:
     image: ${JOB_IMAGE}
     env_file:
       - ../env/runtime.env
+    environment:
+      SYNCODE_ID_LOGICAL_CLOCK_ENABLED: "true"
+      SYNCODE_ID_LOGICAL_CLOCK_WORKER_ID: "13"
+      SYNCODE_ID_LOGICAL_CLOCK_STATE_FILE: /app/id-state/high-watermark.properties
+    volumes:
+      - job_id_state:/app/id-state
     networks:
       - backend
     deploy:
@@ -118,6 +137,12 @@ services:
     image: ${AGENT_IMAGE}
     env_file:
       - ../env/runtime.env
+    environment:
+      OJ_AGENT_AUTH_BASE_URL: http://oj-gateway:19090
+      OJ_AGENT_ALLOW_INSECURE_USER_ID_BODY: "false"
+      OJ_AGENT_RUNTIME_DATA_DIR: /app/runtime-artifacts
+    volumes:
+      - agent_runtime_data:/app/runtime-artifacts
     networks:
       - backend
     deploy:
@@ -131,7 +156,12 @@ services:
       - ../env/runtime.env
     environment:
       SPRING_PROFILES_ACTIVE: swarm
+      SANDBOX_EXECUTION_MODE: ${SANDBOX_EXECUTION_MODE:-pool}
+      SYNCODE_ID_LOGICAL_CLOCK_ENABLED: "true"
+      SYNCODE_ID_LOGICAL_CLOCK_WORKER_ID: "14"
+      SYNCODE_ID_LOGICAL_CLOCK_STATE_FILE: /app/id-state/high-watermark.properties
     volumes:
+      - judge_id_state:/app/id-state
       - type: bind
         source: ${DOCKER_SOCKET_PATH}
         target: /var/run/docker.sock
@@ -159,3 +189,10 @@ networks:
     driver: overlay
   backend:
     driver: overlay
+
+volumes:
+  system_id_state:
+  friend_id_state:
+  job_id_state:
+  judge_id_state:
+  agent_runtime_data:

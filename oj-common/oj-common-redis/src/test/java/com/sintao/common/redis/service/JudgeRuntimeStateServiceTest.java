@@ -12,6 +12,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
 
 class JudgeRuntimeStateServiceTest {
 
@@ -48,5 +50,19 @@ class JudgeRuntimeStateServiceTest {
         assertEquals("RETRY_WAIT", persistedState.get("phase"));
         assertEquals(2, persistedState.get("retryCount"));
         assertEquals("sandbox busy", persistedState.get("lastError"));
+    }
+
+    @Test
+    void onlyTheLockOwnerMayRenewOrReleaseItsLease() {
+        RedisService redisService = mock(RedisService.class);
+        JudgeRuntimeStateService service = new JudgeRuntimeStateService(redisService, 30);
+        String key = CacheConstants.JUDGE_REQUEST_LOCK + "req-lease";
+        when(redisService.compareAndExpire(key, "owner-1", 300)).thenReturn(true);
+        when(redisService.compareAndDelete(key, "owner-1")).thenReturn(true);
+
+        assertTrue(service.renewLock("req-lease", "owner-1", 300));
+        assertTrue(service.unlock("req-lease", "owner-1"));
+        verify(redisService).compareAndExpire(key, "owner-1", 300);
+        verify(redisService).compareAndDelete(key, "owner-1");
     }
 }

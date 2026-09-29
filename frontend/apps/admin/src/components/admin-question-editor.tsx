@@ -21,6 +21,13 @@ const questionTypes = [
 const selectClassName =
   "h-11 rounded-[8px] border border-[var(--border-soft)] bg-[var(--surface-2)] px-4 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)]";
 
+const defaultStarterCodes = {
+  java: "import java.io.*;\n\npublic class Main {\n    public static void main(String[] args) throws Exception {\n        // TODO\n    }\n}",
+  cpp: "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // TODO\n    return 0;\n}",
+  python: "import sys\n\ndef solve():\n    # TODO\n    pass\n\nif __name__ == \"__main__\":\n    solve()",
+  go: "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    in := bufio.NewReader(os.Stdin)\n    out := bufio.NewWriter(os.Stdout)\n    defer out.Flush()\n    _, _ = in, fmt.Fprint\n    // TODO\n}"
+};
+
 function parseJson(value: string) {
   try { return JSON.parse(value) as Record<string, unknown>; } catch { return {}; }
 }
@@ -55,7 +62,8 @@ export function AdminQuestionEditor({ question }: AdminQuestionEditorProps) {
     questionId: "", title: "", difficulty: 2, algorithmTag: "", knowledgeTags: "",
     estimatedMinutes: 20, trainingEnabled: 0, questionType: "PROGRAMMING",
     answerConfigJson: "{}", gradingConfigJson: "{}", timeLimit: 1000, spaceLimit: 262144,
-    content: "", questionCase: "[]", defaultCode: "", mainFuc: ""
+    content: "", questionCase: "[]", defaultCode: defaultStarterCodes.java,
+    starterCodeJson: JSON.stringify(defaultStarterCodes), mainFuc: ""
   });
   const initialAnswerConfig = React.useMemo(() => parseJson(question?.answerConfigJson ?? "{}"), [question]);
   const initialGradingConfig = React.useMemo(() => parseJson(question?.gradingConfigJson ?? "{}"), [question]);
@@ -72,6 +80,22 @@ export function AdminQuestionEditor({ question }: AdminQuestionEditorProps) {
 
   function updateField<K extends keyof AdminQuestionDetail>(key: K, value: AdminQuestionDetail[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function starterCodes() {
+    const parsed = parseJson(form.starterCodeJson);
+    return Object.fromEntries(Object.entries(defaultStarterCodes).map(([language, fallback]) =>
+      [language, typeof parsed[language] === "string" ? parsed[language] : language === "java" && form.defaultCode ? form.defaultCode : fallback]
+    )) as Record<keyof typeof defaultStarterCodes, string>;
+  }
+
+  function updateStarterCode(language: keyof typeof defaultStarterCodes, source: string) {
+    const next = { ...starterCodes(), [language]: source };
+    setForm((current) => ({
+      ...current,
+      defaultCode: language === "java" ? source : current.defaultCode,
+      starterCodeJson: JSON.stringify(next)
+    }));
   }
 
   function setQuestionType(questionType: string) {
@@ -92,7 +116,7 @@ export function AdminQuestionEditor({ question }: AdminQuestionEditorProps) {
     if (form.questionType === "FILE") return [{ acceptedFormats: acceptedFormats.split(",").map((value) => value.trim()).filter(Boolean), maxSizeKb: 200 }, { rubric }];
     if (form.questionType === "PROJECT") return [{ requireRepositoryUrl: true }, { rubric }];
     if (["SHORT_ANSWER", "SQL"].includes(form.questionType)) return [{}, { rubric }];
-    return [{ language: "java" }, { mode: "STANDARD" }];
+    return [{ languages: ["java", "cpp", "python", "go"], entry: "stdin-stdout" }, { mode: "STANDARD" }];
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -158,8 +182,8 @@ export function AdminQuestionEditor({ question }: AdminQuestionEditorProps) {
     {form.questionType === "PROGRAMMING" ? <section className="space-y-4 border-t border-[var(--border-soft)] pt-5">
       <div className="grid gap-4 md:grid-cols-2"><label className="space-y-2"><span className="text-sm text-[var(--text-secondary)]">时间限制（ms）</span><Input type="number" min="1" value={form.timeLimit} onChange={(event) => updateField("timeLimit", Number(event.target.value))} /></label><label className="space-y-2"><span className="text-sm text-[var(--text-secondary)]">空间限制（KB）</span><Input type="number" min="1" value={form.spaceLimit} onChange={(event) => updateField("spaceLimit", Number(event.target.value))} /></label></div>
       <label className="space-y-2"><span className="text-sm text-[var(--text-secondary)]">判题用例 JSON</span><Textarea value={form.questionCase} onChange={(event) => updateField("questionCase", event.target.value)} /></label>
-      <label className="space-y-2"><span className="text-sm text-[var(--text-secondary)]">默认代码</span><Textarea value={form.defaultCode} onChange={(event) => updateField("defaultCode", event.target.value)} /></label>
-      <label className="space-y-2"><span className="text-sm text-[var(--text-secondary)]">主函数片段</span><Textarea value={form.mainFuc} onChange={(event) => updateField("mainFuc", event.target.value)} /></label>
+      <div className="grid gap-4 lg:grid-cols-2">{Object.entries(starterCodes()).map(([language, source]) => <label key={language} className="space-y-2"><span className="text-sm text-[var(--text-secondary)]">{language.toUpperCase()} 初始代码</span><Textarea className="min-h-56 font-mono" value={source} onChange={(event) => updateStarterCode(language as keyof typeof defaultStarterCodes, event.target.value)} /></label>)}</div>
+      <label className="space-y-2"><span className="text-sm text-[var(--text-secondary)]">旧版 Java 主函数片段（仅兼容历史题目）</span><Textarea value={form.mainFuc} onChange={(event) => updateField("mainFuc", event.target.value)} /></label>
     </section> : null}
     {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
     <div className="flex flex-wrap gap-3"><Button type="submit" disabled={submitting}>{submitting ? <LoaderCircle size={14} className="animate-spin" /> : null}{frontendPreviewMode ? "预览模式下不可保存" : "保存题目"}</Button>{question ? <Button type="button" variant="secondary" disabled={submitting} onClick={() => void handleDelete()}>{frontendPreviewMode ? "预览模式下不可删除" : "删除题目"}</Button> : null}</div>

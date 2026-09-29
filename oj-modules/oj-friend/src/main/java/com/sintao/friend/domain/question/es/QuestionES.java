@@ -55,6 +55,9 @@ public class QuestionES {
     @Field(type = FieldType.Text)
     private String defaultCode;
 
+    @Field(type = FieldType.Text)
+    private String starterCodeJson;
+
     @Field(type = FieldType.Date, format = DateFormat.date_hour_minute_second)
     private LocalDateTime createTime;
 }

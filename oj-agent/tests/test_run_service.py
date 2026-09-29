@@ -65,6 +65,34 @@ def test_add_artifact_persists_structured_result_and_event():
     assert events[-1].event_type is EventType.ARTIFACT_CREATED
 
 
+def test_new_service_instance_reads_persisted_run_events_and_artifacts():
+    writer = RunService()
+    run = writer.create_run(
+        run_type=RunType.INTERACTIVE_TUTOR,
+        source=RunSource.WORKSPACE_PANEL,
+        user_id="durable-user",
+        conversation_id="conv-durable",
+        request_payload={"run_type": "interactive_tutor", "context": {"user_message": "help"}},
+    )
+    artifact = writer.add_artifact(
+        Artifact(
+            run_id=run.run_id,
+            artifact_type=ArtifactType.ANSWER_CARD,
+            title="Persisted answer",
+            body={"answer": "stored"},
+        )
+    )
+    writer.mark_succeeded(run.run_id, active_node="response_packaging")
+
+    reader = RunService()
+
+    restored = reader.get_run(run.run_id)
+    assert restored.status is RunStatus.SUCCEEDED
+    assert restored.request_payload["context"]["user_message"] == "help"
+    assert reader.list_artifacts(run.run_id)[0].artifact_id == artifact.artifact_id
+    assert [event.seq for event in reader.list_events(run.run_id)] == [1, 2, 3]
+
+
 def test_balanced_policy_auto_approves_message_delivery():
     service = RunService()
     run = service.create_run(
@@ -118,4 +146,3 @@ def test_balanced_policy_creates_draft_and_inbox_for_high_impact_plan_replace():
     assert drafts[0].write_intent_id == write_intent.write_intent_id
     assert inbox_items[0].linked_draft_id == drafts[0].draft_id
     assert events[-1].event_type is EventType.DRAFT_CREATED
-

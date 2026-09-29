@@ -36,6 +36,11 @@ if [[ -z "${WORKER_IMAGE_LIST:-}" ]]; then
   WORKER_IMAGE_LIST="${AGENT_IMAGE} ${JUDGE_IMAGE}"
 fi
 
+sandbox_image="${SANDBOX_IMAGE:-syncode/oj-sandbox-multilang:1.0.0}"
+if [[ " ${WORKER_IMAGE_LIST} " != *" ${sandbox_image} "* ]]; then
+  WORKER_IMAGE_LIST="${WORKER_IMAGE_LIST} ${sandbox_image}"
+fi
+
 read -r -a worker_images <<< "$WORKER_IMAGE_LIST"
 if [[ "${#worker_images[@]}" -eq 0 ]]; then
   echo "WORKER_IMAGE_LIST is empty" >&2

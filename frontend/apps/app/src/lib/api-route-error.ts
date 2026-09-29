@@ -35,6 +35,7 @@ export function resolveApiRouteError(error: unknown, fallbackMessage: string): R
 }
 
 function mapApiErrorStatus(code: number) {
+  if (code >= 400 && code < 600) return code;
   if (code === 3001) return 401;
   if (code === 3106 || code === 3107) return 429;
   if ((code >= 3000 && code < 4000) || (code >= 4000 && code < 5000)) return 400;

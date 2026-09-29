@@ -1,1 +1,2 @@
 com.sintao.common.mybatis.MyMetaObjectHandler
+com.sintao.common.mybatis.id.LogicalSnowflakeAutoConfiguration

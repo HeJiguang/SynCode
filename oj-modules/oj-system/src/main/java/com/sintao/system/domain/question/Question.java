@@ -43,6 +43,8 @@ public class Question extends BaseEntity {
 
     private String defaultCode;
 
+    private String starterCodeJson;
+
     private String mainFuc;
 }
 

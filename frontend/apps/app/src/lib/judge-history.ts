@@ -18,6 +18,7 @@ function mapProgramType(programType?: number | null) {
   if (programType === 0) return "Java";
   if (programType === 1) return "C++";
   if (programType === 2) return "Go";
+  if (programType === 3) return "Python";
   return "Java";
 }
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 import uuid
 from dataclasses import dataclass
@@ -13,6 +14,7 @@ from app.models.import_record import ImportRecord
 from app.models.remote_db_config import RemoteDatabaseConfig
 from app.schemas.import_preview import ImportPreview
 from app.services.remote_db_config_service import RemoteDatabaseConfigService
+from app.services.starter_codes import build_starter_code_json
 
 
 @dataclass(slots=True)
@@ -51,6 +53,7 @@ class ImporterService:
             raise ValueError("Remote database is not configured.")
 
         question_id = self._generate_question_id()
+        java_starter = candidate.default_code_java or ""
         payload = {
             "question_id": question_id,
             "title": candidate.title,
@@ -59,11 +62,17 @@ class ImporterService:
             "knowledge_tags": candidate.knowledge_tags,
             "estimated_minutes": candidate.estimated_minutes,
             "training_enabled": 1,
+            "question_type": "PROGRAMMING",
+            "answer_config_json": json.dumps(
+                {"languages": ["java", "cpp", "python", "go"], "entry": "stdin-stdout"}
+            ),
+            "grading_config_json": json.dumps({"mode": "STANDARD"}),
             "time_limit": candidate.time_limit_ms,
             "space_limit": candidate.space_limit_kb,
             "content": candidate.statement_markdown,
             "question_case": candidate.question_case_json or "[]",
-            "default_code": candidate.default_code_java or "",
+            "default_code": java_starter,
+            "starter_code_json": build_starter_code_json(java_starter),
             "main_fuc": candidate.main_fuc_java or "",
             "create_by": self.settings.import_create_by,
             "create_time": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -75,12 +84,18 @@ class ImporterService:
                     """
                     INSERT INTO tb_question (
                         question_id, title, difficulty, algorithm_tag, knowledge_tags,
-                        estimated_minutes, training_enabled, time_limit, space_limit,
-                        content, question_case, default_code, main_fuc, create_by, create_time
+                        estimated_minutes, training_enabled, question_type,
+                        answer_config_json, grading_config_json,
+                        time_limit, space_limit,
+                        content, question_case, default_code, starter_code_json, main_fuc,
+                        create_by, create_time
                     ) VALUES (
                         :question_id, :title, :difficulty, :algorithm_tag, :knowledge_tags,
-                        :estimated_minutes, :training_enabled, :time_limit, :space_limit,
-                        :content, :question_case, :default_code, :main_fuc, :create_by, :create_time
+                        :estimated_minutes, :training_enabled, :question_type,
+                        :answer_config_json, :grading_config_json,
+                        :time_limit, :space_limit,
+                        :content, :question_case, :default_code, :starter_code_json, :main_fuc,
+                        :create_by, :create_time
                     )
                     """
                 ),

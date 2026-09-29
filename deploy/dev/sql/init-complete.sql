@@ -28,17 +28,22 @@ CREATE TABLE IF NOT EXISTS tb_question (
     knowledge_tags varchar(500) DEFAULT NULL COMMENT 'comma separated tags',
     estimated_minutes int DEFAULT NULL COMMENT 'estimated solving time',
     training_enabled tinyint NOT NULL DEFAULT 1 COMMENT 'whether training can use this question',
+    question_type varchar(32) NOT NULL DEFAULT 'PROGRAMMING' COMMENT 'question type',
+    answer_config_json json DEFAULT NULL COMMENT 'answer config snapshot',
+    grading_config_json json DEFAULT NULL COMMENT 'grading config snapshot',
     time_limit int NOT NULL COMMENT 'time limit ms',
     space_limit int NOT NULL COMMENT 'space limit kb',
-    content varchar(1000) NOT NULL COMMENT 'problem statement',
-    question_case varchar(1000) DEFAULT NULL COMMENT 'json cases',
-    default_code varchar(2000) NOT NULL COMMENT 'starter code',
-    main_fuc varchar(500) NOT NULL COMMENT 'entry code block',
+    content longtext NOT NULL COMMENT 'problem statement',
+    question_case longtext DEFAULT NULL COMMENT 'json cases',
+    default_code longtext DEFAULT NULL COMMENT 'legacy Java starter code',
+    starter_code_json json DEFAULT NULL COMMENT 'multi-language starter programs',
+    main_fuc longtext DEFAULT NULL COMMENT 'legacy Java entry code block',
     create_by bigint unsigned NOT NULL COMMENT 'creator',
     create_time datetime NOT NULL COMMENT 'created time',
     update_by bigint unsigned DEFAULT NULL COMMENT 'updater',
     update_time datetime DEFAULT NULL COMMENT 'updated time',
-    PRIMARY KEY (question_id)
+    PRIMARY KEY (question_id),
+    KEY idx_question_type (question_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='problem bank';
 
 CREATE TABLE IF NOT EXISTS tb_exam (
@@ -281,7 +286,7 @@ INSERT INTO tb_question (
         'Given two integers, print their sum.',
         '[{"input":"1 2","output":"3"},{"input":"4 5","output":"9"}]',
         'import java.util.*;\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int a = in.nextInt();\n        int b = in.nextInt();\n        System.out.println(a + b);\n    }\n}',
-        'public static void main(String[] args)',
+        NULL,
         1, NOW(), 1, NOW()
     ),
     (
@@ -297,7 +302,7 @@ INSERT INTO tb_question (
         'Given a bracket string, determine whether it is valid.',
         '[{"input":"()[]{}","output":"true"},{"input":"([)]","output":"false"}]',
         'import java.util.*;\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        String s = in.nextLine();\n        System.out.println(isValid(s));\n    }\n    static boolean isValid(String s) {\n        Deque<Character> stack = new ArrayDeque<>();\n        for (char c : s.toCharArray()) {\n            if (c == ''('' || c == ''['' || c == ''{'') stack.push(c);\n            else {\n                if (stack.isEmpty()) return false;\n                char top = stack.pop();\n                if ((c == '')'' && top != ''('') || (c == '']'' && top != ''['') || (c == ''}'' && top != ''{'')) return false;\n            }\n        }\n        return stack.isEmpty();\n    }\n}',
-        'public static void main(String[] args)',
+        NULL,
         1, NOW(), 1, NOW()
     ),
     (
@@ -313,7 +318,7 @@ INSERT INTO tb_question (
         'Find the target index in a sorted array, or print -1.',
         '[{"input":"5\n1 3 5 7 9\n7","output":"3"},{"input":"5\n1 3 5 7 9\n4","output":"-1"}]',
         'import java.util.*;\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int n = Integer.parseInt(in.nextLine().trim());\n        int[] nums = new int[n];\n        for (int i = 0; i < n; i++) nums[i] = in.nextInt();\n        int target = in.nextInt();\n        int left = 0, right = n - 1, ans = -1;\n        while (left <= right) {\n            int mid = left + (right - left) / 2;\n            if (nums[mid] == target) { ans = mid; break; }\n            if (nums[mid] < target) left = mid + 1; else right = mid - 1;\n        }\n        System.out.println(ans);\n    }\n}',
-        'public static void main(String[] args)',
+        NULL,
         1, NOW(), 1, NOW()
     ),
     (
@@ -329,7 +334,7 @@ INSERT INTO tb_question (
         'Count the number of islands in a 0/1 grid.',
         '[{"input":"4 5\n11000\n11000\n00100\n00011","output":"3"}]',
         'import java.util.*;\npublic class Main {\n    static int[] dx = {1,-1,0,0};\n    static int[] dy = {0,0,1,-1};\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int n = in.nextInt();\n        int m = in.nextInt();\n        char[][] grid = new char[n][m];\n        for (int i = 0; i < n; i++) grid[i] = in.next().toCharArray();\n        int count = 0;\n        for (int i = 0; i < n; i++) {\n            for (int j = 0; j < m; j++) {\n                if (grid[i][j] == ''1'') {\n                    count++;\n                    dfs(grid, i, j);\n                }\n            }\n        }\n        System.out.println(count);\n    }\n    static void dfs(char[][] g, int x, int y) {\n        if (x < 0 || y < 0 || x >= g.length || y >= g[0].length || g[x][y] != ''1'') return;\n        g[x][y] = ''0'';\n        for (int k = 0; k < 4; k++) dfs(g, x + dx[k], y + dy[k]);\n    }\n}',
-        'public static void main(String[] args)',
+        NULL,
         1, NOW(), 1, NOW()
     ),
     (
@@ -345,7 +350,7 @@ INSERT INTO tb_question (
         'Return the length of the longest strictly increasing subsequence.',
         '[{"input":"8\n10 9 2 5 3 7 101 18","output":"4"}]',
         'import java.util.*;\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int n = in.nextInt();\n        int[] tails = new int[n];\n        int size = 0;\n        for (int i = 0; i < n; i++) {\n            int x = in.nextInt();\n            int l = 0, r = size;\n            while (l < r) {\n                int mid = (l + r) >>> 1;\n                if (tails[mid] < x) l = mid + 1; else r = mid;\n            }\n            tails[l] = x;\n            if (l == size) size++;\n        }\n        System.out.println(size);\n    }\n}',
-        'public static void main(String[] args)',
+        NULL,
         1, NOW(), 1, NOW()
     )
 ON DUPLICATE KEY UPDATE
@@ -363,6 +368,94 @@ ON DUPLICATE KEY UPDATE
     main_fuc = VALUES(main_fuc),
     update_by = VALUES(update_by),
     update_time = VALUES(update_time);
+
+UPDATE tb_question
+SET starter_code_json = JSON_OBJECT(
+    'java', default_code,
+    'cpp', '#include <bits/stdc++.h>\nusing namespace std;\nint main() {\n    // TODO\n    return 0;\n}',
+    'python', 'def solve():\n    # TODO\n    pass\n\nif __name__ == "__main__":\n    solve()',
+    'go', 'package main\n\nfunc main() {\n    // TODO\n}'
+)
+WHERE starter_code_json IS NULL;
+
+-- Upgrade the seeded demo questions to real multi-language starters and normalize
+-- the question-bank metadata to the multi-language judge pool.
+UPDATE tb_question
+SET starter_code_json = JSON_OBJECT(
+    'java', default_code,
+    'cpp', '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    int a, b;\n    cin >> a >> b;\n    cout << a + b << endl;\n    return 0;\n}',
+    'python', 'a, b = map(int, input().split())\nprint(a + b)',
+    'go', 'package main\n\nimport "fmt"\n\nfunc main() {\n    var a, b int\n    _, _ = fmt.Scan(&a, &b)\n    fmt.Println(a + b)\n}'
+)
+WHERE question_type = 'PROGRAMMING'
+  AND title = 'Two Sum A Plus B'
+  AND default_code LIKE '%Scanner in = new Scanner(System.in)%'
+  AND default_code LIKE '%a + b%';
+
+UPDATE tb_question
+SET starter_code_json = JSON_OBJECT(
+    'java', default_code,
+    'cpp', '#include <bits/stdc++.h>\nusing namespace std;\n\nbool isValid(const string& s) {\n    stack<char> st;\n    for (char c : s) {\n        if (c == ''('' || c == ''['' || c == ''{'') st.push(c);\n        else {\n            if (st.empty()) return false;\n            char top = st.top();\n            st.pop();\n            if ((c == '')'' && top != ''('') || (c == '']'' && top != ''['') || (c == ''}'' && top != ''{'')) return false;\n        }\n    }\n    return st.empty();\n}\n\nint main() {\n    string s;\n    getline(cin, s);\n    cout << (isValid(s) ? "true" : "false") << endl;\n    return 0;\n}',
+    'python', 'def is_valid(s: str) -> bool:\n    stack = []\n    pairs = {'')'': ''('', '']'': ''['', ''}'': ''{''}\n    for c in s:\n        if c in ''([{'' :\n            stack.append(c)\n        elif not stack or stack.pop() != pairs[c]:\n            return False\n    return not stack\n\n\ns = input()\nprint(''true'' if is_valid(s) else ''false'')',
+    'go', 'package main\n\nimport (\n    "bufio"\n    "fmt"\n    "os"\n)\n\nfunc isValid(s string) bool {\n    var stack []rune\n    pairs := map[rune]rune{'')'': ''('', '']'': ''['', ''}'': ''{''}\n    for _, c := range s {\n        if c == ''('' || c == ''['' || c == ''{'' {\n            stack = append(stack, c)\n            continue\n        }\n        if len(stack) == 0 || stack[len(stack)-1] != pairs[c] {\n            return false\n        }\n        stack = stack[:len(stack)-1]\n    }\n    return len(stack) == 0\n}\n\nfunc main() {\n    in := bufio.NewReader(os.Stdin)\n    out := bufio.NewWriter(os.Stdout)\n    defer out.Flush()\n    var line string\n    _, _ = fmt.Fscan(in, &line)\n    if isValid(line) {\n        fmt.Fprintln(out, "true")\n    } else {\n        fmt.Fprintln(out, "false")\n    }\n}'
+)
+WHERE question_type = 'PROGRAMMING'
+  AND title = 'Valid Parentheses';
+
+UPDATE tb_question
+SET starter_code_json = JSON_OBJECT(
+    'java', default_code,
+    'cpp', '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    int n;\n    cin >> n;\n    vector<int> nums(n);\n    for (int i = 0; i < n; i++) cin >> nums[i];\n    int target;\n    cin >> target;\n    int left = 0, right = n - 1, ans = -1;\n    while (left <= right) {\n        int mid = left + (right - left) / 2;\n        if (nums[mid] == target) { ans = mid; break; }\n        if (nums[mid] < target) left = mid + 1; else right = mid - 1;\n    }\n    cout << ans << endl;\n    return 0;\n}',
+    'python', 'def main():\n    n = int(input())\n    nums = list(map(int, input().split()))\n    target = int(input())\n    left, right, ans = 0, n - 1, -1\n    while left <= right:\n        mid = (left + right) // 2\n        if nums[mid] == target:\n            ans = mid\n            break\n        if nums[mid] < target:\n            left = mid + 1\n        else:\n            right = mid - 1\n    print(ans)\n\n\nmain()',
+    'go', 'package main\n\nimport (\n    "bufio"\n    "fmt"\n    "os"\n)\n\nfunc main() {\n    in := bufio.NewReader(os.Stdin)\n    out := bufio.NewWriter(os.Stdout)\n    defer out.Flush()\n    var n int\n    _, _ = fmt.Fscan(in, &n)\n    nums := make([]int, n)\n    for i := 0; i < n; i++ {\n        _, _ = fmt.Fscan(in, &nums[i])\n    }\n    var target int\n    _, _ = fmt.Fscan(in, &target)\n    left, right, ans := 0, n-1, -1\n    for left <= right {\n        mid := left + (right-left)/2\n        if nums[mid] == target {\n            ans = mid\n            break\n        }\n        if nums[mid] < target {\n            left = mid + 1\n        } else {\n            right = mid - 1\n        }\n    }\n    fmt.Fprintln(out, ans)\n}'
+)
+WHERE question_type = 'PROGRAMMING'
+  AND title = 'Binary Search';
+
+UPDATE tb_question
+SET starter_code_json = JSON_OBJECT(
+    'java', default_code,
+    'cpp', '#include <bits/stdc++.h>\nusing namespace std;\n\nint dx[] = {1, -1, 0, 0};\nint dy[] = {0, 0, 1, -1};\n\nvoid dfs(vector<string>& g, int x, int y) {\n    if (x < 0 || y < 0 || x >= (int)g.size() || y >= (int)g[0].size() || g[x][y] != ''1'') return;\n    g[x][y] = ''0'';\n    for (int k = 0; k < 4; k++) dfs(g, x + dx[k], y + dy[k]);\n}\n\nint main() {\n    int n, m;\n    cin >> n >> m;\n    vector<string> grid(n);\n    for (int i = 0; i < n; i++) cin >> grid[i];\n    int count = 0;\n    for (int i = 0; i < n; i++) {\n        for (int j = 0; j < m; j++) {\n            if (grid[i][j] == ''1'') {\n                count++;\n                dfs(grid, i, j);\n            }\n        }\n    }\n    cout << count << endl;\n    return 0;\n}',
+    'python', 'import sys\n\n\ndef count_islands(grid, n, m):\n    count = 0\n    for i in range(n):\n        for j in range(m):\n            if grid[i][j] == ''1'':\n                count += 1\n                stack = [(i, j)]\n                grid[i][j] = ''0''\n                while stack:\n                    x, y = stack.pop()\n                    for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):\n                        if 0 <= nx < n and 0 <= ny < m and grid[nx][ny] == ''1'':\n                            grid[nx][ny] = ''0''\n                            stack.append((nx, ny))\n    return count\n\n\ndef main():\n    data = sys.stdin.read().split()\n    n, m = int(data[0]), int(data[1])\n    grid = [list(data[2 + i]) for i in range(n)]\n    print(count_islands(grid, n, m))\n\n\nmain()',
+    'go', 'package main\n\nimport (\n    "bufio"\n    "fmt"\n    "os"\n)\n\nvar dx = [4]int{1, -1, 0, 0}\nvar dy = [4]int{0, 0, 1, -1}\n\nfunc dfs(g [][]byte, x, y int) {\n    if x < 0 || y < 0 || x >= len(g) || y >= len(g[0]) || g[x][y] != ''1'' {\n        return\n    }\n    g[x][y] = ''0''\n    for k := 0; k < 4; k++ {\n        dfs(g, x+dx[k], y+dy[k])\n    }\n}\n\nfunc main() {\n    in := bufio.NewReader(os.Stdin)\n    out := bufio.NewWriter(os.Stdout)\n    defer out.Flush()\n    var n, m int\n    _, _ = fmt.Fscan(in, &n, &m)\n    g := make([][]byte, n)\n    for i := 0; i < n; i++ {\n        var row string\n        _, _ = fmt.Fscan(in, &row)\n        g[i] = []byte(row)\n    }\n    count := 0\n    for i := 0; i < n; i++ {\n        for j := 0; j < m; j++ {\n            if g[i][j] == ''1'' {\n                count++\n                dfs(g, i, j)\n            }\n        }\n    }\n    fmt.Fprintln(out, count)\n}'
+)
+WHERE question_type = 'PROGRAMMING'
+  AND title = 'Number of Islands';
+
+UPDATE tb_question
+SET starter_code_json = JSON_OBJECT(
+    'java', default_code,
+    'cpp', '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    int n;\n    cin >> n;\n    vector<int> tails(n);\n    int size = 0;\n    for (int i = 0; i < n; i++) {\n        int x;\n        cin >> x;\n        int l = 0, r = size;\n        while (l < r) {\n            int mid = (l + r) / 2;\n            if (tails[mid] < x) l = mid + 1; else r = mid;\n        }\n        tails[l] = x;\n        if (l == size) size++;\n    }\n    cout << size << endl;\n    return 0;\n}',
+    'python', 'import bisect\n\n\ndef main():\n    n = int(input())\n    nums = list(map(int, input().split()))\n    tails = []\n    for x in nums:\n        pos = bisect.bisect_left(tails, x)\n        if pos == len(tails):\n            tails.append(x)\n        else:\n            tails[pos] = x\n    print(len(tails))\n\n\nmain()',
+    'go', 'package main\n\nimport (\n    "bufio"\n    "fmt"\n    "os"\n)\n\nfunc main() {\n    in := bufio.NewReader(os.Stdin)\n    out := bufio.NewWriter(os.Stdout)\n    defer out.Flush()\n    var n int\n    _, _ = fmt.Fscan(in, &n)\n    tails := make([]int, 0, n)\n    for i := 0; i < n; i++ {\n        var x int\n        _, _ = fmt.Fscan(in, &x)\n        l, r := 0, len(tails)\n        for l < r {\n            mid := (l + r) / 2\n            if tails[mid] < x {\n                l = mid + 1\n            } else {\n                r = mid\n            }\n        }\n        if l == len(tails) {\n            tails = append(tails, x)\n        } else {\n            tails[l] = x\n        }\n    }\n    fmt.Fprintln(out, len(tails))\n}'
+)
+WHERE question_type = 'PROGRAMMING'
+  AND title = 'Longest Increasing Subsequence';
+
+UPDATE tb_question
+SET main_fuc = NULL
+WHERE main_fuc = 'public static void main(String[] args)';
+
+UPDATE tb_question
+SET answer_config_json = JSON_OBJECT(
+    'languages', JSON_ARRAY('java', 'cpp', 'python', 'go'),
+    'entry', 'stdin-stdout'
+)
+WHERE question_type = 'PROGRAMMING'
+  AND answer_config_json IS NULL;
+
+UPDATE tb_question
+SET answer_config_json = JSON_SET(
+    answer_config_json,
+    '$.languages', JSON_ARRAY('java', 'cpp', 'python', 'go')
+)
+WHERE question_type = 'PROGRAMMING'
+  AND JSON_EXTRACT(answer_config_json, '$.language') = 'java';
+
+UPDATE tb_question
+SET grading_config_json = JSON_OBJECT('mode', 'STANDARD')
+WHERE question_type = 'PROGRAMMING'
+  AND grading_config_json IS NULL;
 
 INSERT INTO tb_exam (
     exam_id, title, start_time, end_time, status, create_by, create_time, update_by, update_time

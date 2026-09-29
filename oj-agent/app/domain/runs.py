@@ -60,6 +60,7 @@ class EventType(str, Enum):
     RUN_ACCEPTED = "run.accepted"
     RUN_QUEUED = "run.queued"
     RUN_STARTED = "run.started"
+    RESOURCE_LIMIT_REJECTED = "resource.limit_rejected"
     GRAPH_NODE_STARTED = "graph.node_started"
     GRAPH_NODE_COMPLETED = "graph.node_completed"
     RETRIEVAL_QUERY_PLANNED = "retrieval.query_planned"
@@ -67,6 +68,9 @@ class EventType(str, Enum):
     TOOL_CALLED = "tool.called"
     TOOL_SUCCEEDED = "tool.succeeded"
     TOOL_FAILED = "tool.failed"
+    RECOMMENDATION_IMPRESSION = "recommendation.impression"
+    RECOMMENDATION_CLICKED = "recommendation.clicked"
+    TOOL_APPROVAL_REQUESTED = "tool.approval_requested"
     GUARDRAIL_TRIGGERED = "guardrail.triggered"
     ARTIFACT_CREATED = "artifact.created"
     WRITE_INTENT_CREATED = "write.intent_created"
@@ -97,6 +101,7 @@ class Run(BaseModel):
     active_node: str | None = None
     priority: RunPriority = RunPriority.MEDIUM
     context_ref: ContextRef = Field(default_factory=ContextRef)
+    request_payload: dict[str, Any] = Field(default_factory=dict)
     created_at: str = Field(default_factory=utc_now_iso)
     updated_at: str = Field(default_factory=utc_now_iso)
     completed_at: str | None = None

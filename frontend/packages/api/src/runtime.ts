@@ -27,12 +27,13 @@ export function normalizeDifficulty(difficulty?: number | string | null): Diffic
 }
 
 export function isJudgeLanguageSupported(language: CodeLanguage) {
-  return language === "java";
+  return language === "java" || language === "cpp" || language === "python" || language === "go";
 }
 
 export function programTypeFromLanguage(language: CodeLanguage) {
   if (language === "java") return 0;
   if (language === "cpp") return 1;
   if (language === "go") return 2;
+  if (language === "python") return 3;
   throw new Error(`Unsupported judge language: ${language}`);
 }

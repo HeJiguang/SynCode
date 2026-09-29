@@ -1,0 +1,13 @@
+[Unit]
+Description=SynCode test judge backend SSH tunnel
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ssh -NT -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=yes -i /etc/syncode-judge-tunnel_ed25519 -L 172.17.0.1:3306:127.0.0.1:13306 -L 172.17.0.1:25672:127.0.0.1:25672 -L 172.17.0.1:26379:127.0.0.1:26379 root@101.96.200.76
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

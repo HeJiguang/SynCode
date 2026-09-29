@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
@@ -15,6 +16,13 @@ import java.util.concurrent.TimeUnit;
 
 @Component
 public class RedisService {
+
+    private static final DefaultRedisScript<Long> COMPARE_AND_DELETE = new DefaultRedisScript<>(
+            "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+            Long.class);
+    private static final DefaultRedisScript<Long> COMPARE_AND_EXPIRE = new DefaultRedisScript<>(
+            "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('expire', KEYS[1], ARGV[2]) else return 0 end",
+            Long.class);
 
     @Autowired
     public RedisTemplate redisTemplate;
@@ -93,6 +101,16 @@ public class RedisService {
                                               final TimeUnit timeUnit) {
         Boolean success = redisTemplate.opsForValue().setIfAbsent(key, value, timeout, timeUnit);
         return Boolean.TRUE.equals(success);
+    }
+
+    public boolean compareAndDelete(final String key, final String expectedValue) {
+        Long deleted = (Long) redisTemplate.execute(COMPARE_AND_DELETE, List.of(key), expectedValue);
+        return Long.valueOf(1).equals(deleted);
+    }
+
+    public boolean compareAndExpire(final String key, final String expectedValue, final long seconds) {
+        Long renewed = (Long) redisTemplate.execute(COMPARE_AND_EXPIRE, List.of(key), expectedValue, seconds);
+        return Long.valueOf(1).equals(renewed);
     }
 
     /**

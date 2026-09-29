@@ -15,6 +15,7 @@ import com.sintao.common.core.domain.dto.JudgeResultPushDTO;
 import com.sintao.common.core.enums.CodeRunStatus;
 import com.sintao.common.core.enums.JudgeAsyncStatus;
 import com.sintao.common.redis.service.JudgeResultPushService;
+import com.sintao.common.redis.service.JudgeRuntimeStateService;
 import com.sintao.judge.domain.SandBoxExecuteResult;
 import com.sintao.judge.domain.UserSubmit;
 import com.sintao.judge.mapper.UserSubmitMapper;
@@ -23,6 +24,7 @@ import com.sintao.judge.service.ISandboxPoolService;
 import com.sintao.judge.service.ISandboxService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -38,14 +40,20 @@ public class JudgeServiceImpl implements IJudgeService {
     @Autowired
     private ISandboxService sandboxService;
 
-    @Autowired
+    @Autowired(required = false)
     private ISandboxPoolService sandboxPoolService;
+
+    @Value("${sandbox.execution.mode:pool}")
+    private String sandboxExecutionMode;
 
     @Autowired
     private UserSubmitMapper userSubmitMapper;
 
     @Autowired
     private JudgeResultPushService judgeResultPushService;
+
+    @Autowired
+    private JudgeRuntimeStateService judgeRuntimeStateService;
 
     @Override
     public UserQuestionResultVO doJudgeJavaCode(JudgeSubmitDTO judgeSubmitDTO) {
@@ -120,21 +128,30 @@ public class JudgeServiceImpl implements IJudgeService {
     }
 
     private SandBoxExecuteResult executeJavaCode(JudgeSubmitDTO judgeSubmitDTO) {
-        try {
-            return sandboxPoolService.exeJavaCode(
-                    judgeSubmitDTO.getUserId(),
-                    judgeSubmitDTO.getUserCode(),
-                    judgeSubmitDTO.getInputList()
-            );
-        } catch (Exception e) {
-            log.warn("Sandbox pool execution failed, fallback to standalone sandbox, requestId={}",
-                    judgeSubmitDTO.getRequestId(), e);
-            return sandboxService.exeJavaCode(
-                    judgeSubmitDTO.getUserId(),
-                    judgeSubmitDTO.getUserCode(),
-                    judgeSubmitDTO.getInputList()
-            );
+        if ("standalone".equalsIgnoreCase(sandboxExecutionMode)) {
+            return executeByStandaloneSandbox(judgeSubmitDTO);
         }
+        if (!"pool".equalsIgnoreCase(sandboxExecutionMode) && sandboxExecutionMode != null) {
+            throw new IllegalStateException("Unsupported sandbox.execution.mode: " + sandboxExecutionMode);
+        }
+        if (sandboxPoolService == null) {
+            throw new IllegalStateException("Sandbox pool service is unavailable in pool mode");
+        }
+        return sandboxPoolService.executeCode(
+                judgeSubmitDTO.getProgramType(),
+                judgeSubmitDTO.getUserId(),
+                judgeSubmitDTO.getUserCode(),
+                judgeSubmitDTO.getInputList()
+        );
+    }
+
+    private SandBoxExecuteResult executeByStandaloneSandbox(JudgeSubmitDTO judgeSubmitDTO) {
+        return sandboxService.executeCode(
+                judgeSubmitDTO.getProgramType(),
+                judgeSubmitDTO.getUserId(),
+                judgeSubmitDTO.getUserCode(),
+                judgeSubmitDTO.getInputList()
+        );
     }
 
     private UserQuestionResultVO doJudge(JudgeSubmitDTO judgeSubmitDTO,
@@ -209,8 +226,9 @@ public class JudgeServiceImpl implements IJudgeService {
         if (judgeSubmitDTO.getRequestId() != null) {
             String caseJudgeRes = JSON.toJSONString(userQuestionResultVO.getUserExeResultList());
             LocalDateTime finishTime = LocalDateTime.now();
-            userSubmitMapper.update(null, new UpdateWrapper<UserSubmit>()
+            int updated = userSubmitMapper.update(null, new UpdateWrapper<UserSubmit>()
                     .eq("request_id", judgeSubmitDTO.getRequestId())
+                    .eq("judge_status", JudgeAsyncStatus.WAITING.getValue())
                     .set("pass", userQuestionResultVO.getPass())
                     .set("score", userQuestionResultVO.getScore())
                     .set("exe_message", userQuestionResultVO.getExeMessage())
@@ -220,6 +238,10 @@ public class JudgeServiceImpl implements IJudgeService {
                     .set("judge_status", JudgeAsyncStatus.SUCCESS.getValue())
                     .set("finish_time", finishTime)
                     .set("update_by", judgeSubmitDTO.getUserId()));
+            if (updated == 0) {
+                log.info("Judge result already finalized, requestId={}", judgeSubmitDTO.getRequestId());
+                return;
+            }
             JudgeResultPushDTO pushDTO = new JudgeResultPushDTO();
             pushDTO.setRequestId(judgeSubmitDTO.getRequestId());
             pushDTO.setUserId(judgeSubmitDTO.getUserId());
@@ -231,6 +253,12 @@ public class JudgeServiceImpl implements IJudgeService {
             pushDTO.setUseTime(userQuestionResultVO.getUseTime());
             pushDTO.setUseMemory(userQuestionResultVO.getUseMemory());
             pushDTO.setFinishTime(finishTime);
+            try {
+                judgeRuntimeStateService.markSuccess(judgeSubmitDTO.getRequestId());
+            } catch (RuntimeException e) {
+                log.warn("Could not record successful judge runtime state, requestId={}",
+                        judgeSubmitDTO.getRequestId(), e);
+            }
             judgeResultPushService.publishFinalResult(pushDTO);
             return;
         }

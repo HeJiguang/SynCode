@@ -1,6 +1,19 @@
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 
-from app.domain.runs import RunType
+from app.api.serializers import to_api_model
+from app.application.run_labels import enrich_artifact_model
+from app.application.run_projection import (
+    build_failure_artifact,
+    build_runtime_artifact,
+    project_runtime_events,
+    register_runtime_write_intents,
+)
+from app.application.run_service import RunService, run_service
+from app.conversations import ConversationService, get_conversation_service
+from app.core.config import load_settings
+from app.domain.runs import Run, RunType
+from app.domain.tool_permissions import ToolApprovalStatus
+from app.integrations.learning_tools import LearningToolGateway
 from app.runtime.context import build_request_context
 from app.runtime.engine import execute_request_context, execute_training_plan_request
 from app.runtime.enums import TaskType
@@ -20,6 +33,16 @@ INTERACTIVE_RUN_TYPES = {
     RunType.INTERACTIVE_REVIEW,
     RunType.INTERACTIVE_PLAN,
 }
+
+RunExecutor = Callable[..., UnifiedAgentState]
+APPROVED_TOOL_CONTINUATION = (
+    "工具审批已完成。请使用 approved_tool_context 继续原任务并直接给出结果，"
+    "不要再次请求已经批准或拒绝过的相同工具。"
+)
+DENIED_TOOL_CONTINUATION = (
+    "工具请求已被用户拒绝。请在不使用该工具的前提下继续原任务，明确说明限制并给出仍可执行的建议，"
+    "不要再次请求相同工具。"
+)
 
 
 def should_execute_runtime(run_type: str) -> bool:
@@ -43,14 +66,151 @@ def execute_run_request(
                 trace_id=trace_id,
             )
         )
-    return execute_request_context(
-        build_request_context_from_run(
+    context = build_request_context_from_run(request, user_id=user_id, trace_id=trace_id)
+    settings = load_settings()
+    authorization = (headers.get("Authorization") or "").strip()
+    if settings.auth_base_url and authorization:
+        learning = LearningToolGateway(settings.auth_base_url, authorization).collect(
+            question_id=context.question_id,
+            include_candidates=run_type is RunType.INTERACTIVE_RECOMMENDATION,
+        )
+        context.learning_context = learning.prompt_data()
+        context.learning_tool_calls = learning.calls
+    return execute_request_context(context, headers=headers)
+
+
+def execute_and_record_run(
+    request: CreateRunRequest,
+    *,
+    run: Run,
+    user_id: str,
+    headers: Mapping[str, str | None],
+    continuation: bool = False,
+    executor: RunExecutor = execute_run_request,
+    service: RunService = run_service,
+    conversation_service: ConversationService | None = None,
+) -> Run:
+    """Execute one Agent turn and durably project all user-visible results."""
+    conversations = conversation_service or get_conversation_service()
+    conversation_id = run.conversation_id or request.conversation_id
+    if not conversation_id:
+        raise ValueError("Run 缺少 Chat，无法执行。")
+
+    try:
+        service.mark_running(
+            run.run_id,
+            active_node="tool_context_resume" if continuation else "llm_prepare",
+        )
+        trace_id = f"{run.trace_id}:resume" if continuation else run.trace_id
+        state = executor(
             request,
             user_id=user_id,
             trace_id=trace_id,
-        ),
-        headers=headers,
+            headers=headers,
+        )
+        runtime_tool_decisions = state.outcome.response_payload.get("runtime_tool_decisions")
+        if isinstance(runtime_tool_decisions, list):
+            conversations.record_runtime_tool_decisions(
+                user_id,
+                conversation_id,
+                run.run_id,
+                runtime_tool_decisions,
+            )
+        model_tool_requests = state.outcome.response_payload.get("tool_requests")
+        tool_approvals = (
+            conversations.record_model_tool_requests(
+                user_id,
+                conversation_id,
+                run.run_id,
+                model_tool_requests,
+                suppress_resolved_duplicates=continuation,
+            )
+            if isinstance(model_tool_requests, list)
+            else []
+        )
+        state.outcome.response_payload["tool_approvals"] = to_api_model(
+            [approval.model_dump(mode="json") for approval in tool_approvals]
+        )
+        project_runtime_events(run.run_id, state, append_event=service.append_event)
+        runtime_artifact = service.add_artifact(build_runtime_artifact(run.run_id, state))
+        assistant_message = conversations.append_assistant_message(
+            conversation_id,
+            user_id,
+            content=state.outcome.answer or "",
+            run_id=run.run_id,
+            question_id=request.context.question_id,
+            question_title=request.context.question_title,
+            artifact=to_api_model(enrich_artifact_model(runtime_artifact.model_dump(mode="json"))),
+        )
+        candidates = state.outcome.response_payload.get("memory_candidates")
+        if isinstance(candidates, list):
+            conversations.record_memory_candidates(
+                user_id,
+                conversation_id,
+                assistant_message.message_id,
+                candidates,
+            )
+        register_runtime_write_intents(
+            run.run_id,
+            user_id,
+            state,
+            register_write_intent=service.register_write_intent,
+        )
+        pending_approvals = [
+            approval.approval_id
+            for approval in tool_approvals
+            if approval.status is ToolApprovalStatus.PENDING
+        ]
+        if pending_approvals:
+            service.mark_waiting_user(run.run_id, approval_ids=pending_approvals)
+        else:
+            service.mark_succeeded(run.run_id, active_node=state.execution.active_node)
+    except Exception as exc:
+        failure_artifact = service.add_artifact(build_failure_artifact(run.run_id, message=str(exc)))
+        conversations.append_assistant_message(
+            conversation_id,
+            user_id,
+            content=str(exc),
+            run_id=run.run_id,
+            question_id=request.context.question_id,
+            question_title=request.context.question_title,
+            artifact=to_api_model(enrich_artifact_model(failure_artifact.model_dump(mode="json"))),
+            failed=True,
+        )
+        service.mark_failed(run.run_id, reason=str(exc), active_node="llm_runtime")
+    return service.get_run(run.run_id)
+
+
+def build_approval_continuation_request(
+    run: Run,
+    *,
+    user_id: str,
+    denied: bool,
+    conversation_service: ConversationService | None = None,
+) -> CreateRunRequest:
+    """Rehydrate the original request and attach the latest reviewed tool context."""
+    if not run.request_payload:
+        raise ValueError("Run 缺少原始请求快照，无法在审批后恢复。")
+    request = CreateRunRequest.model_validate(run.request_payload)
+    if not run.conversation_id:
+        raise ValueError("Run 缺少 Chat，无法在审批后恢复。")
+    conversations = conversation_service or get_conversation_service()
+    request.user_id = user_id
+    request.conversation_id = run.conversation_id
+    request.context.approved_memories = [
+        memory.content
+        for memory in conversations.context_memories(run.conversation_id, user_id)
+    ]
+    request.context.approved_tool_context = conversations.active_tool_context(
+        run.conversation_id,
+        user_id,
     )
+    original_message = (request.context.user_message or "").strip()
+    continuation_instruction = DENIED_TOOL_CONTINUATION if denied else APPROVED_TOOL_CONTINUATION
+    request.context.user_message = "\n".join(
+        [continuation_instruction, f"原始用户请求：{original_message}"]
+    )
+    return request
 
 
 def build_request_context_from_run(
@@ -71,7 +231,11 @@ def build_request_context_from_run(
         question_title=context.question_title,
         question_content=context.question_content,
         user_code=context.user_code,
+        selected_code=context.selected_code,
+        language=context.language,
         judge_result=context.judge_result,
+        approved_memories=context.approved_memories,
+        approved_tool_context=context.approved_tool_context,
     )
 
 
@@ -114,6 +278,7 @@ def build_training_plan_request_from_run(
     return TrainingPlanRequest(
         trace_id=trace_id,
         user_id=_coerce_int(user_id) or 0,
+        conversation_id=request.conversation_id,
         target_direction="algorithm_foundation",
         recent_submissions=recent_submissions,
         candidate_questions=candidate_questions,

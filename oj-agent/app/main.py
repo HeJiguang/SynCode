@@ -1,14 +1,18 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
 
 from app.api.artifacts import router as artifacts_router
+from app.api.conversations import router as conversations_router
 from app.api.drafts import router as drafts_router
 from app.api.inbox import router as inbox_router
 from app.api.runs import router as runs_router
+from app.api.tool_approvals import router as tool_approvals_router
 from app.api.training import router as training_router
 from app.core.config import load_settings
 from app.core.nacos_registry import NacosRegistry
+from app.conversations.service import ConversationBusy
 from app.retrieval.routes.dense import bootstrap_dense_index
 
 
@@ -41,13 +45,20 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="OJ Agent", version="0.1.0", lifespan=lifespan)
 
 
+@app.exception_handler(ConversationBusy)
+def conversation_busy_handler(_request: Request, exc: ConversationBusy) -> JSONResponse:
+    return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc)})
+
+
 @app.get("/health", include_in_schema=False)
 def health() -> dict[str, str]:
     return {"status": "UP"}
 
 
 app.include_router(training_router)
+app.include_router(conversations_router)
 app.include_router(runs_router)
+app.include_router(tool_approvals_router)
 app.include_router(inbox_router)
 app.include_router(drafts_router)
 app.include_router(artifacts_router)

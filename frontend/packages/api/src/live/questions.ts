@@ -29,6 +29,7 @@ type BackendQuestionDetail = BackendQuestionRow & {
   trainingEnabled?: number | null;
   content?: string | null;
   defaultCode?: string | null;
+  starterCode?: Partial<Record<CodeLanguage, string>> | null;
   exampleCases?: BackendExampleCase[] | null;
 };
 
@@ -94,9 +95,14 @@ function mapQuestionDetail(row: BackendQuestionDetail, tokenQuestionId?: string)
   const base = mapQuestionRow(row, tokenQuestionId);
   const contentBlocks = splitContent(row.content);
   const knowledgeTags = splitTags(row.knowledgeTags);
-  const starterCode = preset ? cloneStarterCode(preset.starterCode) : cloneStarterCode(questionDetails["two-sum"].starterCode);
-
-  if (row.defaultCode) {
+  const starterCode: Record<CodeLanguage, string> = {
+    java: "", cpp: "", python: "", go: "", javascript: ""
+  };
+  if (row.starterCode && Object.keys(row.starterCode).length > 0) {
+    Object.assign(starterCode, row.starterCode);
+  } else if (preset) {
+    Object.assign(starterCode, cloneStarterCode(preset.starterCode));
+  } else if (row.defaultCode) {
     starterCode.java = row.defaultCode;
   }
 
