@@ -31,6 +31,8 @@ The test values must not reference production databases, queues, Redis namespace
 
 These are used only by the manually approved production workflow to run Flyway before service rollout. Grant schema migration permissions without granting unrelated administrative privileges.
 
+When these secrets are absent, the production workflow falls back to the `MYSQL_HOST` / `MYSQL_DATABASE` / `MYSQL_APP_USER` / `MYSQL_PASSWORD` values inside `RUNTIME_ENV_PROD`, so production can still migrate with the application database account. Prefer the dedicated secrets when tighter privileges are required.
+
 ### `DEPLOY_SSH_HOST`
 
 Used only by `bootstrap-runner.yml`.
