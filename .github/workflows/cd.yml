@@ -124,6 +124,20 @@ jobs:
         shell: bash
         run: |
           cd repo
+          if [[ -z "${SYNCODE_DB_URL:-}" ]]; then
+            echo "SYNCODE_DB_URL_PROD secret is not set; deriving Flyway credentials from ${RUNTIME_ENV_FILE}"
+            db_host="$(sed -n 's/^MYSQL_HOST=//p' "${RUNTIME_ENV_FILE}" | tail -1)"
+            db_name="$(sed -n 's/^MYSQL_DATABASE=//p' "${RUNTIME_ENV_FILE}" | tail -1)"
+            db_user="$(sed -n 's/^MYSQL_APP_USER=//p' "${RUNTIME_ENV_FILE}" | tail -1)"
+            db_password="$(sed -n 's/^MYSQL_PASSWORD=//p' "${RUNTIME_ENV_FILE}" | tail -1)"
+            if [[ -z "${db_host}" || -z "${db_name}" || -z "${db_user}" || -z "${db_password}" ]]; then
+              echo "runtime.env is missing MYSQL_HOST/MYSQL_DATABASE/MYSQL_APP_USER/MYSQL_PASSWORD" >&2
+              exit 1
+            fi
+            export SYNCODE_DB_URL="jdbc:mysql://${db_host}:3306/${db_name}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC"
+            export SYNCODE_DB_USER="${db_user}"
+            export SYNCODE_DB_PASSWORD="${db_password}"
+          fi
           mvn --batch-mode -f deploy/migrations/pom.xml flyway:migrate
           mvn --batch-mode -f deploy/migrations/pom.xml flyway:validate
 
