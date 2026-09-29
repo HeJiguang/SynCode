@@ -2,12 +2,12 @@ package com.sintao.judge.callback;
 
 import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.StreamType;
-import com.sintao.common.core.enums.CodeRunStatus;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DockerStartResultCallbackTest {
 
@@ -19,18 +19,29 @@ class DockerStartResultCallbackTest {
         callback.onNext(frame(StreamType.STDOUT, "world"));
 
         assertEquals("hello world", callback.getMessage());
-        assertEquals(CodeRunStatus.SUCCEED, callback.getCodeRunStatus());
     }
 
     @Test
-    void stderrShouldKeepExecutionFailedAfterLaterStdout() {
+    void stderrAndStdoutShouldBeCapturedSeparately() {
         DockerStartResultCallback callback = new DockerStartResultCallback();
 
         callback.onNext(frame(StreamType.STDERR, "failure"));
         callback.onNext(frame(StreamType.STDOUT, "partial output"));
 
         assertEquals("failure", callback.getErrorMessage());
-        assertEquals(CodeRunStatus.FAILED, callback.getCodeRunStatus());
+        assertEquals("partial output", callback.getMessage());
+    }
+
+    @Test
+    void outputFloodShouldBeTruncatedBeforeItExhaustsJudgeMemory() {
+        DockerStartResultCallback callback = new DockerStartResultCallback();
+        String chunk = "x".repeat(600_000);
+
+        callback.onNext(frame(StreamType.STDOUT, chunk));
+        callback.onNext(frame(StreamType.STDOUT, chunk));
+
+        assertEquals(1_048_576, callback.getMessage().length());
+        assertTrue(callback.isOutputTruncated());
     }
 
     private Frame frame(StreamType type, String payload) {

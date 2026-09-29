@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   const code = body.code?.trim();
 
   if (!language || !isJudgeLanguageSupported(language)) {
-    return NextResponse.json({ message: "当前真实判题仅支持 Java。" }, { status: 400 });
+    return NextResponse.json({ message: "当前语言暂未接入真实判题，请切换到 Java / C++ / Python / Go。" }, { status: 400 });
   }
   if (!code) {
     return NextResponse.json({ message: "提交代码不能为空。" }, { status: 400 });

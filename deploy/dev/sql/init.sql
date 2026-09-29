@@ -56,6 +56,7 @@ space_limit int not null comment '空间限制',
 content varchar(1000) not null comment '题目内容',
 question_case varchar(1000)  comment '题目用例',
 default_code varchar(500) not null comment '默认代码块',
+starter_code_json json comment 'multi-language starter programs',
 main_fuc varchar(500) not null comment 'main函数',
 create_by    bigint unsigned not null  comment '创建人',
 create_time  datetime not null comment '创建时间',
@@ -268,7 +269,6 @@ primary key (notice_id),
 key idx_notice_public_publish (is_public, status, publish_time),
 key idx_notice_pinned_publish (is_pinned, publish_time)
 ) DEFAULT CHARSET=utf8mb4 COMMENT '系统公告表'
-
 
 
 

@@ -28,6 +28,7 @@ class JudgeConsumerPushTest {
         userSubmit.setRequestId("req-1");
         userSubmit.setUserId(1001L);
         when(userSubmitMapper.selectOne(any())).thenReturn(userSubmit);
+        when(userSubmitMapper.update(any(), any(UpdateWrapper.class))).thenReturn(1);
         ReflectionTestUtils.setField(consumer, "userSubmitMapper", userSubmitMapper);
         ReflectionTestUtils.setField(consumer, "judgeRuntimeStateService", judgeRuntimeStateService);
         ReflectionTestUtils.setField(consumer, "judgeResultPushService", judgeResultPushService);

@@ -162,7 +162,8 @@ export function EditorPanel({
   questionContent,
   examples = []
 }: EditorPanelProps) {
-  const availableLanguages = Object.keys(initialCode) as CodeLanguage[];
+  const availableLanguages = (Object.keys(initialCode) as CodeLanguage[])
+    .filter((item) => isJudgeLanguageSupported(item) && initialCode[item]?.trim());
   const [language, setLanguage] = useState<CodeLanguage>(availableLanguages[0] ?? "java");
   const [drafts, setDrafts] = useState<Record<CodeLanguage, string>>(initialCode);
   const [mounted, setMounted] = useState(false);
@@ -229,12 +230,13 @@ export function EditorPanel({
     });
   }, [activeCode, language, questionContent, questionId, questionTitle]);
 
-  const fireAiPrompt = useCallback((prompt: string, label: string) => {
+  const fireAiPrompt = useCallback((prompt: string, label: string, selectedCode?: string) => {
     window.dispatchEvent(
       new CustomEvent("syncode:ai-prompt", {
         detail: {
           prompt,
-          label
+          label,
+          selectedCode
         }
       })
     );
@@ -378,7 +380,8 @@ export function EditorPanel({
 
           fireAiPrompt(
             `请解释下面这段 ${languageLabels[language]} 代码在题目「${questionTitle ?? questionId}」里的作用：\n\`\`\`${language}\n${code}\n\`\`\``,
-            "解释代码"
+            "解释代码",
+            code
           );
         }
       });
@@ -397,7 +400,8 @@ export function EditorPanel({
 
           fireAiPrompt(
             `请帮我检查下面这段 ${languageLabels[language]} 代码可能存在的问题，并给出修改建议：\n\`\`\`${language}\n${code}\n\`\`\``,
-            "定位问题"
+            "定位问题",
+            code
           );
         }
       });
@@ -416,7 +420,8 @@ export function EditorPanel({
 
           fireAiPrompt(
             `请分析下面这段 ${languageLabels[language]} 代码的复杂度，并给出更优写法：\n\`\`\`${language}\n${code}\n\`\`\``,
-            "优化复杂度"
+            "优化复杂度",
+            code
           );
         }
       });
@@ -496,7 +501,7 @@ export function EditorPanel({
     }
 
     if (!isJudgeLanguageSupported(language)) {
-      setJudgeStage({ label: "当前真实运行仅支持 Java。", done: true, error: true });
+      setJudgeStage({ label: "当前语言暂未接入真实判题。", done: true, error: true });
       return;
     }
 
@@ -558,7 +563,7 @@ export function EditorPanel({
     }
 
     if (!isJudgeLanguageSupported(language)) {
-      const message = "当前真实判题仅支持 Java。";
+      const message = "当前语言暂未接入真实判题。";
       setJudgeStage({ label: message, done: true, error: true });
       emitJudgeResult({ questionId, status: "Compile Error", message });
       window.setTimeout(() => setJudgeStage(null), 2200);
@@ -724,7 +729,7 @@ export function EditorPanel({
             <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
             <span className="text-xs text-[var(--text-secondary)]">Monaco 已启用多语言高亮</span>
           </div>
-          <span className="text-xs text-[var(--text-muted)]">{submitEnabled ? "当前真实运行与判题支持 Java" : "当前语言仅支持编辑与 AI 辅助"}</span>
+          <span className="text-xs text-[var(--text-muted)]">{submitEnabled ? "当前真实运行与判题支持 Java / C++ / Python / Go" : "当前语言仅支持编辑与 AI 辅助"}</span>
         </div>
 
         {!mounted ? (

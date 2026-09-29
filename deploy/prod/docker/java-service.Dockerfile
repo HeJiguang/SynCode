@@ -1,4 +1,5 @@
-FROM eclipse-temurin:17-jre
+ARG BASE_IMAGE=eclipse-temurin:17-jre
+FROM ${BASE_IMAGE}
 
 ARG JAR_FILE
 

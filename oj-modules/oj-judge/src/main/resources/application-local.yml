@@ -24,8 +24,22 @@ spring:
 
 sandbox:
   docker:
+    image: ${SANDBOX_DOCKER_IMAGE:syncode/oj-sandbox-multilang:1.0.0}
+    name-prefix: ${SANDBOX_DOCKER_NAME_PREFIX:oj-sandbox-core}
     volume: /usr/share/java
+  limit:
+    compile-time: ${SANDBOX_COMPILE_TIMEOUT_SECONDS:10}
+    total-time: ${SANDBOX_TOTAL_TIMEOUT_SECONDS:60}
 
 judge:
+  consumer:
+    prefetch: ${JUDGE_CONSUMER_PREFETCH:0}
+  scheduler:
+    workers: ${JUDGE_SCHEDULER_WORKERS:0}
+    realtime-burst: ${JUDGE_REALTIME_BURST:4}
+    queue-capacity-multiplier: ${JUDGE_QUEUE_CAPACITY_MULTIPLIER:1}
+  lock:
+    lease-seconds: ${JUDGE_LOCK_LEASE_SECONDS:30}
+    renew-interval-seconds: ${JUDGE_LOCK_RENEW_INTERVAL_SECONDS:10}
   runtime-state:
     ttl-minutes: 1440

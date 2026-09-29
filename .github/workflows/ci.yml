@@ -66,7 +66,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install --yes mysql-client
 
       - name: Initialize legacy schema
-        run: mysql --host=127.0.0.1 --user=root < deploy/dev/sql/init-complete.sql
+        run: mysql --host=127.0.0.1 --user=root < deploy/migrations/mysql/preflight/legacy_baseline_schema.sql
 
       - name: Verify legacy preflight
         run: |
@@ -98,6 +98,22 @@ jobs:
           violations="$(printf '%s\n' "${output}" | sed '$d')"
           if [[ -n "${violations}" ]]; then
             echo "Mixed question migration verification returned violations:" >&2
+            echo "${violations}" >&2
+            exit 1
+          fi
+          printf '%s\n' "${output}" | tail -n 1
+          output="$(mysql --batch --skip-column-names --host=127.0.0.1 --user=root bitoj_dev < deploy/migrations/mysql/verification/verify_V2026092201__ai_conversation_memory_and_tool_approval.sql)"
+          violations="$(printf '%s\n' "${output}" | sed '$d')"
+          if [[ -n "${violations}" ]]; then
+            echo "AI conversation migration verification returned violations:" >&2
+            echo "${violations}" >&2
+            exit 1
+          fi
+          printf '%s\n' "${output}" | tail -n 1
+          output="$(mysql --batch --skip-column-names --host=127.0.0.1 --user=root bitoj_dev < deploy/migrations/mysql/verification/verify_V2026092901__question_starter_multilang_backfill.sql)"
+          violations="$(printf '%s\n' "${output}" | sed '$d')"
+          if [[ -n "${violations}" ]]; then
+            echo "Multi-language starter backfill verification returned violations:" >&2
             echo "${violations}" >&2
             exit 1
           fi

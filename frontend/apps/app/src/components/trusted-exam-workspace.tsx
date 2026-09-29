@@ -83,6 +83,10 @@ const questionTypeLabels: Record<string, string> = {
   FILL_BLANK: "填空题", SHORT_ANSWER: "简答题", SQL: "SQL 题", FILE: "文件题", PROJECT: "项目题"
 };
 
+const languageLabels: Record<string, string> = {
+  java: "Java", cpp: "C++", python: "Python", go: "Go"
+};
+
 function answerTypeFor(questionType = "PROGRAMMING") {
   if (questionType === "PROGRAMMING") return "CODE";
   if (["SINGLE_CHOICE", "MULTIPLE_CHOICE"].includes(questionType)) return "CHOICE";
@@ -93,9 +97,9 @@ function answerTypeFor(questionType = "PROGRAMMING") {
   return "TEXT";
 }
 
-function initialAnswerContent(question: Question) {
+function initialAnswerContent(question: Question, language = question.allowedLanguages[0] ?? "java") {
   const type = question.questionType ?? "PROGRAMMING";
-  if (type === "PROGRAMMING") return question.starterCode.java ?? "";
+  if (type === "PROGRAMMING") return question.starterCode[language] ?? "";
   if (["SINGLE_CHOICE", "MULTIPLE_CHOICE", "FILL_BLANK"].includes(type)) return "[]";
   if (type === "TRUE_FALSE") return JSON.stringify("true");
   if (["FILE", "PROJECT"].includes(type)) return "{}";
@@ -246,6 +250,16 @@ export function TrustedExamWorkspace({ examId, demoMode = false }: { examId: str
     next.questions.forEach((question) => {
       const serverAnswer = next.answers.find((answer) => answer.versionQuestionId === question.versionQuestionId);
       const local = window.localStorage.getItem(`syncode-exam-draft:${next.attemptId}:${question.versionQuestionId}`);
+      let localDraft: Partial<Answer> | null = null;
+      if (local !== null) {
+        try {
+          const parsed = JSON.parse(local) as Partial<Answer>;
+          localDraft = typeof parsed === "object" && typeof parsed.content === "string"
+            ? parsed : { content: local };
+        } catch {
+          localDraft = { content: local };
+        }
+      }
       const base = serverAnswer ?? {
         versionQuestionId: question.versionQuestionId,
         answerType: answerTypeFor(question.questionType),
@@ -254,7 +268,7 @@ export function TrustedExamWorkspace({ examId, demoMode = false }: { examId: str
         answerVersion: 0,
         frozen: false
       };
-      restored[question.versionQuestionId] = local === null ? base : { ...base, content: local };
+      restored[question.versionQuestionId] = localDraft === null ? base : { ...base, ...localDraft };
     });
     draftsRef.current = restored;
     setDrafts(restored);
@@ -449,7 +463,26 @@ export function TrustedExamWorkspace({ examId, demoMode = false }: { examId: str
       [activeQuestion.versionQuestionId]: { ...activeAnswer, content }
     };
     setDrafts(draftsRef.current);
-    window.localStorage.setItem(`syncode-exam-draft:${attempt.attemptId}:${activeQuestion.versionQuestionId}`, content);
+    window.localStorage.setItem(
+      `syncode-exam-draft:${attempt.attemptId}:${activeQuestion.versionQuestionId}`,
+      JSON.stringify({ language: activeAnswer.language, content })
+    );
+    setSaveState("dirty");
+  }
+
+  function changeLanguage(language: string) {
+    if (!attempt || !activeQuestion || !activeAnswer || language === activeAnswer.language) return;
+    const next = {
+      ...activeAnswer,
+      language,
+      content: initialAnswerContent(activeQuestion, language)
+    };
+    draftsRef.current = { ...draftsRef.current, [activeQuestion.versionQuestionId]: next };
+    setDrafts(draftsRef.current);
+    window.localStorage.setItem(
+      `syncode-exam-draft:${attempt.attemptId}:${activeQuestion.versionQuestionId}`,
+      JSON.stringify({ language, content: next.content })
+    );
     setSaveState("dirty");
   }
 
@@ -576,7 +609,7 @@ export function TrustedExamWorkspace({ examId, demoMode = false }: { examId: str
       <div className="grid min-h-0 overflow-auto lg:grid-cols-[220px_minmax(0,0.85fr)_minmax(420px,1.15fr)] lg:overflow-hidden">
         <aside className="border-b border-[var(--border-soft)] bg-[var(--surface-2)] p-3 lg:overflow-auto lg:border-b-0 lg:border-r"><p className="px-2 py-2 text-xs font-semibold text-[var(--text-muted)]">题目导航</p><div className="flex gap-1 overflow-x-auto lg:block lg:space-y-1">{attempt.questions.map((question) => { const answer = drafts[question.versionQuestionId]; const selected = question.versionQuestionId === activeQuestion?.versionQuestionId; return <button key={question.versionQuestionId} aria-current={selected ? "step" : undefined} onClick={() => setActiveId(question.versionQuestionId)} className={`flex min-w-[190px] items-center gap-3 rounded-[8px] px-3 py-3 text-left text-sm lg:w-full lg:min-w-0 ${selected ? "bg-[var(--surface-1)]" : "text-[var(--text-secondary)] hover:bg-[var(--surface-3)]"}`}><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--border-soft)] font-mono text-xs">{answer?.answerVersion > 0 ? <Check size={13} /> : question.questionOrder}</span><span className="min-w-0 flex-1 truncate">{question.title}</span><span className="text-xs text-[var(--text-muted)]">{question.score}</span></button>; })}</div></aside>
         <main className="border-b border-[var(--border-soft)] p-5 md:p-6 lg:overflow-auto lg:border-b-0 lg:border-r"><div className="flex flex-wrap gap-2"><Tag tone="accent">第 {activeQuestion?.questionOrder} 题</Tag><Tag>{activeQuestion?.score} 分</Tag>{activeQuestion ? <Tag>{questionTypeLabels[activeQuestion.questionType ?? "PROGRAMMING"]}</Tag> : null}{activeQuestion?.required ? <Tag tone="warning">必答</Tag> : null}</div><h1 className="mt-4 text-2xl font-semibold">{activeQuestion?.title}</h1><div className="mt-6 whitespace-pre-wrap text-sm leading-8 text-[var(--text-secondary)]">{activeQuestion?.content}</div>{(activeQuestion?.questionType ?? "PROGRAMMING") === "PROGRAMMING" ? <div className="mt-8 flex gap-4 border-t border-[var(--border-soft)] pt-4 text-xs text-[var(--text-muted)]"><span>时间 {activeQuestion?.timeLimit} ms</span><span>内存 {activeQuestion?.spaceLimit} KB</span></div> : null}</main>
-        <section className="grid min-h-[520px] grid-rows-[auto_1fr_auto] bg-[var(--surface-1)] lg:min-h-0"><div className="flex items-center justify-between border-b border-[var(--border-soft)] px-4 py-3"><div className="flex items-center gap-2 text-sm font-medium"><FileCode2 size={15} />{activeQuestion ? questionTypeLabels[activeQuestion.questionType ?? "PROGRAMMING"] : "作答"}</div><div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">{saveState === "saving" ? <LoaderCircle size={13} className="animate-spin" /> : saveState === "offline" || saveState === "conflict" ? <CloudOff size={13} /> : <Cloud size={13} />}{saveState === "dirty" ? "待保存" : saveState === "saving" ? "保存中" : saveState === "offline" ? "网络异常" : saveState === "conflict" ? "版本冲突" : demoMode ? "已保存到本机" : "已保存"}</div></div>{activeQuestion ? <MixedAnswerEditor question={activeQuestion} answer={activeAnswer} disabled={busy} onChange={updateAnswer} /> : null}<div className="border-t border-[var(--border-soft)] p-4">{error ? <p className="mb-3 flex items-center gap-2 text-sm text-[var(--danger)]"><AlertTriangle size={14} />{error}</p> : null}{notice ? <p className="mb-3 text-sm text-[var(--success)]">{notice}</p> : null}<div className="flex flex-wrap justify-between gap-3"><div className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><LockKeyhole size={13} />{(activeQuestion?.questionType ?? "PROGRAMMING") === "PROGRAMMING" ? demoMode ? "体验操作不会发送到判题服务" : "正式提交使用当前已保存版本" : "答案会自动保存，交卷后进入统一评分"}</div>{(activeQuestion?.questionType ?? "PROGRAMMING") === "PROGRAMMING" ? <div className="flex gap-2"><Button size="sm" variant="secondary" disabled={busy} onClick={() => void submit("RUN")}><Play size={14} />运行</Button><Button size="sm" disabled={busy} onClick={() => void submit("FORMAL")}><Send size={14} />提交</Button></div> : <Button size="sm" variant="secondary" disabled={busy || saveState !== "dirty"} onClick={() => void saveActive()}><Cloud size={14} />保存答案</Button>}</div></div></section>
+        <section className="grid min-h-[520px] grid-rows-[auto_1fr_auto] bg-[var(--surface-1)] lg:min-h-0"><div className="flex items-center justify-between border-b border-[var(--border-soft)] px-4 py-3"><div className="flex items-center gap-2 text-sm font-medium"><FileCode2 size={15} />{activeQuestion ? questionTypeLabels[activeQuestion.questionType ?? "PROGRAMMING"] : "作答"}</div><div className="flex items-center gap-3">{(activeQuestion?.questionType ?? "PROGRAMMING") === "PROGRAMMING" && activeAnswer ? <select aria-label="判题语言" className="h-8 border border-[var(--border-soft)] bg-[var(--surface-2)] px-2 text-xs outline-none" value={activeAnswer.language} disabled={busy} onChange={(event) => changeLanguage(event.target.value)}>{activeQuestion?.allowedLanguages.map((language) => <option key={language} value={language}>{languageLabels[language] ?? language}</option>)}</select> : null}<div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">{saveState === "saving" ? <LoaderCircle size={13} className="animate-spin" /> : saveState === "offline" || saveState === "conflict" ? <CloudOff size={13} /> : <Cloud size={13} />}{saveState === "dirty" ? "待保存" : saveState === "saving" ? "保存中" : saveState === "offline" ? "网络异常" : saveState === "conflict" ? "版本冲突" : demoMode ? "已保存到本机" : "已保存"}</div></div></div>{activeQuestion ? <MixedAnswerEditor question={activeQuestion} answer={activeAnswer} disabled={busy} onChange={updateAnswer} /> : null}<div className="border-t border-[var(--border-soft)] p-4">{error ? <p className="mb-3 flex items-center gap-2 text-sm text-[var(--danger)]"><AlertTriangle size={14} />{error}</p> : null}{notice ? <p className="mb-3 text-sm text-[var(--success)]">{notice}</p> : null}<div className="flex flex-wrap justify-between gap-3"><div className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><LockKeyhole size={13} />{(activeQuestion?.questionType ?? "PROGRAMMING") === "PROGRAMMING" ? demoMode ? "体验操作不会发送到判题服务" : "正式提交使用当前已保存版本" : "答案会自动保存，交卷后进入统一评分"}</div>{(activeQuestion?.questionType ?? "PROGRAMMING") === "PROGRAMMING" ? <div className="flex gap-2"><Button size="sm" variant="secondary" disabled={busy} onClick={() => void submit("RUN")}><Play size={14} />运行</Button><Button size="sm" disabled={busy} onClick={() => void submit("FORMAL")}><Send size={14} />提交</Button></div> : <Button size="sm" variant="secondary" disabled={busy || saveState !== "dirty"} onClick={() => void saveActive()}><Cloud size={14} />保存答案</Button>}</div></div></section>
       </div>}
   </div>;
 }

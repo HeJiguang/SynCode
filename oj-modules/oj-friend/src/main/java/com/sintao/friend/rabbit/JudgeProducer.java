@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.sintao.common.core.constants.RabbitMQConstants;
 import com.sintao.common.core.domain.dto.JudgeResultPushDTO;
 import com.sintao.common.core.enums.JudgeAsyncStatus;
+import com.sintao.common.core.enums.JudgeTaskType;
 import com.sintao.common.core.enums.ResultCode;
 import com.sintao.common.redis.service.JudgeResultPushService;
 import com.sintao.common.redis.service.JudgeRuntimeStateService;
@@ -44,11 +45,12 @@ public class JudgeProducer {
             if (correlationData == null || correlationData.getId() == null) {
                 return;
             }
-            if (ack) {
+            if (ack && correlationData.getReturned() == null) {
                 judgeRuntimeStateService.markPublished(correlationData.getId());
                 return;
             }
-            markDispatchFailed(correlationData.getId(), cause);
+            String error = correlationData.getReturned() == null ? cause : correlationData.getReturned().getReplyText();
+            markDispatchFailed(correlationData.getId(), error);
         });
         rabbitTemplate.setReturnsCallback(returned ->
                 markDispatchFailed(returned.getMessage().getMessageProperties().getCorrelationId(), returned.getReplyText()));
@@ -56,14 +58,23 @@ public class JudgeProducer {
 
     public void produceMsg(JudgeSubmitDTO judgeSubmitDTO) {
         try {
+            JudgeTaskType taskType = JudgeTaskType.resolve(
+                    judgeSubmitDTO.getTaskType(),
+                    judgeSubmitDTO.getExamId()
+            );
+            judgeSubmitDTO.setTaskType(taskType);
+            String routingKey = taskType == JudgeTaskType.BATCH
+                    ? RabbitMQConstants.JUDGE_BATCH_KEY
+                    : RabbitMQConstants.JUDGE_SUBMIT_KEY;
             CorrelationData correlationData = new CorrelationData(judgeSubmitDTO.getRequestId());
             rabbitTemplate.convertAndSend(
                     RabbitMQConstants.OJ_JUDGE_EXCHANGE,
-                    RabbitMQConstants.JUDGE_SUBMIT_KEY,
+                    routingKey,
                     judgeSubmitDTO,
                     message -> {
                         message.getMessageProperties().setCorrelationId(judgeSubmitDTO.getRequestId());
                         message.getMessageProperties().setMessageId(judgeSubmitDTO.getRequestId());
+                        message.getMessageProperties().setHeader("judgeTaskType", taskType.name());
                         return message;
                     },
                     correlationData
@@ -83,12 +94,16 @@ public class JudgeProducer {
                 .select("request_id", "user_id")
                 .eq("request_id", requestId));
         LocalDateTime finishTime = LocalDateTime.now();
-        judgeRuntimeStateService.markDispatchFailed(requestId, lastError);
-        userSubmitMapper.update(null, new UpdateWrapper<UserSubmit>()
+        int updated = userSubmitMapper.update(null, new UpdateWrapper<UserSubmit>()
                 .eq("request_id", requestId)
+                .eq("judge_status", JudgeAsyncStatus.WAITING.getValue())
                 .set("judge_status", JudgeAsyncStatus.DISPATCH_FAILED.getValue())
                 .set("last_error", lastError)
                 .set("finish_time", finishTime));
+        if (updated == 0) {
+            return;
+        }
+        judgeRuntimeStateService.markDispatchFailed(requestId, lastError);
         JudgeResultPushDTO pushDTO = new JudgeResultPushDTO();
         pushDTO.setRequestId(requestId);
         if (userSubmit != null) {

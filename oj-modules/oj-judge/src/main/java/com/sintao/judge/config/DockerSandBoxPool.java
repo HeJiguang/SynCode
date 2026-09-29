@@ -17,12 +17,16 @@ import com.sintao.common.core.constants.JudgeConstants;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
-import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 public class DockerSandBoxPool {
@@ -40,6 +44,7 @@ public class DockerSandBoxPool {
     private final String containerNamePrefix;
     private final BlockingQueue<String> containerQueue;
     private final Map<String, String> containerNameMap;
+    private final Set<String> missingContainerNames = new HashSet<>();
 
     public DockerSandBoxPool(DockerClient dockerClient,
                              String sandboxImage,
@@ -60,22 +65,40 @@ public class DockerSandBoxPool {
         this.poolSize = poolSize;
         this.containerNamePrefix = containerNamePrefix;
         this.containerQueue = new ArrayBlockingQueue<>(poolSize);
-        this.containerNameMap = new HashMap<>();
+        this.containerNameMap = new ConcurrentHashMap<>();
     }
 
     public void initDockerPool() {
         log.info("------ Creating sandbox pool ------");
         for (int i = 0; i < poolSize; i++) {
-            createContainer(containerNamePrefix + "-" + i);
+            createContainer(containerNamePrefix + "-" + i, true);
         }
         log.info("------ Sandbox pool ready ------");
     }
 
     public String getContainer() {
         try {
-            String containerId = containerQueue.take();
-            ensureContainerRunning(containerId);
-            return containerId;
+            while (true) {
+                repairMissingContainers();
+                String containerId = containerQueue.poll(5, TimeUnit.SECONDS);
+                if (containerId == null) {
+                    if (containerNameMap.isEmpty()) {
+                        throw new IllegalStateException("No healthy sandbox containers are available");
+                    }
+                    continue;
+                }
+                try {
+                    ensureContainerRunning(containerId);
+                    return containerId;
+                } catch (RuntimeException e) {
+                    try {
+                        replaceContainer(containerId);
+                    } catch (RuntimeException replacementError) {
+                        e.addSuppressed(replacementError);
+                    }
+                    throw e;
+                }
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Interrupted while waiting for a sandbox container", e);
@@ -91,6 +114,34 @@ public class DockerSandBoxPool {
         }
     }
 
+    public synchronized void replaceContainer(String containerId) {
+        String containerName = containerNameMap.remove(containerId);
+        if (containerName == null) {
+            throw new IllegalStateException("Unknown sandbox container: " + containerId);
+        }
+        missingContainerNames.add(containerName);
+        try {
+            dockerClient.removeContainerCmd(containerId).withForce(true).exec();
+            FileUtil.clean(baseCodeDir() + File.separator + containerName);
+            createContainer(containerName, false);
+            missingContainerNames.remove(containerName);
+        } catch (RuntimeException e) {
+            log.error("Could not replace sandbox container {}", containerName, e);
+            throw e;
+        }
+    }
+
+    private synchronized void repairMissingContainers() {
+        for (String containerName : List.copyOf(missingContainerNames)) {
+            try {
+                createContainer(containerName, false);
+                missingContainerNames.remove(containerName);
+            } catch (RuntimeException e) {
+                log.warn("Sandbox container {} remains unavailable", containerName, e);
+            }
+        }
+    }
+
     public String getCodeDir(String containerId) {
         String containerName = containerNameMap.get(containerId);
         if (containerName == null) {
@@ -103,16 +154,20 @@ public class DockerSandBoxPool {
         dockerClient.restartContainerCmd(containerId).withTimeout(1).exec();
     }
 
-    private void createContainer(String containerName) {
+    private void createContainer(String containerName, boolean reuseExisting) {
+        pullSandboxImage();
         List<Container> containerList = dockerClient.listContainersCmd().withShowAll(true).exec();
         if (!CollectionUtil.isEmpty(containerList)) {
             String dockerContainerName = JudgeConstants.JAVA_CONTAINER_PREFIX + containerName;
             for (Container container : containerList) {
                 String[] containerNames = container.getNames();
                 if (containerNames != null && containerNames.length > 0 && dockerContainerName.equals(containerNames[0])) {
-                    if ("running".equals(container.getState()) && hasExpectedIsolation(container.getId())) {
-                        containerQueue.offer(container.getId());
+                    if (reuseExisting && "running".equals(container.getState()) && hasExpectedIsolation(container.getId())) {
                         containerNameMap.put(container.getId(), containerName);
+                        if (!containerQueue.offer(container.getId())) {
+                            containerNameMap.remove(container.getId());
+                            throw new IllegalStateException("Sandbox pool is full while adopting " + containerName);
+                        }
                         return;
                     }
                     dockerClient.removeContainerCmd(container.getId()).withForce(true).exec();
@@ -121,7 +176,6 @@ public class DockerSandBoxPool {
             }
         }
 
-        pullJavaEnvImage();
         HostConfig hostConfig = getHostConfig(containerName);
         CreateContainerCmd containerCmd = dockerClient.createContainerCmd(sandboxImage).withName(containerName);
         CreateContainerResponse response = containerCmd
@@ -133,13 +187,21 @@ public class DockerSandBoxPool {
                 .exec();
         String containerId = response.getId();
         dockerClient.startContainerCmd(containerId).exec();
-        containerQueue.offer(containerId);
         containerNameMap.put(containerId, containerName);
+        if (!containerQueue.offer(containerId)) {
+            containerNameMap.remove(containerId);
+            dockerClient.removeContainerCmd(containerId).withForce(true).exec();
+            throw new IllegalStateException("Sandbox pool is full while creating " + containerName);
+        }
     }
 
     private boolean hasExpectedIsolation(String containerId) {
-        HostConfig hostConfig = dockerClient.inspectContainerCmd(containerId).exec().getHostConfig();
+        var container = dockerClient.inspectContainerCmd(containerId).exec();
+        HostConfig hostConfig = container.getHostConfig();
         return hostConfig != null
+                && container.getConfig() != null
+                && Objects.equals(sandboxImage, container.getConfig().getImage())
+                && Objects.equals(dockerClient.inspectImageCmd(sandboxImage).exec().getId(), container.getImageId())
                 && Objects.equals(memoryLimit, hostConfig.getMemory())
                 && Objects.equals(memorySwapLimit, hostConfig.getMemorySwap())
                 && Objects.equals(cpuLimit * 1_000_000_000L, hostConfig.getNanoCPUs())
@@ -155,12 +217,12 @@ public class DockerSandBoxPool {
         }
     }
 
-    private void pullJavaEnvImage() {
+    private void pullSandboxImage() {
         ListImagesCmd listImagesCmd = dockerClient.listImagesCmd();
         List<Image> imageList = listImagesCmd.exec();
         for (Image image : imageList) {
             String[] repoTags = image.getRepoTags();
-            if (repoTags != null && repoTags.length > 0 && sandboxImage.equals(repoTags[0])) {
+            if (repoTags != null && Arrays.asList(repoTags).contains(sandboxImage)) {
                 return;
             }
         }
@@ -183,6 +245,7 @@ public class DockerSandBoxPool {
         hostConfig.withPidsLimit(pidsLimit);
         hostConfig.withNetworkMode("none");
         hostConfig.withReadonlyRootfs(true);
+        hostConfig.withTmpFs(Map.of("/tmp", "rw,noexec,nosuid,size=64m"));
         return hostConfig;
     }
 

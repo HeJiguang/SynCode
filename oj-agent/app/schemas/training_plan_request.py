@@ -81,6 +81,8 @@ class TrainingPlanRequest(BaseModel):
     trace_id: str = Field(..., description="Trace id")
     # 用户ID，必填
     user_id: int = Field(..., description="User id")
+    # 可选的稳定会话标识，用于让 Agent Runtime 延续同一学习上下文
+    conversation_id: str | None = Field(default=None, description="Conversation id")
     # 用户当前的技术评级或等级，选填
     current_level: str | None = Field(default=None, description="Current level")
     # 用户设定的目标学习方向（比如：后端架构、算法竞赛等），选填

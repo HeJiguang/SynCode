@@ -22,11 +22,14 @@ import com.sintao.common.core.constants.JudgeConstants;
 import com.sintao.common.core.enums.CodeRunStatus;
 import com.sintao.judge.callback.DockerStartResultCallback;
 import com.sintao.judge.callback.StatisticsCallback;
+import com.sintao.judge.config.SandboxTimeoutProperties;
 import com.sintao.judge.domain.CompileResult;
+import com.sintao.judge.domain.JudgeLanguageDefinition;
 import com.sintao.judge.domain.SandBoxExecuteResult;
 import com.sintao.judge.service.ISandboxService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -36,6 +39,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -43,16 +47,18 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class SandboxServiceImpl implements ISandboxService {
 
+    private static final String[] KEEPALIVE_CMD = {"sh", "-c", "while true; do sleep 3600; done"};
+
     @Value("${sandbox.docker.host:tcp://localhost:2375}")
     private String dockerHost;
 
-    @Value("${sandbox.docker.image:eclipse-temurin:8-jdk-alpine}")
+    @Value("${sandbox.docker.image:syncode/oj-sandbox-multilang:1.0.0}")
     private String sandboxImage;
 
-    @Value("${sandbox.limit.memory:100000000}")
+    @Value("${sandbox.limit.memory:268435456}")
     private Long memoryLimit;
 
-    @Value("${sandbox.limit.memory-swap:100000000}")
+    @Value("${sandbox.limit.memory-swap:268435456}")
     private Long memorySwapLimit;
 
     @Value("${sandbox.limit.cpu:1}")
@@ -64,24 +70,33 @@ public class SandboxServiceImpl implements ISandboxService {
     @Value("${sandbox.limit.pids:64}")
     private Long pidsLimit;
 
+    @Autowired
+    private SandboxTimeoutProperties timeoutProperties;
+
     @Override
-    public SandBoxExecuteResult exeJavaCode(Long userId, String userCode, List<String> inputList) {
-        String userCodeDir = createUserCodeFile(userId, userCode);
+    public SandBoxExecuteResult executeCode(Integer programType, Long userId, String userCode, List<String> inputList) {
+        JudgeLanguageDefinition language = JudgeLanguageDefinition.fromProgramType(programType);
+        long deadlineNanos = timeoutProperties.deadlineNanos();
+        String userCodeDir = createUserCodeFile(userId, language.sourceFileName(), userCode);
         SandboxContext context = null;
         try {
             context = initDockerSandbox(userCodeDir);
-            CompileResult compileResult = compileCodeByDocker(context);
+            CompileResult compileResult = compileCodeByDocker(context, language.compileCommand(),
+                    language.minimumCompileSeconds(), deadlineNanos);
+            if (compileResult.isTimedOut()) {
+                return SandBoxExecuteResult.fail(CodeRunStatus.OUT_OF_TIME, "编译超时");
+            }
             if (!compileResult.isCompiled()) {
                 return SandBoxExecuteResult.fail(CodeRunStatus.COMPILE_FAILED, compileResult.getExeMessage());
             }
-            return executeJavaCodeByDocker(context, inputList);
+            return executeCodeByDocker(context, language.runCommand(), inputList, deadlineNanos);
         } finally {
             deleteContainer(context);
             FileUtil.del(userCodeDir);
         }
     }
 
-    private String createUserCodeFile(Long userId, String userCode) {
+    private String createUserCodeFile(Long userId, String sourceFileName, String userCode) {
         String examCodeDir = System.getProperty("user.dir") + File.separator + JudgeConstants.EXAM_CODE_DIR;
         if (!FileUtil.exist(examCodeDir)) {
             FileUtil.mkdir(examCodeDir);
@@ -92,7 +107,7 @@ public class SandboxServiceImpl implements ISandboxService {
         if (!FileUtil.exist(userCodeDir)) {
             FileUtil.mkdir(userCodeDir);
         }
-        String userCodeFileName = userCodeDir + File.separator + JudgeConstants.USER_CODE_JAVA_CLASS_NAME;
+        String userCodeFileName = userCodeDir + File.separator + sourceFileName;
         FileUtil.writeString(userCode, userCodeFileName, Constants.UTF8);
         return userCodeDir;
     }
@@ -105,23 +120,24 @@ public class SandboxServiceImpl implements ISandboxService {
                 .getInstance(clientConfig)
                 .withDockerCmdExecFactory(new NettyDockerCmdExecFactory())
                 .build();
-        pullJavaEnvImage(dockerClient);
+        pullSandboxImage(dockerClient);
         HostConfig hostConfig = getHostConfig(userCodeDir);
         CreateContainerCmd containerCmd = dockerClient
                 .createContainerCmd(sandboxImage)
-                .withName(JudgeConstants.JAVA_CONTAINER_NAME + "-" + UUID.randomUUID());
+                .withName("oj-sandbox-" + UUID.randomUUID());
         CreateContainerResponse response = containerCmd
                 .withHostConfig(hostConfig)
                 .withAttachStderr(true)
                 .withAttachStdout(true)
                 .withTty(true)
+                .withCmd(KEEPALIVE_CMD)
                 .exec();
         String containerId = response.getId();
         dockerClient.startContainerCmd(containerId).exec();
         return new SandboxContext(dockerClient, containerId);
     }
 
-    private void pullJavaEnvImage(DockerClient dockerClient) {
+    private void pullSandboxImage(DockerClient dockerClient) {
         ListImagesCmd listImagesCmd = dockerClient.listImagesCmd();
         List<Image> imageList = listImagesCmd.exec();
         for (Image image : imageList) {
@@ -148,18 +164,34 @@ public class SandboxServiceImpl implements ISandboxService {
         hostConfig.withPidsLimit(pidsLimit);
         hostConfig.withNetworkMode("none");
         hostConfig.withReadonlyRootfs(true);
+        hostConfig.withTmpFs(Map.of("/tmp", "rw,noexec,nosuid,size=64m"));
         return hostConfig;
     }
 
-    private CompileResult compileCodeByDocker(SandboxContext context) {
-        String cmdId = createExecCmd(context, DockerExecInputSpec.forCompile(JudgeConstants.DOCKER_JAVAC_CMD));
+    private CompileResult compileCodeByDocker(SandboxContext context, String[] compileCommand,
+                                              long minimumCompileSeconds,
+                                              long deadlineNanos) {
+        String cmdId = createExecCmd(context, DockerExecInputSpec.forCompile(compileCommand));
         DockerStartResultCallback resultCallback = new DockerStartResultCallback();
         CompileResult compileResult = new CompileResult();
         try {
-            context.dockerClient().execStartCmd(cmdId).exec(resultCallback).awaitCompletion();
-            if (CodeRunStatus.FAILED.equals(resultCallback.getCodeRunStatus())) {
+            long waitMillis = timeoutProperties.compileWaitMillis(deadlineNanos, minimumCompileSeconds);
+            boolean completed = waitMillis > 0
+                    && context.dockerClient().execStartCmd(cmdId).exec(resultCallback)
+                    .awaitCompletion(waitMillis, TimeUnit.MILLISECONDS);
+            if (!completed) {
+                compileResult.setTimedOut(true);
+                compileResult.setExeMessage("编译超时");
+                return compileResult;
+            }
+            if (resultCallback.isOutputTruncated()) {
                 compileResult.setCompiled(false);
-                compileResult.setExeMessage(resultCallback.getErrorMessage());
+                compileResult.setExeMessage("编译输出超出限制");
+                return compileResult;
+            }
+            if (!execSucceeded(context.dockerClient(), cmdId)) {
+                compileResult.setCompiled(false);
+                compileResult.setExeMessage(execMessage(resultCallback));
             } else {
                 compileResult.setCompiled(true);
             }
@@ -170,22 +202,28 @@ public class SandboxServiceImpl implements ISandboxService {
         }
     }
 
-    private SandBoxExecuteResult executeJavaCodeByDocker(SandboxContext context, List<String> inputList) {
+    private SandBoxExecuteResult executeCodeByDocker(SandboxContext context,
+                                                     String[] runCommand,
+                                                     List<String> inputList,
+                                                     long deadlineNanos) {
         List<String> outList = new ArrayList<>();
         long maxMemory = 0L;
         long maxUseTime = 0L;
         for (String inputArgs : inputList) {
-            DockerExecInputSpec execInputSpec = DockerExecInputSpec.forRun(JudgeConstants.DOCKER_JAVA_EXEC_CMD, inputArgs);
+            DockerExecInputSpec execInputSpec = DockerExecInputSpec.forRun(runCommand, inputArgs);
             String cmdId = createExecCmd(context, execInputSpec);
             StatsCmd statsCmd = context.dockerClient().statsCmd(context.containerId());
             StatisticsCallback statisticsCallback = statsCmd.exec(new StatisticsCallback());
             long startNanos = System.nanoTime();
             DockerStartResultCallback resultCallback = new DockerStartResultCallback();
             try {
-                boolean completed = execStart(context.dockerClient(), cmdId, execInputSpec.stdin(), resultCallback)
-                        .awaitCompletion(timeLimit, TimeUnit.SECONDS);
+                long waitMillis = timeoutProperties.executionWaitMillis(deadlineNanos, timeLimit);
+                boolean completed = waitMillis > 0
+                        && execStart(context.dockerClient(), cmdId, execInputSpec.stdin(), resultCallback)
+                        .awaitCompletion(waitMillis, TimeUnit.MILLISECONDS);
                 if (!completed) {
-                    return SandBoxExecuteResult.fail(CodeRunStatus.OUT_OF_TIME, outList, maxMemory, timeLimit * 1000L);
+                    long reportedTime = waitMillis > 0 ? waitMillis : timeLimit * 1000L;
+                    return SandBoxExecuteResult.fail(CodeRunStatus.OUT_OF_TIME, outList, maxMemory, reportedTime);
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -193,8 +231,11 @@ public class SandboxServiceImpl implements ISandboxService {
             } finally {
                 statsCmd.close();
             }
-            if (CodeRunStatus.FAILED.equals(resultCallback.getCodeRunStatus())) {
-                return SandBoxExecuteResult.fail(CodeRunStatus.NOT_ALL_PASSED);
+            if (resultCallback.isOutputTruncated()) {
+                return SandBoxExecuteResult.fail(CodeRunStatus.FAILED, "程序输出超出限制");
+            }
+            if (!execSucceeded(context.dockerClient(), cmdId)) {
+                return SandBoxExecuteResult.fail(CodeRunStatus.FAILED, execMessage(resultCallback));
             }
             long userTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
             maxUseTime = Math.max(maxUseTime, userTime);
@@ -216,6 +257,23 @@ public class SandboxServiceImpl implements ISandboxService {
                 .withAttachStdout(true)
                 .exec();
         return cmdResponse.getId();
+    }
+
+    private boolean execSucceeded(DockerClient dockerClient, String cmdId) {
+        Long exitCode = dockerClient.inspectExecCmd(cmdId).exec().getExitCodeLong();
+        if (exitCode == null) {
+            throw new IllegalStateException("Sandbox exec has no exit code: " + cmdId);
+        }
+        return exitCode == 0;
+    }
+
+    private String execMessage(DockerStartResultCallback callback) {
+        String stderr = callback.getErrorMessage();
+        if (stderr != null && !stderr.isBlank()) {
+            return stderr;
+        }
+        String stdout = callback.getMessage();
+        return stdout != null && !stdout.isBlank() ? stdout : CodeRunStatus.FAILED.getMsg();
     }
 
     private DockerStartResultCallback execStart(DockerClient dockerClient, String cmdId, InputStream stdin,
@@ -243,7 +301,7 @@ public class SandboxServiceImpl implements ISandboxService {
         DockerClient dockerClient = context.dockerClient();
         String containerId = context.containerId();
         try {
-            dockerClient.stopContainerCmd(containerId).exec();
+            dockerClient.stopContainerCmd(containerId).withTimeout(0).exec();
         } catch (Exception e) {
             log.warn("Failed to stop sandbox container {}", containerId, e);
         }

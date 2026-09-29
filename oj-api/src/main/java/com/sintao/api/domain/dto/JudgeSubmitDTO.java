@@ -1,5 +1,6 @@
 package com.sintao.api.domain.dto;
 
+import com.sintao.common.core.enums.JudgeTaskType;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -10,6 +11,8 @@ import java.util.List;
 public class JudgeSubmitDTO {
 
     private String requestId;
+
+    private JudgeTaskType taskType;
 
     private Long userId;
 

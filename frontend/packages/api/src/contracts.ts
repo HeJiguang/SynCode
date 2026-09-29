@@ -88,6 +88,89 @@ export type AiRunCreateResponse = {
   eventsUrl: string;
   artifactsUrl: string;
   bootstrapArtifactId?: string;
+  conversationId?: string;
+  rolloverRecommended?: boolean;
+  contextTokenEstimate?: number;
+  contextTokenLimit?: number;
+};
+
+export type AiConversationStatus = "ACTIVE" | "ROLLED_OVER" | "ARCHIVED";
+export type AiMessageRole = "USER" | "ASSISTANT" | "SYSTEM";
+export type AiMemoryStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export type AiConversation = {
+  conversationId: string;
+  userId: string;
+  title: string;
+  status: AiConversationStatus;
+  isDefault: boolean;
+  currentQuestionId?: string | null;
+  currentQuestionTitle?: string | null;
+  continuedFromConversationId?: string | null;
+  messageCount: number;
+  contextTokenEstimate: number;
+  softTokenLimit: number;
+  hardTokenLimit: number;
+  rolloverRecommended: boolean;
+  hardLimitReached: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastMessageAt?: string | null;
+};
+
+export type AiConversationMessage = {
+  messageId: string;
+  conversationId: string;
+  runId?: string | null;
+  role: AiMessageRole;
+  content: string;
+  sequence: number;
+  questionId?: string | null;
+  contextSnapshot: Record<string, unknown>;
+  artifact?: AiArtifact | null;
+  tokenEstimate: number;
+  status: "COMPLETE" | "FAILED";
+  createdAt: string;
+};
+
+export type AiMemoryItem = {
+  memoryId: string;
+  userId: string;
+  memoryType: string;
+  content: string;
+  reason?: string | null;
+  confidence: number;
+  status: AiMemoryStatus;
+  sourceConversationId?: string | null;
+  sourceMessageId?: string | null;
+  createdAt: string;
+  reviewedAt?: string | null;
+};
+
+export type AiToolApproval = {
+  approvalId: string;
+  userId: string;
+  conversationId?: string | null;
+  runId: string;
+  toolName: string;
+  action: string;
+  resource?: string | null;
+  arguments: Record<string, unknown>;
+  constraints: Record<string, unknown>;
+  result?: Record<string, unknown> | null;
+  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "PROHIBITED";
+  decision: "AUTO_ALLOW" | "ASK_USER" | "BLOCK";
+  status: "PENDING" | "APPROVED" | "DENIED" | "EXPIRED" | "EXECUTED";
+  reason?: string | null;
+  createdAt: string;
+  expiresAt?: string | null;
+  resolvedAt?: string | null;
+};
+
+export type AiConversationSnapshot = {
+  conversation: AiConversation;
+  messages: AiConversationMessage[];
+  contextMemories: AiMemoryItem[];
 };
 
 export type TrainingTask = {

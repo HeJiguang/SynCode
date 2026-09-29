@@ -4,6 +4,7 @@ import type { AiRunCreateResponse } from "@aioj/api";
 import { requestJson } from "@aioj/api";
 
 import { resolveAgentApiBaseUrl } from "../../../../lib/agent-base-url";
+import { resolveApiRouteError } from "../../../../lib/api-route-error";
 import { getServerAccessToken } from "../../../../lib/server-auth";
 
 export async function POST(request: Request) {
@@ -11,18 +12,21 @@ export async function POST(request: Request) {
   if (!token) {
     return NextResponse.json({ message: "请先登录后使用 AI 辅助。" }, { status: 401 });
   }
-  const body = await request.json();
+  try {
+    const body = await request.json();
+    if (!body?.context?.userMessage?.trim()) {
+      return NextResponse.json({ message: "AI prompt is required." }, { status: 400 });
+    }
 
-  if (!body?.context?.userMessage?.trim()) {
-    return NextResponse.json({ message: "AI prompt is required." }, { status: 400 });
+    const payload = await requestJson<AiRunCreateResponse>("/api/runs", {
+      method: "POST",
+      token,
+      baseUrl: resolveAgentApiBaseUrl(),
+      body: JSON.stringify(body)
+    });
+    return NextResponse.json(payload);
+  } catch (error) {
+    const resolved = resolveApiRouteError(error, "AI 运行创建失败。");
+    return NextResponse.json(resolved.body, { status: resolved.status });
   }
-
-  const payload = await requestJson<AiRunCreateResponse>("/api/runs", {
-    method: "POST",
-    token,
-    baseUrl: resolveAgentApiBaseUrl(),
-    body: JSON.stringify(body)
-  });
-
-  return NextResponse.json(payload);
 }

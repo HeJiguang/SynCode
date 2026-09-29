@@ -59,6 +59,15 @@ def project_runtime_events(
     *,
     append_event: Callable[[str, EventType, dict | None], object],
 ) -> None:
+    for call in state.outcome.response_payload.get("learning_tool_calls", []):
+        if not isinstance(call, dict):
+            continue
+        succeeded = call.get("status") == "SUCCEEDED"
+        append_event(
+            run_id,
+            EventType.TOOL_SUCCEEDED if succeeded else EventType.TOOL_FAILED,
+            {"toolName": call.get("tool_name"), "reason": call.get("reason") if not succeeded else None},
+        )
     if state.evidence.route_names:
         append_event(
             run_id,

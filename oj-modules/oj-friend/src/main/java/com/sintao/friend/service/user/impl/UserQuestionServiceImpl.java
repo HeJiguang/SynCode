@@ -14,6 +14,7 @@ import com.sintao.api.domain.vo.UserQuestionResultVO;
 import com.sintao.common.core.constants.Constants;
 import com.sintao.common.core.domain.R;
 import com.sintao.common.core.enums.JudgeAsyncStatus;
+import com.sintao.common.core.enums.JudgeTaskType;
 import com.sintao.common.core.enums.ProgramType;
 import com.sintao.common.core.enums.QuestionResType;
 import com.sintao.common.core.enums.ResultCode;
@@ -66,61 +67,52 @@ public class UserQuestionServiceImpl implements IUserQuestionService {
 
     @Override
     public R<UserCodeRunVO> run(UserRunDTO runDTO) {
-        Integer programType = runDTO.getProgramType();
-        if (ProgramType.JAVA.getValue().equals(programType)) {
-            RunPayload runPayload = buildRunPayload(runDTO.getQuestionId(), runDTO.getCustomInputs());
-            JudgeSubmitDTO judgeSubmitDTO = assembleJudgeSubmitDTO(
-                    runDTO.getQuestionId(),
-                    runDTO.getExamId(),
-                    runDTO.getProgramType(),
-                    runDTO.getUserCode(),
-                    runPayload.inputList(),
-                    runPayload.outputList()
-            );
-            return remoteJudgeService.runJavaCode(judgeSubmitDTO);
-        }
-        throw new ServiceException(ResultCode.FAILED_NOT_SUPPORT_PROGRAM);
+        requireProgramType(runDTO.getProgramType());
+        RunPayload runPayload = buildRunPayload(runDTO.getQuestionId(), runDTO.getCustomInputs());
+        JudgeSubmitDTO judgeSubmitDTO = assembleJudgeSubmitDTO(
+                runDTO.getQuestionId(),
+                runDTO.getExamId(),
+                runDTO.getProgramType(),
+                runDTO.getUserCode(),
+                runPayload.inputList(),
+                runPayload.outputList()
+        );
+        return remoteJudgeService.runJavaCode(judgeSubmitDTO);
     }
 
     @Override
     public R<UserQuestionResultVO> submit(UserSubmitDTO submitDTO) {
-        Integer programType = submitDTO.getProgramType();
-        if (ProgramType.JAVA.getValue().equals(programType)) {
-            JudgeSubmitDTO judgeSubmitDTO = assembleJudgeSubmitDTO(
-                    submitDTO.getQuestionId(),
-                    submitDTO.getExamId(),
-                    submitDTO.getProgramType(),
-                    submitDTO.getUserCode(),
-                    null,
-                    null
-            );
-            return remoteJudgeService.doJudgeJavaCode(judgeSubmitDTO);
-        }
-        throw new ServiceException(ResultCode.FAILED_NOT_SUPPORT_PROGRAM);
+        requireProgramType(submitDTO.getProgramType());
+        JudgeSubmitDTO judgeSubmitDTO = assembleJudgeSubmitDTO(
+                submitDTO.getQuestionId(),
+                submitDTO.getExamId(),
+                submitDTO.getProgramType(),
+                submitDTO.getUserCode(),
+                null,
+                null
+        );
+        return remoteJudgeService.doJudgeJavaCode(judgeSubmitDTO);
     }
 
     @Override
     public AsyncSubmitResponseVO rabbitSubmit(UserSubmitDTO submitDTO) {
-        Integer programType = submitDTO.getProgramType();
-        if (ProgramType.JAVA.getValue().equals(programType)) {
-            JudgeSubmitDTO judgeSubmitDTO = assembleJudgeSubmitDTO(
-                    submitDTO.getQuestionId(),
-                    submitDTO.getExamId(),
-                    submitDTO.getProgramType(),
-                    submitDTO.getUserCode(),
-                    null,
-                    null
-            );
-            judgeSubmitDTO.setRequestId(UUID.randomUUID().toString().replace("-", ""));
-            userSubmitMapper.insert(buildAcceptedSubmit(judgeSubmitDTO));
-            judgeRuntimeStateService.markAccepted(judgeSubmitDTO.getRequestId());
-            judgeProducer.produceMsg(judgeSubmitDTO);
-            AsyncSubmitResponseVO responseVO = new AsyncSubmitResponseVO();
-            responseVO.setRequestId(judgeSubmitDTO.getRequestId());
-            responseVO.setStatus("ACCEPTED");
-            return responseVO;
-        }
-        throw new ServiceException(ResultCode.FAILED_NOT_SUPPORT_PROGRAM);
+        requireProgramType(submitDTO.getProgramType());
+        JudgeSubmitDTO judgeSubmitDTO = assembleJudgeSubmitDTO(
+                submitDTO.getQuestionId(),
+                submitDTO.getExamId(),
+                submitDTO.getProgramType(),
+                submitDTO.getUserCode(),
+                null,
+                null
+        );
+        judgeSubmitDTO.setRequestId(UUID.randomUUID().toString().replace("-", ""));
+        userSubmitMapper.insert(buildAcceptedSubmit(judgeSubmitDTO));
+        judgeRuntimeStateService.markAccepted(judgeSubmitDTO.getRequestId());
+        judgeProducer.produceMsg(judgeSubmitDTO);
+        AsyncSubmitResponseVO responseVO = new AsyncSubmitResponseVO();
+        responseVO.setRequestId(judgeSubmitDTO.getRequestId());
+        responseVO.setStatus("ACCEPTED");
+        return responseVO;
     }
 
     @Override
@@ -161,8 +153,9 @@ public class UserQuestionServiceImpl implements IUserQuestionService {
         BeanUtil.copyProperties(questionES, judgeSubmitDTO);
         judgeSubmitDTO.setUserId(ThreadLocalUtil.get(Constants.USER_ID, Long.class));
         judgeSubmitDTO.setExamId(examId);
+        judgeSubmitDTO.setTaskType(examId == null ? JudgeTaskType.REALTIME : JudgeTaskType.BATCH);
         judgeSubmitDTO.setProgramType(programType);
-        judgeSubmitDTO.setUserCode(codeConnect(userCode, questionES.getMainFuc()));
+        judgeSubmitDTO.setUserCode(assembleUserCode(programType, userCode, questionES.getMainFuc()));
 
         if (inputOverrides != null && outputOverrides != null) {
             judgeSubmitDTO.setInputList(inputOverrides);
@@ -233,6 +226,22 @@ public class UserQuestionServiceImpl implements IUserQuestionService {
             return userCode.substring(0, targetLastIndex) + "\n" + mainFunc + "\n" + userCode.substring(targetLastIndex);
         }
         throw new ServiceException(ResultCode.FAILED);
+    }
+
+    private String assembleUserCode(Integer programType, String userCode, String mainFunc) {
+        ProgramType language = requireProgramType(programType);
+        if (language != ProgramType.JAVA || StrUtil.isBlank(mainFunc)) {
+            return userCode;
+        }
+        return codeConnect(userCode, mainFunc);
+    }
+
+    private ProgramType requireProgramType(Integer programType) {
+        try {
+            return ProgramType.fromValue(programType);
+        } catch (IllegalArgumentException exception) {
+            throw new ServiceException(ResultCode.FAILED_NOT_SUPPORT_PROGRAM);
+        }
     }
 
     private UserSubmit buildAcceptedSubmit(JudgeSubmitDTO judgeSubmitDTO) {

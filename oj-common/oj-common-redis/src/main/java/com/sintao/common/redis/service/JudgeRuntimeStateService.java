@@ -38,6 +38,10 @@ public class JudgeRuntimeStateService {
         saveRuntimeState(requestId, "CONSUMING", null, null);
     }
 
+    public void markSuccess(String requestId) {
+        saveRuntimeState(requestId, "SUCCESS", null, null);
+    }
+
     public void markRetryWaiting(String requestId, Integer retryCount, String lastError) {
         saveRuntimeState(requestId, "RETRY_WAIT", retryCount, lastError);
     }
@@ -59,8 +63,12 @@ public class JudgeRuntimeStateService {
         );
     }
 
-    public void unlock(String requestId) {
-        redisService.deleteObject(CacheConstants.JUDGE_REQUEST_LOCK + requestId);
+    public boolean renewLock(String requestId, String consumerId, long timeoutSeconds) {
+        return redisService.compareAndExpire(CacheConstants.JUDGE_REQUEST_LOCK + requestId, consumerId, timeoutSeconds);
+    }
+
+    public boolean unlock(String requestId, String consumerId) {
+        return redisService.compareAndDelete(CacheConstants.JUDGE_REQUEST_LOCK + requestId, consumerId);
     }
 
     private void saveRuntimeState(String requestId, String phase, Integer retryCount, String lastError) {

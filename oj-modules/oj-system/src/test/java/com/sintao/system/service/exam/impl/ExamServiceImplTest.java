@@ -134,12 +134,42 @@ class ExamServiceImplTest {
         assertEquals(800L, snapshot.getVersionId());
         assertEquals("[{\"input\":\"1 2\",\"output\":\"3\"}]", snapshot.getQuestionCase());
         assertEquals(40, snapshot.getScore());
-        assertEquals("[\"java\"]", snapshot.getAllowedLanguagesJson());
+        assertEquals("[\"java\",\"cpp\",\"python\",\"go\"]", snapshot.getAllowedLanguagesJson());
         assertEquals(64, snapshot.getContentHash().length());
         ArgumentCaptor<ExamAuditEvent> auditCaptor = ArgumentCaptor.forClass(ExamAuditEvent.class);
         verify(examAuditEventMapper).insert(auditCaptor.capture());
         assertEquals("EXAM_PUBLISHED", auditCaptor.getValue().getAction());
         verify(examCacheManager).addCache(exam);
+    }
+
+    @Test
+    void publishShouldExpandLegacyJavaOnlyStarterToFullLanguagePool() throws Exception {
+        Exam exam = validDraft();
+        ExamQuestion relation = relation();
+        Question question = validQuestion();
+        question.setStarterCodeJson("{\"java\":\"public class Main {}\"}");
+        when(examCommandMapper.selectOne(any())).thenReturn(null);
+        when(examMapper.selectByIdForUpdate(10L)).thenReturn(exam);
+        when(examQuestionMapper.selectList(any())).thenReturn(List.of(relation));
+        when(questionMapper.selectBatchIds(any())).thenReturn(List.of(question));
+        doAnswer(invocation -> {
+            ((ExamVersion) invocation.getArgument(0)).setVersionId(801L);
+            return 1;
+        }).when(examVersionMapper).insert(any(ExamVersion.class));
+        when(examVersionQuestionMapper.insert(any())).thenReturn(1);
+        when(examMapper.updateById(any())).thenReturn(1);
+
+        service.publish(10L, "publish-key-4", "request-4");
+
+        ArgumentCaptor<ExamVersionQuestion> questionCaptor = ArgumentCaptor.forClass(ExamVersionQuestion.class);
+        verify(examVersionQuestionMapper).insert(questionCaptor.capture());
+        ExamVersionQuestion snapshot = questionCaptor.getValue();
+        assertEquals("[\"java\",\"cpp\",\"python\",\"go\"]", snapshot.getAllowedLanguagesJson());
+        var starters = objectMapper.readTree(snapshot.getStarterCodeJson());
+        assertEquals("public class Main {}", starters.get("java").asText());
+        for (String language : List.of("cpp", "python", "go")) {
+            assertFalse(starters.get(language).asText().isBlank(), language + " starter should be filled");
+        }
     }
 
     @Test
@@ -241,6 +271,8 @@ class ExamServiceImplTest {
         question.setSpaceLimit(131072L);
         question.setQuestionCase("[{\"input\":\"1 2\",\"output\":\"3\"}]");
         question.setDefaultCode("public class Main {}");
+        question.setStarterCodeJson("{\"java\":\"public class Main {}\",\"cpp\":\"int main() {}\","
+                + "\"python\":\"print(3)\",\"go\":\"package main\\nfunc main() {}\"}");
         question.setMainFuc("public static void main(String[] args)");
         question.setUpdateTime(LocalDateTime.of(2026, 9, 1, 0, 0));
         return question;

@@ -14,7 +14,13 @@ WORKDIR /app
 COPY oj-agent/pyproject.toml /app/pyproject.toml
 COPY oj-agent/app /app/app
 
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir . \
+    && groupadd --system syncode \
+    && useradd --system --gid syncode --home-dir /app syncode \
+    && mkdir -p /app/runtime-artifacts \
+    && chown -R syncode:syncode /app/runtime-artifacts
+
+USER syncode
 
 EXPOSE 8015
 

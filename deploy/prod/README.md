@@ -93,4 +93,5 @@ a verification code from the production login page and confirm delivery.
 - This pipeline assumes the worker services remain constrained to the worker node.
 - If you move more services to the worker, update `WORKER_IMAGE_LIST` in the stack env secret/template.
 - `oj-judge` now expects the worker to provide `/var/run/docker.sock`, `/app/user-code`, and `/app/user-code-pool` as bind-mountable host paths.
+- Java business services use distinct logical-clock Snowflake worker IDs and named volumes for ID high-watermark state. Preserve those volumes during rollback or host migration; see `docs/architecture/logical-clock-snowflake.md`.
 - If you later add a domestic registry, the image sync step can be replaced with local push/pull logic.

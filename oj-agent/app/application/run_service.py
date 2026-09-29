@@ -36,6 +36,8 @@ class RunService:
         conversation_id: str | None = None,
         entry_graph: str = "llm_runtime",
         context_ref: ContextRef | None = None,
+        request_payload: dict | None = None,
+        initial_status: RunStatus = RunStatus.ACCEPTED,
     ) -> Run:
         run = self.run_store.save(
             Run(
@@ -45,6 +47,8 @@ class RunService:
                 conversation_id=conversation_id,
                 entry_graph=entry_graph,
                 context_ref=context_ref or ContextRef(),
+                request_payload=dict(request_payload or {}),
+                status=initial_status,
             )
         )
         self.run_store.append_event(
@@ -52,6 +56,12 @@ class RunService:
             EventType.RUN_ACCEPTED,
             {"runType": run.run_type.value, "source": run.source.value},
         )
+        if initial_status is RunStatus.QUEUED:
+            self.run_store.append_event(
+                run.run_id,
+                EventType.RUN_QUEUED,
+                {"limitPolicy": "user-active-and-rate"},
+            )
         return run
 
     def add_artifact(self, artifact: Artifact) -> Artifact:
@@ -131,6 +141,15 @@ class RunService:
         )
         return run
 
+    def mark_waiting_user(self, run_id: str, *, approval_ids: list[str]) -> Run:
+        run = self.run_store.update_status(run_id, RunStatus.WAITING_USER, active_node="tool_approval")
+        self.run_store.append_event(
+            run_id,
+            EventType.TOOL_APPROVAL_REQUESTED,
+            {"approvalIds": approval_ids, "approvalScope": "once"},
+        )
+        return run
+
     def mark_failed(self, run_id: str, *, reason: str, active_node: str | None = None) -> Run:
         run = self.run_store.update_status(run_id, RunStatus.FAILED, active_node=active_node)
         self.run_store.append_event(
@@ -145,6 +164,9 @@ class RunService:
 
     def list_drafts(self, user_id: str) -> list[Draft]:
         return self.draft_store.list_for_user(user_id)
+
+    def get_draft(self, draft_id: str) -> Draft:
+        return self.draft_store.get(draft_id)
 
     def list_write_intents(self, run_id: str) -> list[WriteIntent]:
         return [item.model_copy() for item in self._write_intents.get(run_id, [])]
@@ -173,8 +195,8 @@ class RunService:
         return draft
 
     def clear(self) -> None:
-        self.run_store.clear()
         self.artifact_store.clear()
+        self.run_store.clear()
         self.draft_store.clear()
         self.inbox_store.clear()
         self._write_intents.clear()

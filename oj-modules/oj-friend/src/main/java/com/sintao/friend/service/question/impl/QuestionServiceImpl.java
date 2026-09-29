@@ -4,11 +4,14 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.TypeReference;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.github.pagehelper.PageHelper;
 import com.sintao.common.core.constants.Constants;
 import com.sintao.common.core.domain.TableDataInfo;
 import com.sintao.common.core.enums.ResultCode;
+import com.sintao.common.core.utils.MultiLanguageStarterCodes;
 import com.sintao.common.security.exception.ServiceException;
 import com.sintao.friend.domain.question.Question;
 import com.sintao.friend.domain.question.QuestionCase;
@@ -33,6 +36,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -99,7 +103,9 @@ public class QuestionServiceImpl implements IQuestionService {
         QuestionES questionES = findIndexedQuestion(questionId);
         QuestionDetailVO questionDetailVO = new QuestionDetailVO();
         if (questionES != null) {
+            backfillStarterCode(questionES);
             BeanUtil.copyProperties(questionES, questionDetailVO);
+            questionDetailVO.setStarterCode(parseStarterCode(questionES.getStarterCodeJson(), questionES.getDefaultCode()));
             questionDetailVO.setExampleCases(extractExampleCases(questionES.getQuestionCase()));
             return questionDetailVO;
         }
@@ -109,6 +115,7 @@ public class QuestionServiceImpl implements IQuestionService {
         }
         refreshQuestion();
         BeanUtil.copyProperties(question, questionDetailVO);
+        questionDetailVO.setStarterCode(parseStarterCode(question.getStarterCodeJson(), question.getDefaultCode()));
         questionDetailVO.setExampleCases(extractExampleCases(question.getQuestionCase()));
         return questionDetailVO;
     }
@@ -201,6 +208,42 @@ public class QuestionServiceImpl implements IQuestionService {
                 .limit(2)
                 .map(this::toQuestionCaseVO)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Index documents written before starter_code_json existed miss the multi-language starters.
+     * Heal them from the database on access instead of waiting for a full reindex.
+     */
+    private void backfillStarterCode(QuestionES questionES) {
+        if (StrUtil.isNotBlank(questionES.getStarterCodeJson())) {
+            return;
+        }
+        Question question = questionMapper.selectById(questionES.getQuestionId());
+        if (question == null || StrUtil.isBlank(question.getStarterCodeJson())) {
+            return;
+        }
+        questionES.setStarterCodeJson(question.getStarterCodeJson());
+        questionES.setMainFuc(question.getMainFuc());
+        questionRepository.save(questionES);
+    }
+
+    private Map<String, String> parseStarterCode(String starterCodeJson, String legacyJavaCode) {
+        if (StrUtil.isBlank(starterCodeJson)) {
+            return MultiLanguageStarterCodes.buildStarterMap(legacyJavaCode);
+        }
+        try {
+            Map<String, String> starters = JSON.parseObject(starterCodeJson, new TypeReference<>() { });
+            if (CollectionUtil.isEmpty(starters)) {
+                return MultiLanguageStarterCodes.buildStarterMap(legacyJavaCode);
+            }
+            if (StrUtil.isBlank(starters.get(MultiLanguageStarterCodes.JAVA))) {
+                starters.put(MultiLanguageStarterCodes.JAVA, MultiLanguageStarterCodes.javaStarterOrDefault(legacyJavaCode));
+            }
+            return MultiLanguageStarterCodes.expandStarterMap(starters);
+        } catch (RuntimeException exception) {
+            log.warn("Invalid starter code JSON; expanding legacy starter to judge-pool languages", exception);
+            return MultiLanguageStarterCodes.buildStarterMap(legacyJavaCode);
+        }
     }
 
     private QuestionCaseVO toQuestionCaseVO(QuestionCase questionCase) {

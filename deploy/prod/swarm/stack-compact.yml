@@ -51,6 +51,7 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       SYNCODE_BACKEND_BASE_URL: http://oj-runtime:19090
+      AGENT_PUBLIC_BASE_URL: http://oj-agent:8015
       SYNCODE_DEMO_LOGIN_ENABLED: ${SYNCODE_DEMO_LOGIN_ENABLED:-false}
       SYNCODE_TEST_LOGIN_ENABLED: ${SYNCODE_TEST_LOGIN_ENABLED:-false}
     networks:
@@ -107,6 +108,11 @@ services:
       SYNCODE_TEST_STUDENT_EMAIL: ${SYNCODE_TEST_STUDENT_EMAIL:-student@syncode.test}
       SYNCODE_TEST_TEACHER_EMAIL: ${SYNCODE_TEST_TEACHER_EMAIL:-teacher@syncode.test}
       SYNCODE_TEST_TEACHER_ACCOUNT: ${SYNCODE_TEST_TEACHER_ACCOUNT:-admin}
+      SYNCODE_ID_LOGICAL_CLOCK_ENABLED: "true"
+      SYNCODE_ID_LOGICAL_CLOCK_WORKER_ID: "1"
+      SYNCODE_ID_LOGICAL_CLOCK_STATE_FILE: /app/id-state/high-watermark.properties
+    volumes:
+      - runtime_id_state:/app/id-state
     networks:
       backend:
         aliases:
@@ -141,7 +147,12 @@ services:
       REDIS_PORT: 6379
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
+      SANDBOX_EXECUTION_MODE: ${SANDBOX_EXECUTION_MODE:-pool}
+      SYNCODE_ID_LOGICAL_CLOCK_ENABLED: "true"
+      SYNCODE_ID_LOGICAL_CLOCK_WORKER_ID: "2"
+      SYNCODE_ID_LOGICAL_CLOCK_STATE_FILE: /app/id-state/high-watermark.properties
     volumes:
+      - judge_id_state:/app/id-state
       - type: bind
         source: ${DOCKER_SOCKET_PATH}
         target: /var/run/docker.sock
@@ -175,6 +186,13 @@ services:
       - ../env/runtime.env
     environment:
       OJ_AGENT_NACOS_ENABLED: "false"
+      OJ_AGENT_AUTH_BASE_URL: http://oj-runtime:19090
+      OJ_AGENT_ALLOW_INSECURE_USER_ID_BODY: "false"
+      OJ_AGENT_RUNTIME_DATA_DIR: /app/runtime-artifacts
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+    volumes:
+      - agent_runtime_data:/app/runtime-artifacts
     networks:
       - backend
     healthcheck:
@@ -203,3 +221,8 @@ networks:
   backend:
     external: true
     name: ${BACKEND_NETWORK}
+
+volumes:
+  runtime_id_state:
+  judge_id_state:
+  agent_runtime_data:

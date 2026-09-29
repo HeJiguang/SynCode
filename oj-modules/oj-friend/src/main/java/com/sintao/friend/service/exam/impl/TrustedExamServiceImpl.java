@@ -14,6 +14,7 @@ import com.sintao.common.core.enums.ExamAttemptStatus;
 import com.sintao.common.core.enums.ExamGradeStatus;
 import com.sintao.common.core.enums.ExamStatus;
 import com.sintao.common.core.enums.JudgeAsyncStatus;
+import com.sintao.common.core.enums.JudgeTaskType;
 import com.sintao.common.core.enums.ProgramType;
 import com.sintao.common.core.enums.QuestionResType;
 import com.sintao.common.core.enums.ResultCode;
@@ -348,7 +349,7 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
         QuestionType questionType = QuestionType.from(question.getQuestionType());
         answer.setAnswerType(questionType.getAnswerType());
         answer.setLanguageCode(questionType == QuestionType.PROGRAMMING
-                ? (request.getLanguage() == null ? "java" : request.getLanguage()) : null);
+                ? programType(request.getLanguage()).getLanguageCode() : null);
         answer.setAnswerContent(request.getContent());
         answer.setContentHash(hash);
         answer.setAnswerVersion(currentVersion + 1);
@@ -407,9 +408,7 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
         if (!Objects.equals(answer.getAnswerVersion(), request.getAnswerVersion())) {
             throw answerConflict(answer);
         }
-        if (!"java".equalsIgnoreCase(answer.getLanguageCode())) {
-            throw new ServiceException(ResultCode.FAILED_NOT_SUPPORT_PROGRAM);
-        }
+        programType(answer.getLanguageCode());
         int priorFormal = formalSubmissionCount(attemptId, request.getVersionQuestionId());
         if ("FORMAL".equals(kind) && priorFormal >= version.getMaxFormalSubmissions()) {
             throw new ServiceException(ResultCode.EXAM_SUBMISSION_LIMIT_REACHED);
@@ -852,9 +851,13 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
         if (!questionType.getAnswerType().equals(type)) {
             throw new ServiceException(ResultCode.FAILED_PARAMS_VALIDATE);
         }
-        String language = request.getLanguage() == null ? "java" : request.getLanguage();
-        if (questionType == QuestionType.PROGRAMMING && !"java".equalsIgnoreCase(language)) {
-            throw new ServiceException(ResultCode.FAILED_NOT_SUPPORT_PROGRAM);
+        if (questionType == QuestionType.PROGRAMMING) {
+            ProgramType language = programType(request.getLanguage());
+            List<String> allowed = readJson(question.getAllowedLanguagesJson(),
+                    new TypeReference<List<String>>() {}, List.of("java"));
+            if (allowed.stream().noneMatch(code -> language.getLanguageCode().equalsIgnoreCase(code))) {
+                throw new ServiceException(ResultCode.FAILED_NOT_SUPPORT_PROGRAM);
+            }
         }
     }
 
@@ -880,6 +883,7 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
                                         ExamVersionQuestion question, String kind) {
         JudgeSubmitDTO payload = new JudgeSubmitDTO();
         payload.setRequestId(requestId);
+        payload.setTaskType(JudgeTaskType.BATCH);
         payload.setUserId(attempt.getUserId());
         payload.setExamId(attempt.getExamId());
         payload.setAttemptId(attempt.getAttemptId());
@@ -888,7 +892,7 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
         payload.setAnswerVersion(answer.getAnswerVersion());
         payload.setSubmitKind(kind);
         payload.setQuestionId(question.getQuestionId());
-        payload.setProgramType(ProgramType.JAVA.getValue());
+        payload.setProgramType(programType(answer.getLanguageCode()).getValue());
         payload.setDifficulty(1);
         payload.setTimeLimit(question.getTimeLimit());
         payload.setSpaceLimit(question.getSpaceLimit());
@@ -921,7 +925,7 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
         submission.setAnswerId(answer.getAnswerId());
         submission.setAnswerVersion(answer.getAnswerVersion());
         submission.setSubmitKind(kind);
-        submission.setProgramType(ProgramType.JAVA.getValue());
+        submission.setProgramType(payload.getProgramType());
         submission.setUserCode(answer.getAnswerContent());
         submission.setPass(QuestionResType.IN_JUDGE.getValue());
         submission.setScore(0);
@@ -1047,6 +1051,15 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
         } catch (JsonProcessingException exception) {
             log.warn("Invalid trusted exam snapshot JSON", exception);
             return fallback;
+        }
+    }
+
+    private ProgramType programType(String languageCode) {
+        String resolved = languageCode == null || languageCode.isBlank() ? "java" : languageCode;
+        try {
+            return ProgramType.fromLanguageCode(resolved);
+        } catch (IllegalArgumentException exception) {
+            throw new ServiceException(ResultCode.FAILED_NOT_SUPPORT_PROGRAM);
         }
     }
 

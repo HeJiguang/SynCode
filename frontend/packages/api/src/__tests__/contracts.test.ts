@@ -156,7 +156,9 @@ async function main() {
   assert.equal(api.programTypeFromLanguage("java"), 0);
   assert.equal(api.programTypeFromLanguage("cpp"), 1);
   assert.equal(api.programTypeFromLanguage("go"), 2);
-  assert.equal(api.isJudgeLanguageSupported("python"), false);
+  assert.equal(api.programTypeFromLanguage("python"), 3);
+  assert.equal(api.isJudgeLanguageSupported("python"), true);
+  assert.equal(api.isJudgeLanguageSupported("javascript"), false);
 
   await withPatchedEnv(
     {

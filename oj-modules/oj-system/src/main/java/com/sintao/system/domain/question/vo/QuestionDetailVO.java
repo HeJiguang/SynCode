@@ -40,6 +40,8 @@ public class QuestionDetailVO {
 
     private String defaultCode;
 
+    private String starterCodeJson;
+
     private String mainFuc;
 }
 

@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import socket
 from typing import Any
+from urllib.parse import quote_plus
 
 from app.core.nacos_config import load_nacos_config as _load_nacos_config
 import yaml
@@ -65,6 +66,26 @@ class AgentSettings:
     trace_store_backend: str = "memory"
     query_ledger_store_backend: str = "memory"
     evaluation_store_backend: str = "memory"
+    agent_runtime_provider: str = "direct"
+    agent_runtime_fallback_to_direct: bool = True
+    hermes_base_url: str | None = None
+    hermes_api_key: str | None = None
+    hermes_provider: str = "deepseek"
+    hermes_chat_model: str | None = None
+    hermes_training_model: str | None = None
+    hermes_request_timeout_seconds: float = 10.0
+    hermes_run_timeout_seconds: float = 90.0
+    hermes_poll_interval_seconds: float = 0.25
+    database_url: str | None = None
+    auth_base_url: str | None = None
+    allow_insecure_user_id_body: bool = False
+    conversation_soft_token_limit: int = 16000
+    conversation_hard_token_limit: int = 22000
+    user_max_active_runs: int = 3
+    user_run_rate_limit_per_minute: int = 20
+    active_run_stale_seconds: float = 300.0
+    global_max_concurrent_runs: int = 16
+    run_admission_wait_seconds: float = 15.0
 
 
 def _to_bool(raw: str | bool | None, default: bool) -> bool:
@@ -218,6 +239,27 @@ def _resolve_default_nacos_ip() -> str:
     return "127.0.0.1"
 
 
+def _build_database_url(runtime_data_dir: str, nacos_config: dict[str, Any]) -> str:
+    explicit = _read_str(nacos_config, "OJ_AGENT_DATABASE_URL", ("database", "url"))
+    if explicit:
+        return explicit
+
+    mysql_host = os.getenv("MYSQL_HOST")
+    mysql_database = os.getenv("MYSQL_DATABASE")
+    mysql_user = os.getenv("MYSQL_APP_USER") or os.getenv("SPRING_DATASOURCE_USERNAME")
+    mysql_password = os.getenv("MYSQL_PASSWORD") or os.getenv("SPRING_DATASOURCE_PASSWORD")
+    mysql_port = os.getenv("MYSQL_PORT", "3306")
+    if all((mysql_host, mysql_database, mysql_user, mysql_password)):
+        return (
+            "mysql+pymysql://"
+            f"{quote_plus(str(mysql_user))}:{quote_plus(str(mysql_password))}"
+            f"@{mysql_host}:{mysql_port}/{mysql_database}?charset=utf8mb4"
+        )
+
+    database_path = Path(runtime_data_dir) / "syncode-agent.sqlite3"
+    return f"sqlite+pysqlite:///{database_path}"
+
+
 def load_settings() -> AgentSettings:
     """
     全局配置加载入口函数。
@@ -244,6 +286,18 @@ def load_settings() -> AgentSettings:
     embedding_provider = _read_str(nacos_config, "OJ_AGENT_EMBEDDING_PROVIDER", ("llm", "embedding-provider"), "openai_compatible")
     embedding_model = _read_str(nacos_config, "OJ_AGENT_EMBEDDING_MODEL", ("llm", "embedding-model"))
     embedding_dimensions = _read_int(nacos_config, "OJ_AGENT_EMBEDDING_DIMENSIONS", ("llm", "embedding-dimensions"), 256)
+    agent_runtime_provider = _read_str(
+        nacos_config,
+        "OJ_AGENT_RUNTIME_PROVIDER",
+        ("agent-runtime", "provider"),
+        "direct",
+    ) or "direct"
+    runtime_data_dir = _read_str(
+        nacos_config,
+        "OJ_AGENT_RUNTIME_DATA_DIR",
+        ("runtime", "data-dir"),
+        DEFAULT_RUNTIME_DATA_DIR,
+    ) or DEFAULT_RUNTIME_DATA_DIR
 
     # 5. 实例化并返回最终的配置对象
     return AgentSettings(
@@ -274,10 +328,115 @@ def load_settings() -> AgentSettings:
         qdrant_collection=_read_str(nacos_config, "OJ_AGENT_QDRANT_COLLECTION", ("qdrant", "collection"), "oj-agent-knowledge") or "oj-agent-knowledge",
         qdrant_top_k=_read_int(nacos_config, "OJ_AGENT_QDRANT_TOP_K", ("qdrant", "top-k"), 3),
         qdrant_chunk_size=_read_int(nacos_config, "OJ_AGENT_QDRANT_CHUNK_SIZE", ("qdrant", "chunk-size"), 240),
-        runtime_data_dir=_read_str(nacos_config, "OJ_AGENT_RUNTIME_DATA_DIR", ("runtime", "data-dir"), DEFAULT_RUNTIME_DATA_DIR) or DEFAULT_RUNTIME_DATA_DIR,
+        runtime_data_dir=runtime_data_dir,
         trace_store_backend=_read_str(nacos_config, "OJ_AGENT_TRACE_STORE", ("runtime", "trace-store"), "memory") or "memory",
         query_ledger_store_backend=_read_str(nacos_config, "OJ_AGENT_QUERY_LEDGER_STORE", ("runtime", "query-ledger-store"), "memory") or "memory",
         evaluation_store_backend=_read_str(nacos_config, "OJ_AGENT_EVALUATION_STORE", ("runtime", "evaluation-store"), "memory") or "memory",
+        agent_runtime_provider=agent_runtime_provider,
+        agent_runtime_fallback_to_direct=_read_bool(
+            nacos_config,
+            "OJ_AGENT_RUNTIME_FALLBACK_TO_DIRECT",
+            ("agent-runtime", "fallback-to-direct"),
+            True,
+        ),
+        hermes_base_url=_read_str(
+            nacos_config,
+            "OJ_AGENT_HERMES_BASE_URL",
+            ("agent-runtime", "hermes", "base-url"),
+        ),
+        hermes_api_key=_read_str(
+            nacos_config,
+            "OJ_AGENT_HERMES_API_KEY",
+            ("agent-runtime", "hermes", "api-key"),
+        ),
+        hermes_provider=_read_str(
+            nacos_config,
+            "OJ_AGENT_HERMES_PROVIDER",
+            ("agent-runtime", "hermes", "provider"),
+            "deepseek",
+        ) or "deepseek",
+        hermes_chat_model=_read_str(
+            nacos_config,
+            "OJ_AGENT_HERMES_CHAT_MODEL",
+            ("agent-runtime", "hermes", "chat-model"),
+        ),
+        hermes_training_model=_read_str(
+            nacos_config,
+            "OJ_AGENT_HERMES_TRAINING_MODEL",
+            ("agent-runtime", "hermes", "training-model"),
+        ),
+        hermes_request_timeout_seconds=_read_float(
+            nacos_config,
+            "OJ_AGENT_HERMES_REQUEST_TIMEOUT_SECONDS",
+            ("agent-runtime", "hermes", "request-timeout-seconds"),
+            10.0,
+        ),
+        hermes_run_timeout_seconds=_read_float(
+            nacos_config,
+            "OJ_AGENT_HERMES_RUN_TIMEOUT_SECONDS",
+            ("agent-runtime", "hermes", "run-timeout-seconds"),
+            90.0,
+        ),
+        hermes_poll_interval_seconds=_read_float(
+            nacos_config,
+            "OJ_AGENT_HERMES_POLL_INTERVAL_SECONDS",
+            ("agent-runtime", "hermes", "poll-interval-seconds"),
+            0.25,
+        ),
+        database_url=_build_database_url(runtime_data_dir, nacos_config),
+        auth_base_url=_read_str(
+            nacos_config,
+            "OJ_AGENT_AUTH_BASE_URL",
+            ("agent", "auth-base-url"),
+        ),
+        allow_insecure_user_id_body=_read_bool(
+            nacos_config,
+            "OJ_AGENT_ALLOW_INSECURE_USER_ID_BODY",
+            ("agent", "allow-insecure-user-id-body"),
+            False,
+        ),
+        conversation_soft_token_limit=_read_int(
+            nacos_config,
+            "OJ_AGENT_CONVERSATION_SOFT_TOKEN_LIMIT",
+            ("conversation", "soft-token-limit"),
+            16000,
+        ),
+        conversation_hard_token_limit=_read_int(
+            nacos_config,
+            "OJ_AGENT_CONVERSATION_HARD_TOKEN_LIMIT",
+            ("conversation", "hard-token-limit"),
+            22000,
+        ),
+        user_max_active_runs=_read_int(
+            nacos_config,
+            "OJ_AGENT_USER_MAX_ACTIVE_RUNS",
+            ("run-limits", "user-max-active-runs"),
+            3,
+        ),
+        user_run_rate_limit_per_minute=_read_int(
+            nacos_config,
+            "OJ_AGENT_USER_RUN_RATE_LIMIT_PER_MINUTE",
+            ("run-limits", "user-run-rate-limit-per-minute"),
+            20,
+        ),
+        active_run_stale_seconds=_read_float(
+            nacos_config,
+            "OJ_AGENT_ACTIVE_RUN_STALE_SECONDS",
+            ("run-limits", "active-run-stale-seconds"),
+            300.0,
+        ),
+        global_max_concurrent_runs=_read_int(
+            nacos_config,
+            "OJ_AGENT_GLOBAL_MAX_CONCURRENT_RUNS",
+            ("run-limits", "global-max-concurrent-runs"),
+            16,
+        ),
+        run_admission_wait_seconds=_read_float(
+            nacos_config,
+            "OJ_AGENT_RUN_ADMISSION_WAIT_SECONDS",
+            ("run-limits", "admission-wait-seconds"),
+            15.0,
+        ),
         nacos_config_enabled=_to_bool(os.getenv("OJ_AGENT_NACOS_CONFIG_ENABLED"), bool(os.getenv("OJ_AGENT_NACOS_SERVER_ADDR"))),
         nacos_config_data_id=os.getenv("OJ_AGENT_NACOS_CONFIG_DATA_ID", "oj-agent-local.yaml"),
         nacos_enabled=_read_bool(nacos_config, "OJ_AGENT_NACOS_ENABLED", ("nacos", "enabled"), False),

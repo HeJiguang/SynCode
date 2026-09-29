@@ -25,9 +25,28 @@ spring:
 sandbox:
   docker:
     host: ${SANDBOX_DOCKER_HOST:unix:///var/run/docker.sock}
+    image: ${SANDBOX_DOCKER_IMAGE:syncode/oj-sandbox-multilang:1.0.0}
+    name-prefix: ${SANDBOX_DOCKER_NAME_PREFIX:oj-sandbox-core}
     volume: ${SANDBOX_DOCKER_VOLUME:/usr/share/java}
+  limit:
+    compile-time: ${SANDBOX_COMPILE_TIMEOUT_SECONDS:10}
+    total-time: ${SANDBOX_TOTAL_TIMEOUT_SECONDS:60}
 
 judge:
+  consumer:
+    # One consumer per instance; zero derives its in-flight credit from scheduler capacity.
+    prefetch: ${JUDGE_CONSUMER_PREFETCH:0}
+  scheduler:
+    # Zero uses the local sandbox capacity. A lower value reserves warm containers without running work on them.
+    workers: ${JUDGE_SCHEDULER_WORKERS:0}
+    # Prefer realtime work while guaranteeing one batch dispatch after each realtime burst.
+    realtime-burst: ${JUDGE_REALTIME_BURST:4}
+    # Two broker consumers can reserve at most 2x local capacity in total.
+    queue-capacity-multiplier: ${JUDGE_QUEUE_CAPACITY_MULTIPLIER:1}
+  lock:
+    # A short renewable lease bounds failover time without expiring healthy long-running jobs.
+    lease-seconds: ${JUDGE_LOCK_LEASE_SECONDS:30}
+    renew-interval-seconds: ${JUDGE_LOCK_RENEW_INTERVAL_SECONDS:10}
   runtime-state:
     ttl-minutes: 1440
 

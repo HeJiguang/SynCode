@@ -10,6 +10,7 @@ import com.github.pagehelper.PageHelper;
 import com.sintao.common.core.constants.Constants;
 import com.sintao.common.core.enums.ResultCode;
 import com.sintao.common.core.enums.QuestionType;
+import com.sintao.common.core.utils.MultiLanguageStarterCodes;
 import com.sintao.common.security.exception.ServiceException;
 import com.sintao.system.domain.question.Question;
 import com.sintao.system.domain.question.dto.QuestionAddDTO;
@@ -70,6 +71,11 @@ public class QuestionServiceImpl implements IQuestionService {
         if (CollectionUtil.isNotEmpty(questionList)) {
             throw new ServiceException(ResultCode.FAILED_ALREADY_EXISTS);
         }
+        if (QuestionType.PROGRAMMING.name().equals(questionAddDTO.getQuestionType())
+                && StrUtil.isBlank(questionAddDTO.getStarterCodeJson())) {
+            questionAddDTO.setStarterCodeJson(
+                    MultiLanguageStarterCodes.buildStarterJson(questionAddDTO.getDefaultCode()));
+        }
         Question question = new Question();
         BeanUtil.copyProperties(questionAddDTO, question);
         int insert = questionMapper.insert(question);
@@ -115,6 +121,14 @@ public class QuestionServiceImpl implements IQuestionService {
         oldQuestion.setContent(questionEditDTO.getContent());
         oldQuestion.setQuestionCase(questionEditDTO.getQuestionCase());
         oldQuestion.setDefaultCode(questionEditDTO.getDefaultCode());
+        if (questionEditDTO.getStarterCodeJson() != null) {
+            oldQuestion.setStarterCodeJson(questionEditDTO.getStarterCodeJson());
+        }
+        if (QuestionType.PROGRAMMING.name().equals(oldQuestion.getQuestionType())
+                && StrUtil.isBlank(oldQuestion.getStarterCodeJson())) {
+            oldQuestion.setStarterCodeJson(
+                    MultiLanguageStarterCodes.buildStarterJson(questionEditDTO.getDefaultCode()));
+        }
         oldQuestion.setMainFuc(questionEditDTO.getMainFuc());
         QuestionES questionES = new QuestionES();
         BeanUtil.copyProperties(oldQuestion, questionES);
@@ -173,6 +187,9 @@ public class QuestionServiceImpl implements IQuestionService {
                     || request.getSpaceLimit() == null || request.getSpaceLimit() <= 0
                     || !readArray(request.getQuestionCase())) {
                 throw new ServiceException(ResultCode.FAILED_PARAMS_VALIDATE);
+            }
+            if (StrUtil.isNotBlank(request.getStarterCodeJson())) {
+                request.setStarterCodeJson(readObject(request.getStarterCodeJson(), "{}").toString());
             }
         } else {
             if (request.getTimeLimit() == null || request.getTimeLimit() <= 0) request.setTimeLimit(1000L);
