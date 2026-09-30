@@ -135,7 +135,10 @@ jobs:
               exit 1
             fi
             reachable=""
+            db_port=3306
             worker_host="$(sed -n 's/^WORKER_SSH_HOST=//p' "${STACK_ENV_FILE}" | tail -1)"
+            worker_user="$(sed -n 's/^WORKER_SSH_USER=//p' "${STACK_ENV_FILE}" | tail -1)"
+            worker_port="$(sed -n 's/^WORKER_SSH_PORT=//p' "${STACK_ENV_FILE}" | tail -1)"
             candidates=("${db_host}" "127.0.0.1")
             if [[ -n "${worker_host}" && "${worker_host}" != "${db_host}" ]]; then
               candidates+=("${worker_host}")
@@ -147,19 +150,40 @@ jobs:
               fi
               echo "MySQL at ${candidate}:3306 is not reachable"
             done
+            if [[ -z "${reachable}" && -n "${worker_host}" && -n "${worker_user}" ]]; then
+              echo "Opening SSH tunnel 127.0.0.1:13306 -> ${worker_host}:3306 for MySQL"
+              ssh -i .cd-tmp/worker_id_ed25519 -p "${worker_port:-22}" \
+                -o StrictHostKeyChecking=accept-new -o ExitOnForwardFailure=yes \
+                -f -N -L 13306:127.0.0.1:3306 "${worker_user}@${worker_host}"
+              for _ in $(seq 1 15); do
+                if timeout 2 bash -c "</dev/tcp/127.0.0.1/13306" 2>/dev/null; then
+                  reachable="127.0.0.1"
+                  db_port=13306
+                  break
+                fi
+                sleep 1
+              done
+            fi
             if [[ -z "${reachable}" ]]; then
               echo "No reachable MySQL on 3306 among: ${candidates[*]}" >&2
               exit 1
             fi
-            if [[ "${reachable}" != "${db_host}" ]]; then
+            if [[ "${db_port}" == 3306 && "${reachable}" != "${db_host}" ]]; then
               echo "Direct access to ${db_host} is blocked; migrating via ${reachable} instead"
             fi
-            export SYNCODE_DB_URL="jdbc:mysql://${reachable}:3306/${db_name}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC"
+            export SYNCODE_DB_URL="jdbc:mysql://${reachable}:${db_port}/${db_name}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC"
             export SYNCODE_DB_USER="${db_user}"
             export SYNCODE_DB_PASSWORD="${db_password}"
           fi
-          mvn --batch-mode -f deploy/migrations/pom.xml flyway:migrate
-          mvn --batch-mode -f deploy/migrations/pom.xml flyway:validate
+          migrate_status=0
+          mvn --batch-mode -f deploy/migrations/pom.xml flyway:migrate || migrate_status=$?
+          if [[ "${migrate_status}" -eq 0 ]]; then
+            mvn --batch-mode -f deploy/migrations/pom.xml flyway:validate || migrate_status=$?
+          fi
+          if [[ "${db_port}" != 3306 ]]; then
+            pkill -f "13306:127.0.0.1:3306" 2>/dev/null || true
+          fi
+          exit "${migrate_status}"
 
       - name: Verify manager toolchain
         shell: bash
