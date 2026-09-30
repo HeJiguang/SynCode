@@ -144,12 +144,16 @@ jobs:
             if [[ -n "${worker_host}" && "${worker_host}" != "${db_host}" ]]; then
               candidates+=("${worker_host}")
             fi
+            # The shared MySQL publishes as 13306 on the swarm host; try both ports per candidate.
             for candidate in "${candidates[@]}"; do
-              if timeout 5 bash -c "</dev/tcp/${candidate}/3306" 2>/dev/null; then
-                reachable="${candidate}"
-                break
-              fi
-              echo "MySQL at ${candidate}:3306 is not reachable from the host"
+              for candidate_port in 3306 13306; do
+                if timeout 5 bash -c "</dev/tcp/${candidate}/${candidate_port}" 2>/dev/null; then
+                  reachable="${candidate}"
+                  db_port="${candidate_port}"
+                  break 2
+                fi
+              done
+              echo "MySQL at ${candidate} is not reachable on 3306 or 13306 from the host"
             done
             if [[ -z "${reachable}" ]]; then
               # The manager's host-level egress to MySQL is blocked, but the production service
@@ -160,13 +164,13 @@ jobs:
                 if docker run --rm debian:bookworm-slim bash -c "timeout 5 bash -c '</dev/tcp/${candidate}/3306'" 2>/dev/null; then
                   echo "MySQL at ${candidate}:3306 is reachable from a container; starting TCP relay"
                   docker rm -f cd-mysql-relay >/dev/null 2>&1 || true
-                  if docker run -d --name cd-mysql-relay -p 127.0.0.1:13306:13306 \
+                  if docker run -d --name cd-mysql-relay -p 127.0.0.1:23306:13306 \
                       -v "$(pwd)/deploy/prod/scripts/mysql_relay.py:/relay.py:ro" \
                       python:3.11-slim python /relay.py "${candidate}" 3306 >/dev/null 2>&1; then
                     for _ in $(seq 1 15); do
-                      if timeout 2 bash -c "</dev/tcp/127.0.0.1/13306" 2>/dev/null; then
+                      if timeout 2 bash -c "</dev/tcp/127.0.0.1/23306" 2>/dev/null; then
                         reachable="127.0.0.1"
-                        db_port=13306
+                        db_port=23306
                         relay_started=1
                         break
                       fi
@@ -182,11 +186,11 @@ jobs:
               echo "Opening SSH tunnel 127.0.0.1:13306 -> ${worker_host}:3306 for MySQL"
               ssh -i .cd-tmp/worker_id_ed25519 -p "${worker_port:-22}" \
                 -o StrictHostKeyChecking=accept-new -o ExitOnForwardFailure=yes \
-                -f -N -L 13306:127.0.0.1:3306 "${worker_user}@${worker_host}"
+                -f -N -L 23306:127.0.0.1:3306 "${worker_user}@${worker_host}"
               for _ in $(seq 1 15); do
-                if timeout 2 bash -c "</dev/tcp/127.0.0.1/13306" 2>/dev/null; then
+                if timeout 2 bash -c "</dev/tcp/127.0.0.1/23306" 2>/dev/null; then
                   reachable="127.0.0.1"
-                  db_port=13306
+                  db_port=23306
                   break
                 fi
                 sleep 1
@@ -211,7 +215,7 @@ jobs:
           if [[ "${relay_started}" -eq 1 ]]; then
             docker rm -f cd-mysql-relay >/dev/null 2>&1 || true
           elif [[ "${db_port}" != 3306 ]]; then
-            pkill -f "13306:127.0.0.1:3306" 2>/dev/null || true
+            pkill -f "23306:127.0.0.1:3306" 2>/dev/null || true
           fi
           exit "${migrate_status}"
 
