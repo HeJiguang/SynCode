@@ -134,7 +134,22 @@ jobs:
               echo "runtime.env is missing MYSQL_HOST/MYSQL_DATABASE/MYSQL_APP_USER/MYSQL_PASSWORD" >&2
               exit 1
             fi
-            export SYNCODE_DB_URL="jdbc:mysql://${db_host}:3306/${db_name}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC"
+            reachable=""
+            for candidate in "${db_host}" 127.0.0.1; do
+              if timeout 5 bash -c "</dev/tcp/${candidate}/3306" 2>/dev/null; then
+                reachable="${candidate}"
+                break
+              fi
+              echo "MySQL at ${candidate}:3306 is not reachable"
+            done
+            if [[ -z "${reachable}" ]]; then
+              echo "Neither ${db_host} nor 127.0.0.1 exposes MySQL on 3306" >&2
+              exit 1
+            fi
+            if [[ "${reachable}" != "${db_host}" ]]; then
+              echo "Hairpin access to ${db_host} is blocked; migrating via ${reachable} instead"
+            fi
+            export SYNCODE_DB_URL="jdbc:mysql://${reachable}:3306/${db_name}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC"
             export SYNCODE_DB_USER="${db_user}"
             export SYNCODE_DB_PASSWORD="${db_password}"
           fi
