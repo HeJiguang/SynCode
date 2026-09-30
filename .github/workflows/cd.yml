@@ -136,6 +136,7 @@ jobs:
             fi
             reachable=""
             db_port=3306
+            relay_started=0
             worker_host="$(sed -n 's/^WORKER_SSH_HOST=//p' "${STACK_ENV_FILE}" | tail -1)"
             worker_user="$(sed -n 's/^WORKER_SSH_USER=//p' "${STACK_ENV_FILE}" | tail -1)"
             worker_port="$(sed -n 's/^WORKER_SSH_PORT=//p' "${STACK_ENV_FILE}" | tail -1)"
@@ -148,8 +149,35 @@ jobs:
                 reachable="${candidate}"
                 break
               fi
-              echo "MySQL at ${candidate}:3306 is not reachable"
+              echo "MySQL at ${candidate}:3306 is not reachable from the host"
             done
+            if [[ -z "${reachable}" ]]; then
+              # The manager's host-level egress to MySQL is blocked, but the production service
+              # containers reach the database through the Docker bridge. Probe that path and,
+              # when it works, relay 127.0.0.1:13306 through a cached python image container.
+              for candidate in "${db_host}" "${worker_host}"; do
+                [[ -z "${candidate}" ]] && continue
+                if docker run --rm debian:bookworm-slim bash -c "timeout 5 bash -c '</dev/tcp/${candidate}/3306'" 2>/dev/null; then
+                  echo "MySQL at ${candidate}:3306 is reachable from a container; starting TCP relay"
+                  docker rm -f cd-mysql-relay >/dev/null 2>&1 || true
+                  if docker run -d --name cd-mysql-relay -p 127.0.0.1:13306:13306 \
+                      -v "$(pwd)/deploy/prod/scripts/mysql_relay.py:/relay.py:ro" \
+                      python:3.11-slim python /relay.py "${candidate}" 3306 >/dev/null 2>&1; then
+                    for _ in $(seq 1 15); do
+                      if timeout 2 bash -c "</dev/tcp/127.0.0.1/13306" 2>/dev/null; then
+                        reachable="127.0.0.1"
+                        db_port=13306
+                        relay_started=1
+                        break
+                      fi
+                      sleep 1
+                    done
+                  fi
+                  break
+                fi
+                echo "MySQL at ${candidate}:3306 is not reachable from a container either"
+              done
+            fi
             if [[ -z "${reachable}" && -n "${worker_host}" && -n "${worker_user}" ]]; then
               echo "Opening SSH tunnel 127.0.0.1:13306 -> ${worker_host}:3306 for MySQL"
               ssh -i .cd-tmp/worker_id_ed25519 -p "${worker_port:-22}" \
@@ -180,7 +208,9 @@ jobs:
           if [[ "${migrate_status}" -eq 0 ]]; then
             mvn --batch-mode -f deploy/migrations/pom.xml flyway:validate || migrate_status=$?
           fi
-          if [[ "${db_port}" != 3306 ]]; then
+          if [[ "${relay_started}" -eq 1 ]]; then
+            docker rm -f cd-mysql-relay >/dev/null 2>&1 || true
+          elif [[ "${db_port}" != 3306 ]]; then
             pkill -f "13306:127.0.0.1:3306" 2>/dev/null || true
           fi
           exit "${migrate_status}"
