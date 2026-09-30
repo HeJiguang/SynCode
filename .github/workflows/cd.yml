@@ -135,7 +135,12 @@ jobs:
               exit 1
             fi
             reachable=""
-            for candidate in "${db_host}" 127.0.0.1; do
+            worker_host="$(sed -n 's/^WORKER_SSH_HOST=//p' "${STACK_ENV_FILE}" | tail -1)"
+            candidates=("${db_host}" "127.0.0.1")
+            if [[ -n "${worker_host}" && "${worker_host}" != "${db_host}" ]]; then
+              candidates+=("${worker_host}")
+            fi
+            for candidate in "${candidates[@]}"; do
               if timeout 5 bash -c "</dev/tcp/${candidate}/3306" 2>/dev/null; then
                 reachable="${candidate}"
                 break
@@ -143,11 +148,11 @@ jobs:
               echo "MySQL at ${candidate}:3306 is not reachable"
             done
             if [[ -z "${reachable}" ]]; then
-              echo "Neither ${db_host} nor 127.0.0.1 exposes MySQL on 3306" >&2
+              echo "No reachable MySQL on 3306 among: ${candidates[*]}" >&2
               exit 1
             fi
             if [[ "${reachable}" != "${db_host}" ]]; then
-              echo "Hairpin access to ${db_host} is blocked; migrating via ${reachable} instead"
+              echo "Direct access to ${db_host} is blocked; migrating via ${reachable} instead"
             fi
             export SYNCODE_DB_URL="jdbc:mysql://${reachable}:3306/${db_name}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC"
             export SYNCODE_DB_USER="${db_user}"
