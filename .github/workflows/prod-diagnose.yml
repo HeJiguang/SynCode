@@ -80,8 +80,7 @@ jobs:
           curl -s --max-time 15 "http://127.0.0.1/friend/question/semiLogin/detail?questionId=20001" | head -c 120
           echo
           for service in \
-            "onlineoj-test_oj-friend" \
-            "onlineoj-test_oj-gateway" \
+            "onlineoj-test_oj-runtime" \
             "onlineoj-test_oj-judge"
           do
             echo "=== service status: ${service} ==="
