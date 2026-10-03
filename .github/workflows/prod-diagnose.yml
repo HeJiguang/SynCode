@@ -74,18 +74,22 @@ jobs:
         shell: bash
         run: |
           set +e
+          echo "=== triggering detail requests for correlation ==="
+          curl -s --max-time 15 "http://127.0.0.1/friend/question/semiLogin/detail?questionId=20003" | head -c 300
+          echo
+          curl -s --max-time 15 "http://127.0.0.1/friend/question/semiLogin/detail?questionId=20001" | head -c 120
+          echo
           for service in \
-            "onlineoj-test_nginx" \
-            "onlineoj-test_oj-gateway" \
             "onlineoj-test_oj-friend" \
-            "onlineoj-test_oj-judge" \
-            "onlineoj-test_oj-system"
+            "onlineoj-test_oj-gateway" \
+            "onlineoj-test_oj-judge"
           do
             echo "=== service status: ${service} ==="
             docker service ps --no-trunc "${service}" | head -5
-            echo "=== service logs (errors): ${service} ==="
-            docker service logs --tail 400 "${service}" 2>&1 | grep -E "ERROR|Exception|error" | tail -60
+            echo "=== service raw logs (tail 150): ${service} ==="
+            docker service logs --tail 150 --timestamps "${service}" 2>&1 | tail -150
           done
+          exit 0
 
       - name: Prepare worker SSH key
         shell: bash
