@@ -16,6 +16,12 @@ jobs:
       - x64
       - syncode-prod
     steps:
+      - name: Clear stale workspace
+        shell: bash
+        run: |
+          rm -rf "${GITHUB_WORKSPACE}"
+          mkdir -p "${GITHUB_WORKSPACE}"
+
       - name: Checkout
         uses: actions/checkout@v5
 
@@ -27,6 +33,10 @@ jobs:
           date
           echo "=== docker service ls ==="
           docker service ls
+          echo "=== docker network ls (overlay/bridge) ==="
+          docker network ls
+          echo "=== published ports on the host ==="
+          ss -ltnp | grep -E ':(80|443|3306|13306|8848)' || true
           echo "=== docker stack services onlineoj-prod ==="
           docker stack services "onlineoj-prod"
           echo "=== docker stack ps onlineoj-prod ==="
