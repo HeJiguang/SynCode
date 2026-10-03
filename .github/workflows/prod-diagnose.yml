@@ -43,6 +43,13 @@ jobs:
           docker stack ps "onlineoj-prod" --no-trunc
           echo "=== docker ps ==="
           docker ps
+          echo "=== disk usage ==="
+          df -h
+          echo "=== elasticsearch health ==="
+          curl -s --max-time 8 "http://127.0.0.1:9200/_cluster/health" || true
+          echo
+          curl -s --max-time 8 "http://127.0.0.1:9200/_settings?filter_path=**.blocks.*" || true
+          echo
           for service in \
             "onlineoj-prod_nginx" \
             "onlineoj-prod_web" \
@@ -61,6 +68,23 @@ jobs:
             docker service ps "${service}" --no-trunc || true
             echo "=== service logs: ${service} ==="
             docker service logs --tail 120 "${service}" || true
+          done
+
+      - name: Collect serving stack diagnostics
+        shell: bash
+        run: |
+          set +e
+          for service in \
+            "onlineoj-test_nginx" \
+            "onlineoj-test_oj-gateway" \
+            "onlineoj-test_oj-friend" \
+            "onlineoj-test_oj-judge" \
+            "onlineoj-test_oj-system"
+          do
+            echo "=== service status: ${service} ==="
+            docker service ps --no-trunc "${service}" | head -5
+            echo "=== service logs (errors): ${service} ==="
+            docker service logs --tail 400 "${service}" 2>&1 | grep -E "ERROR|Exception|error" | tail -60
           done
 
       - name: Prepare worker SSH key
