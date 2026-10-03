@@ -18,6 +18,7 @@ import com.sintao.common.core.enums.JudgeTaskType;
 import com.sintao.common.core.enums.ProgramType;
 import com.sintao.common.core.enums.QuestionResType;
 import com.sintao.common.core.enums.ResultCode;
+import com.sintao.common.core.utils.LegacyJsonRepair;
 import com.sintao.common.core.utils.ThreadLocalUtil;
 import com.sintao.common.redis.service.JudgeRuntimeStateService;
 import com.sintao.common.security.exception.ServiceException;
@@ -188,7 +189,7 @@ public class UserQuestionServiceImpl implements IUserQuestionService {
         if (StrUtil.isBlank(questionCaseJson)) {
             return List.of();
         }
-        return JSONUtil.toList(questionCaseJson, QuestionCase.class);
+        return JSONUtil.toList(LegacyJsonRepair.escapeControlCharsInStrings(questionCaseJson), QuestionCase.class);
     }
 
     private RunPayload buildRunPayload(Long questionId, List<String> customInputs) {

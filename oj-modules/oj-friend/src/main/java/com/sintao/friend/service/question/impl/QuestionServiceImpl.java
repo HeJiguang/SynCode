@@ -11,6 +11,7 @@ import com.github.pagehelper.PageHelper;
 import com.sintao.common.core.constants.Constants;
 import com.sintao.common.core.domain.TableDataInfo;
 import com.sintao.common.core.enums.ResultCode;
+import com.sintao.common.core.utils.LegacyJsonRepair;
 import com.sintao.common.core.utils.MultiLanguageStarterCodes;
 import com.sintao.common.security.exception.ServiceException;
 import com.sintao.friend.domain.question.Question;
@@ -200,7 +201,8 @@ public class QuestionServiceImpl implements IQuestionService {
         if (StrUtil.isBlank(questionCaseJson)) {
             return new ArrayList<>();
         }
-        List<QuestionCase> questionCaseList = JSONUtil.toList(questionCaseJson, QuestionCase.class);
+        List<QuestionCase> questionCaseList = JSONUtil.toList(
+                LegacyJsonRepair.escapeControlCharsInStrings(questionCaseJson), QuestionCase.class);
         if (CollectionUtil.isEmpty(questionCaseList)) {
             return new ArrayList<>();
         }
