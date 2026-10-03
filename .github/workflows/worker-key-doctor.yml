@@ -1,0 +1,110 @@
+name: worker-key-doctor
+
+on:
+  workflow_dispatch:
+    inputs:
+      worker_host:
+        description: Worker host to test the keys against
+        required: false
+        default: 101.96.200.77
+        type: string
+
+env:
+  RUNNER_WORKER_SSH_KEY_FILE: /opt/syncode-runner/.ssh/onlineoj_worker_ci
+
+jobs:
+  doctor:
+    name: Diagnose Worker SSH Keys
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - syncode-prod
+    steps:
+      - name: Prepare every candidate key separately
+        shell: bash
+        env:
+          WORKER_SSH_KEY: ${{ secrets.WORKER_SSH_KEY }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p .cd-tmp
+
+          normalize_key() {
+            local source_file="$1" target_file="$2"
+            sed 's/\r$//' "${source_file}" > "${target_file}"
+            chmod 600 "${target_file}"
+            if ssh-keygen -y -f "${target_file}" >/dev/null 2>&1; then
+              return 0
+            fi
+            sed 's/\\n/\n/g' "${source_file}" > "${target_file}"
+            chmod 600 "${target_file}"
+            if ssh-keygen -y -f "${target_file}" >/dev/null 2>&1; then
+              return 0
+            fi
+            if base64 --decode < "${source_file}" > "${target_file}" 2>/dev/null; then
+              chmod 600 "${target_file}"
+              if ssh-keygen -y -f "${target_file}" >/dev/null 2>&1; then
+                return 0
+              fi
+            fi
+            rm -f "${target_file}"
+            return 1
+          }
+
+          if [[ -f "${RUNNER_WORKER_SSH_KEY_FILE}" ]] \
+              && normalize_key "${RUNNER_WORKER_SSH_KEY_FILE}" .cd-tmp/key_runner_local; then
+            echo "runner-local key: VALID"
+          else
+            echo "runner-local key: missing or invalid"
+          fi
+
+          if [[ -n "${WORKER_SSH_KEY:-}" ]]; then
+            printf '%s\n' "${WORKER_SSH_KEY}" > .cd-tmp/secret_worker_raw
+            if normalize_key .cd-tmp/secret_worker_raw .cd-tmp/key_worker_secret; then
+              echo "WORKER_SSH_KEY secret: VALID private key"
+            else
+              echo "WORKER_SSH_KEY secret: NOT a usable private key (check for truncation or mangling)"
+            fi
+            rm -f .cd-tmp/secret_worker_raw
+          else
+            echo "WORKER_SSH_KEY secret: empty"
+          fi
+
+          if [[ -n "${DEPLOY_SSH_KEY:-}" ]]; then
+            printf '%s\n' "${DEPLOY_SSH_KEY}" > .cd-tmp/secret_deploy_raw
+            if normalize_key .cd-tmp/secret_deploy_raw .cd-tmp/key_deploy_secret; then
+              echo "DEPLOY_SSH_KEY secret: VALID private key"
+            else
+              echo "DEPLOY_SSH_KEY secret: NOT a usable private key"
+            fi
+            rm -f .cd-tmp/secret_deploy_raw
+          else
+            echo "DEPLOY_SSH_KEY secret: empty"
+          fi
+
+      - name: Show public keys and test worker login
+        shell: bash
+        run: |
+          set +e
+          worker_host="${{ github.event.inputs.worker_host }}"
+          [[ -z "${worker_host}" ]] && worker_host="101.96.200.77"
+          for key_file in .cd-tmp/key_runner_local .cd-tmp/key_worker_secret .cd-tmp/key_deploy_secret; do
+            echo "=== ${key_file} ==="
+            if [[ ! -f "${key_file}" ]]; then
+              echo "  (no usable key)"
+              continue
+            fi
+            echo "  public key (safe to share, add to the worker authorized_keys):"
+            ssh-keygen -y -f "${key_file}" | sed 's/^/    /'
+            echo "  login test as root@${worker_host}:"
+            timeout 15 ssh -i "${key_file}" \
+              -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=8 \
+              -o StrictHostKeyChecking=accept-new \
+              "root@${worker_host}" 'echo SSH_LOGIN_OK' 2>&1 | sed 's/^/    /'
+          done
+
+      - name: Cleanup
+        if: always()
+        shell: bash
+        run: rm -rf .cd-tmp

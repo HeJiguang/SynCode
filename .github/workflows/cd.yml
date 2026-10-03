@@ -11,6 +11,11 @@ on:
         description: Optional CI run id that contains the deploy bundle artifact
         required: false
         type: string
+      sync_worker_images:
+        description: Sync judge/agent images to the worker over SSH (disable on single-node setups or when the worker key is broken)
+        required: false
+        default: true
+        type: boolean
 
 concurrency:
   group: cd-prod
@@ -227,6 +232,20 @@ jobs:
           docker version
           docker info
 
+      - name: Guard against host port conflicts
+        shell: bash
+        run: |
+          # A rolling redeploy of this same stack legitimately holds port 80 already;
+          # only another stack or process squatting on it must block the deploy.
+          holder="$(docker service ls --format '{{.Name}} {{.Ports}}' 2>/dev/null | awk '$0 ~ /\*:80->/ {print $1; exit}')"
+          if [[ -n "${holder}" && "${holder}" != "${STACK_NAME}_"* ]]; then
+            echo "Port 80 is already published by another stack: ${holder}" >&2
+            echo "Deploying onlineoj-prod here would create a half-started parallel stack." >&2
+            echo "Give production its own host, or remove the conflicting stack first." >&2
+            exit 1
+          fi
+          echo "Port 80 is free or owned by ${STACK_NAME}; continuing"
+
       - name: Build and deploy locally
         shell: bash
         run: |
@@ -235,7 +254,7 @@ jobs:
           chmod +x deploy/prod/scripts/sync-worker-images.sh
           chmod +x deploy/prod/scripts/deploy.sh
           BUILD_LOCAL_IMAGES=true \
-          SYNC_WORKER_IMAGES=true \
+          SYNC_WORKER_IMAGES=${{ github.event.inputs.sync_worker_images != 'false' }} \
           WORKER_SSH_KEY_FILE=.cd-tmp/worker_id_ed25519 \
           STACK_ENV_FILE="${STACK_ENV_FILE}" \
           RUNTIME_ENV_FILE="${RUNTIME_ENV_FILE}" \
