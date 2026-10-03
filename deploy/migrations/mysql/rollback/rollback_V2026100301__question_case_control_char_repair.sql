@@ -1,0 +1,4 @@
+-- Logical rollback of V2026100301__question_case_control_char_repair: none.
+-- Re-inserting raw control characters into JSON string values would recreate the
+-- "Unterminated string" failures this migration repairs. The escaped representation
+-- is the correct JSON encoding, so the change is intentionally forward-only.
