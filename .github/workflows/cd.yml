@@ -33,6 +33,11 @@ env:
   SYNCODE_DB_URL: ${{ secrets.SYNCODE_DB_URL_PROD }}
   SYNCODE_DB_USER: ${{ secrets.SYNCODE_DB_USER_PROD }}
   SYNCODE_DB_PASSWORD: ${{ secrets.SYNCODE_DB_PASSWORD_PROD }}
+  HERMES_DEEPSEEK_API_KEY: ${{ secrets.HERMES_DEEPSEEK_API_KEY }}
+  SYNCODE_HERMES_API_KEY: ${{ secrets.SYNCODE_HERMES_API_KEY }}
+  SYNCODE_HERMES_SESSION_SECRET: ${{ secrets.SYNCODE_HERMES_SESSION_SECRET }}
+  SYNCODE_HERMES_PROVISION_KEY: ${{ secrets.SYNCODE_HERMES_PROVISION_KEY }}
+  SYNCODE_MCP_SERVICE_KEY: ${{ secrets.SYNCODE_MCP_SERVICE_KEY }}
 
 jobs:
   release:
@@ -110,6 +115,8 @@ jobs:
             echo "NACOS_CONFIG_ENABLED=true"
             echo "NACOS_DISCOVERY_ENABLED=true"
           } >> "${RUNTIME_ENV_FILE}"
+          chmod +x deploy/prod/scripts/configure-hermes.sh
+          deploy/prod/scripts/configure-hermes.sh "${STACK_ENV_FILE}"
           chmod +x deploy/prod/scripts/configure-login-mail.sh
           deploy/prod/scripts/configure-login-mail.sh "${RUNTIME_ENV_FILE}"
           sed -i "s#sha-REPLACE_ME#${{ steps.meta.outputs.image_tag }}#g" "${STACK_ENV_FILE}"

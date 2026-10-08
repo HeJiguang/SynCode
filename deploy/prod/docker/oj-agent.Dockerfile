@@ -15,10 +15,10 @@ COPY oj-agent/pyproject.toml /app/pyproject.toml
 COPY oj-agent/app /app/app
 
 RUN pip install --no-cache-dir . \
-    && groupadd --system syncode \
-    && useradd --system --gid syncode --home-dir /app syncode \
-    && mkdir -p /app/runtime-artifacts \
-    && chown -R syncode:syncode /app/runtime-artifacts
+    && groupadd --system --gid 10000 syncode \
+    && useradd --system --uid 10000 --gid syncode --home-dir /app syncode \
+    && mkdir -p /app/runtime-artifacts /var/lib/hermes \
+    && chown -R syncode:syncode /app/runtime-artifacts /var/lib/hermes
 
 USER syncode
 
