@@ -7,7 +7,11 @@ COPY frontend/apps ./apps
 COPY frontend/packages ./packages
 COPY frontend/tsconfig.base.json ./tsconfig.base.json
 
-RUN npm ci
+RUN npm ci \
+    --fetch-retries=5 \
+    --fetch-retry-mintimeout=10000 \
+    --fetch-retry-maxtimeout=60000 \
+    --fetch-timeout=120000
 
 FROM deps AS builder
 
