@@ -77,10 +77,14 @@ echo "[build] judge image -> $JUDGE_IMAGE"
 docker build -f deploy/prod/docker/java-service.Dockerfile --build-arg JAR_FILE=oj-modules/oj-judge/target/oj-judge-1.0-SNAPSHOT-exec.jar -t "$JUDGE_IMAGE" .
 
 sandbox_image="${SANDBOX_IMAGE:-syncode/oj-sandbox-multilang:1.0.0}"
-echo "[build] sandbox image -> $sandbox_image"
-docker build -f deploy/prod/docker/oj-sandbox-multilang.Dockerfile \
-  --build-arg DEBIAN_MIRROR="${SANDBOX_APT_MIRROR:-deb.debian.org}" \
-  -t "$sandbox_image" .
+if docker image inspect "$sandbox_image" >/dev/null 2>&1; then
+  echo "[build] reusing sandbox image -> $sandbox_image"
+else
+  echo "[build] sandbox image -> $sandbox_image"
+  docker build -f deploy/prod/docker/oj-sandbox-multilang.Dockerfile \
+    --build-arg DEBIAN_MIRROR="${SANDBOX_APT_MIRROR:-deb.debian.org}" \
+    -t "$sandbox_image" .
+fi
 
 echo "[build] oj-agent image -> $AGENT_IMAGE"
 docker build -f deploy/prod/docker/oj-agent.Dockerfile -t "$AGENT_IMAGE" .
