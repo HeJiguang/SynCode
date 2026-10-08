@@ -85,4 +85,10 @@ docker build -f deploy/prod/docker/oj-sandbox-multilang.Dockerfile \
 echo "[build] oj-agent image -> $AGENT_IMAGE"
 docker build -f deploy/prod/docker/oj-agent.Dockerfile -t "$AGENT_IMAGE" .
 
+: "${HERMES_IMAGE:?HERMES_IMAGE is required}"
+echo "[build] Hermes image -> $HERMES_IMAGE"
+docker build -f deploy/prod/docker/hermes.Dockerfile \
+  --build-arg HERMES_BASE_IMAGE="${HERMES_BASE_IMAGE:-nousresearch/hermes-agent:latest}" \
+  -t "$HERMES_IMAGE" .
+
 echo "[build] image build completed"

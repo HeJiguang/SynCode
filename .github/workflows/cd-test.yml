@@ -41,6 +41,11 @@ jobs:
       STACK_ENV_FILE: deploy/prod/env/stack.env
       RUNTIME_ENV_FILE: deploy/prod/env/runtime.env
       DEPLOYMENT_MODE: compact
+      HERMES_DEEPSEEK_API_KEY: ${{ secrets.HERMES_DEEPSEEK_API_KEY }}
+      SYNCODE_HERMES_API_KEY: ${{ secrets.SYNCODE_HERMES_API_KEY }}
+      SYNCODE_HERMES_SESSION_SECRET: ${{ secrets.SYNCODE_HERMES_SESSION_SECRET }}
+      SYNCODE_HERMES_PROVISION_KEY: ${{ secrets.SYNCODE_HERMES_PROVISION_KEY }}
+      SYNCODE_MCP_SERVICE_KEY: ${{ secrets.SYNCODE_MCP_SERVICE_KEY }}
       SYNCODE_DB_URL: ${{ secrets.SYNCODE_DB_URL_TEST }}
       SYNCODE_DB_USER: ${{ secrets.SYNCODE_DB_USER_TEST }}
       SYNCODE_DB_PASSWORD: ${{ secrets.SYNCODE_DB_PASSWORD_TEST }}
@@ -107,6 +112,8 @@ jobs:
             echo "SYNCODE_TEST_TEACHER_EMAIL=teacher@syncode.test"
             echo "SYNCODE_TEST_TEACHER_ACCOUNT=${TEST_ADMIN_ACCOUNT}"
           } >> "${STACK_ENV_FILE}"
+          chmod +x deploy/prod/scripts/configure-hermes.sh
+          deploy/prod/scripts/configure-hermes.sh "${STACK_ENV_FILE}"
           sed -i "s#sha-REPLACE_ME#${{ steps.source.outputs.image_tag }}#g" "${STACK_ENV_FILE}"
 
       - name: Migrate test database

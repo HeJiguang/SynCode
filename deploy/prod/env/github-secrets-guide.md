@@ -21,6 +21,10 @@ The production deploy path no longer depends on GHCR or on GitHub-hosted runners
 - `TEST_CANDIDATE_EMAIL`, `TEST_CANDIDATE_CODE`: base email and test-only verification code; each run registers a unique plus-addressed candidate.
 - `TEST_QUESTION_ID`: seeded A+B programming question used for real sandbox judging.
 
+`STACK_ENV_TEST` must also define the Hermes image/model values and four independent SynCode Hermes/MCP
+secrets shown in `stack.env.example`. Use test-only values; never reuse the production profile volume or
+credentials.
+
 The test values must not reference production databases, queues, Redis namespaces, or Nacos namespaces.
 
 ### Production migration credentials
@@ -84,8 +88,14 @@ Copy the full content of [stack.env.prod.template](/D:/Project/OnlineOJ/bite-oj-
 - `WORKER_SSH_HOST`, `WORKER_SSH_USER`, `WORKER_SSH_PORT` if needed
 - `WORKER_IMAGE_LIST` if more services move onto the worker
 - `JUDGE_HOST_USER_CODE_DIR` and `JUDGE_HOST_USER_CODE_POOL_DIR` if you want different host paths for judge sandbox files
+- `HERMES_BASE_IMAGE`, `HERMES_MODEL`, and `HERMES_DEEPSEEK_API_KEY`
+- `SYNCODE_HERMES_API_KEY`, `SYNCODE_HERMES_SESSION_SECRET`, `SYNCODE_HERMES_PROVISION_KEY`, and `SYNCODE_MCP_SERVICE_KEY`
 
 Do not manually replace `sha-REPLACE_ME`. The workflow does that for each release.
+
+Generate each SynCode secret independently with a cryptographically secure random generator. The Hermes API,
+profile provision, MCP service, and session-scope secrets protect different boundaries and must not share a
+value. `HERMES_DEEPSEEK_API_KEY` is the only one sent to the model provider.
 
 ### `RUNTIME_ENV_PROD`
 
@@ -108,6 +118,21 @@ Keep these runtime bootstrap values:
 - `MYSQL_HOST`
 - `MYSQL_DATABASE`
 - `MYSQL_APP_USER`
+
+### Hermes deployment secrets
+
+The test environment and production workflows read these as individual GitHub Secrets and append them to
+the temporary stack environment at deploy time:
+
+- `HERMES_DEEPSEEK_API_KEY`
+- `SYNCODE_HERMES_API_KEY`
+- `SYNCODE_HERMES_SESSION_SECRET`
+- `SYNCODE_HERMES_PROVISION_KEY`
+- `SYNCODE_MCP_SERVICE_KEY`
+
+Set the five names in the `test` GitHub environment for isolated test deployment. Set the same names as
+repository secrets before production deployment. Generate every `SYNCODE_*` value independently; do not
+reuse the DeepSeek provider key. The deployment stops before building images when any value is absent.
 - `MYSQL_PASSWORD`
 - `REDIS_HOST`
 - `REDIS_PORT`
