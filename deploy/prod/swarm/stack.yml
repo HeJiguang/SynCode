@@ -44,6 +44,11 @@ services:
       HOSTNAME: 0.0.0.0
       SYNCODE_BACKEND_BASE_URL: http://oj-gateway:19090
       AGENT_PUBLIC_BASE_URL: http://oj-agent:8015
+      SYNCODE_HERMES_BASE_URL: http://hermes:8642
+      SYNCODE_HERMES_API_KEY: ${SYNCODE_HERMES_API_KEY}
+      SYNCODE_HERMES_SESSION_SECRET: ${SYNCODE_HERMES_SESSION_SECRET}
+      SYNCODE_HERMES_PROVISION_URL: http://oj-agent-tools:8016/internal/profiles/ensure
+      SYNCODE_HERMES_PROVISION_KEY: ${SYNCODE_HERMES_PROVISION_KEY}
       SYNCODE_DEMO_LOGIN_ENABLED: ${SYNCODE_DEMO_LOGIN_ENABLED:-false}
     networks:
       - edge
@@ -150,6 +155,63 @@ services:
         constraints:
           - ${WORKER_CONSTRAINT}
 
+  oj-agent-tools:
+    image: ${AGENT_IMAGE}
+    command: ["uvicorn", "app.mcp_gateway.server:app", "--host", "0.0.0.0", "--port", "8016"]
+    env_file:
+      - ../env/runtime.env
+    environment:
+      HERMES_HOME: /var/lib/hermes
+      HERMES_API_SERVER_KEY: ${SYNCODE_HERMES_API_KEY}
+      HERMES_MODEL: ${HERMES_MODEL:-deepseek-chat}
+      DEEPSEEK_API_KEY: ${HERMES_DEEPSEEK_API_KEY}
+      SYNCODE_HERMES_PROVISION_KEY: ${SYNCODE_HERMES_PROVISION_KEY}
+      SYNCODE_HERMES_SKILLS_DIR: /opt/syncode/hermes/skills
+      SYNCODE_MCP_PUBLIC_URL: http://oj-agent-tools:8016/mcp
+      SYNCODE_MCP_SERVICE_KEY: ${SYNCODE_MCP_SERVICE_KEY}
+    volumes:
+      - hermes_data:/var/lib/hermes
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8016/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      placement:
+        constraints:
+          - ${MANAGER_CONSTRAINT}
+
+  hermes:
+    image: ${HERMES_IMAGE}
+    command: ["gateway", "run"]
+    environment:
+      HERMES_UID: "10000"
+      HERMES_GID: "10000"
+      HERMES_GATEWAY_BOOTSTRAP_STATE: running
+      GATEWAY_MULTIPLEX_PROFILES: "true"
+      API_SERVER_ENABLED: "true"
+      API_SERVER_HOST: 0.0.0.0
+      API_SERVER_PORT: "8642"
+      API_SERVER_KEY: ${SYNCODE_HERMES_API_KEY}
+      DEEPSEEK_API_KEY: ${HERMES_DEEPSEEK_API_KEY}
+    volumes:
+      - hermes_data:/opt/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8642/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    deploy:
+      placement:
+        constraints:
+          - ${MANAGER_CONSTRAINT}
+
   oj-judge:
     image: ${JUDGE_IMAGE}
     env_file:
@@ -196,3 +258,4 @@ volumes:
   job_id_state:
   judge_id_state:
   agent_runtime_data:
+  hermes_data:
