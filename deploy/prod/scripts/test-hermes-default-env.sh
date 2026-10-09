@@ -7,6 +7,8 @@ script="${repo_root}/deploy/prod/docker/hermes-default-env.sh"
 test_root="$(mktemp -d)"
 trap 'rm -rf "$test_root"' EXIT
 
+[[ "$(head -n 1 "$script")" == "#!/command/with-contenv sh" ]]
+
 cat > "${test_root}/.env" <<'EOF'
 KEEP_ME=unchanged
 API_SERVER_KEY=stale
@@ -23,7 +25,7 @@ run_sync() {
   API_SERVER_PORT=8642 \
   API_SERVER_KEY=0123456789abcdef \
   DEEPSEEK_API_KEY=deepseek-test-key \
-    "$script"
+    sh "$script"
 }
 
 run_sync
@@ -40,7 +42,7 @@ file_mode="$(stat -c '%a' "${test_root}/.env" 2>/dev/null || stat -f '%Lp' "${te
 [[ "$(grep -c '^API_SERVER_PORT=8642$' "${test_root}/.env")" == "1" ]]
 [[ "$(grep -c '^DEEPSEEK_API_KEY=deepseek-test-key$' "${test_root}/.env")" == "1" ]]
 
-if HERMES_HOME="$test_root" DEEPSEEK_API_KEY=deepseek-test-key "$script" >/dev/null 2>&1; then
+if HERMES_HOME="$test_root" DEEPSEEK_API_KEY=deepseek-test-key sh "$script" >/dev/null 2>&1; then
   echo "Hermes default environment accepted a missing API_SERVER_KEY" >&2
   exit 1
 fi
