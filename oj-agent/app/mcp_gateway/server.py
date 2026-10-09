@@ -6,7 +6,7 @@ import os
 
 from fastapi import FastAPI, Header, HTTPException, status
 from fastmcp import FastMCP
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.config import load_settings
 from app.mcp_gateway.identity import resolve_tool_identity
@@ -22,6 +22,20 @@ READ_ONLY_TOOL = {
     "idempotentHint": True,
     "openWorldHint": False,
 }
+CONTROLLED_WRITE_TOOL = {
+    "readOnlyHint": False,
+    "destructiveHint": False,
+    "idempotentHint": False,
+    "openWorldHint": False,
+}
+
+
+class TrainingPlanTaskInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question_id: str
+    recommended_reason: str = Field(min_length=1, max_length=500)
+    due_time: str | None = None
 
 
 def repository() -> LearningRepository:
@@ -46,6 +60,13 @@ def get_my_submission_history(question_id: str, limit: int = 5) -> list[dict]:
     """Read the current user's recent submissions for one question, including code and judge diagnostics."""
     identity = resolve_tool_identity()
     return repository().get_submission_history(identity.user_id, question_id, limit)
+
+
+@mcp.tool(annotations=READ_ONLY_TOOL)
+def get_my_recent_submissions(limit: int = 20) -> list[dict]:
+    """Read the current user's recent submissions across questions without exposing other users."""
+    identity = resolve_tool_identity()
+    return repository().get_recent_submissions(identity.user_id, limit)
 
 
 @mcp.tool(annotations=READ_ONLY_TOOL)
@@ -78,6 +99,56 @@ def search_practice_questions(
         exclude_solved=exclude_solved,
         limit=limit,
     )
+
+
+@mcp.tool(annotations=CONTROLLED_WRITE_TOOL)
+def save_my_training_plan(
+    plan_title: str,
+    plan_goal: str,
+    tasks: list[TrainingPlanTaskInput],
+    ai_summary: str | None = None,
+) -> dict:
+    """Save an approved training plan for the current user using real SynCode questions."""
+    identity = resolve_tool_identity()
+    return repository().save_training_plan(
+        identity.user_id,
+        plan_title=plan_title,
+        plan_goal=plan_goal,
+        tasks=[task.model_dump() for task in tasks],
+        ai_summary=ai_summary,
+    )
+
+
+@mcp.tool(annotations=CONTROLLED_WRITE_TOOL)
+def update_my_training_task(task_id: str, task_status: int = 1) -> dict:
+    """Mark one owned training task pending (0), completed (1), or skipped (2)."""
+    identity = resolve_tool_identity()
+    return repository().update_training_task(identity.user_id, task_id, task_status)
+
+
+@mcp.tool(annotations=CONTROLLED_WRITE_TOOL)
+def record_my_recommendation_feedback(
+    recommendation_id: str,
+    action: str,
+    question_id: str | None = None,
+    run_id: str | None = None,
+) -> dict:
+    """Record an approved impression, open, acceptance, or skip for a recommendation shown to the current user."""
+    identity = resolve_tool_identity()
+    return repository().record_recommendation_feedback(
+        identity.user_id,
+        recommendation_id=recommendation_id,
+        action=action,
+        question_id=question_id,
+        run_id=run_id,
+    )
+
+
+@mcp.tool(annotations=READ_ONLY_TOOL)
+def get_my_training_effects(plan_id: str | None = None) -> dict:
+    """Measure attempts, completions and passes for the current user's latest or selected plan."""
+    identity = resolve_tool_identity()
+    return repository().get_training_effects(identity.user_id, plan_id)
 
 
 class ProfileRequest(BaseModel):

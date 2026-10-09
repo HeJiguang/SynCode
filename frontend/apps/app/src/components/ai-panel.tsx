@@ -7,12 +7,14 @@ import { frontendPreviewMode } from "@aioj/config";
 import {
   AlertTriangle,
   Ban,
+  Brain,
   Check,
   Code2,
   Copy,
   History,
   LoaderCircle,
   MessageSquarePlus,
+  RefreshCw,
   Send,
   ShieldAlert,
   Wrench,
@@ -97,7 +99,55 @@ type AgentRuntimeEvent = Record<string, unknown> & {
   command?: string;
   preview?: string;
   choices?: string[];
+  review_kind?: string;
+  context_candidate_id?: string;
 };
+
+type MemoryDocument = {
+  target: "memory" | "user";
+  label: string;
+  entries: string[];
+  limit_chars?: number;
+  runtime: string;
+  active: boolean;
+};
+
+type MemoryOperation = {
+  action?: string;
+  content?: string;
+  old_text?: string;
+};
+
+type MemoryCandidate = {
+  id: string;
+  action: string;
+  summary: string;
+  origin: string;
+  created_at?: number;
+  target: "memory" | "user";
+  proposal: MemoryOperation & { operations?: MemoryOperation[] };
+  runtime: string;
+  active: boolean;
+};
+
+type ContextCandidate = {
+  id: string;
+  status: "pending" | "approved" | "rejected" | "stale";
+  session_id?: string;
+  run_id?: string;
+  source_message_ids: string[];
+  retained_message_ids: string[];
+  source_tokens: number;
+  retained_tokens: number;
+  summary_tokens: number;
+  summary: string;
+  edited_summary?: string | null;
+  source_messages: Array<{ id: string; role: string; content: string }>;
+  runtime: string;
+  active: boolean;
+};
+
+type AgentRunStatus = AgentRuntimeEvent & { status?: string };
 
 type TextBlock = { type: "text"; content: string } | { type: "code"; lang: string; content: string };
 
@@ -181,23 +231,35 @@ async function responseError(response: Response, fallback: string) {
   return payload?.message ?? payload?.error?.message ?? fallback;
 }
 
-async function readSse(response: Response, onEvent: (name: string, payload: AgentRuntimeEvent) => void) {
+const TERMINAL_RUN_EVENTS = new Set(["run.completed", "run.failed", "run.cancelled", "run.interrupted"]);
+
+async function readSse(
+  response: Response,
+  onEvent: (name: string, payload: AgentRuntimeEvent) => void,
+  onCursor: (eventId: string) => void
+) {
   if (!response.body) throw new Error("AI 助手没有返回事件流。");
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let terminal = false;
 
   const consume = (frame: string) => {
     let name = "message";
+    let eventId: string | undefined;
     const data: string[] = [];
     for (const line of frame.replace(/\r/g, "").split("\n")) {
       if (line.startsWith(":")) continue;
+      if (line.startsWith("id:")) eventId = line.slice(3).trim();
       if (line.startsWith("event:")) name = line.slice(6).trim();
       if (line.startsWith("data:")) data.push(line.slice(5).trimStart());
     }
     if (!data.length) return;
     const payload = JSON.parse(data.join("\n")) as AgentRuntimeEvent;
-    onEvent(name === "message" && typeof payload.event === "string" ? payload.event : name, payload);
+    const resolvedName = name === "message" && typeof payload.event === "string" ? payload.event : name;
+    if (eventId) onCursor(eventId);
+    if (TERMINAL_RUN_EVENTS.has(resolvedName)) terminal = true;
+    onEvent(resolvedName, payload);
   };
 
   while (true) {
@@ -209,6 +271,18 @@ async function readSse(response: Response, onEvent: (name: string, payload: Agen
     if (done) break;
   }
   if (buffer.trim()) consume(buffer);
+  return terminal;
+}
+
+function memoryProposalText(candidate: MemoryCandidate) {
+  const operations = candidate.proposal.operations ?? [candidate.proposal];
+  return operations.map((operation) => {
+    if (operation.action === "remove") return `删除：${operation.old_text ?? ""}`;
+    if (operation.action === "replace") {
+      return `替换：${operation.old_text ?? ""}\n改为：${operation.content ?? ""}`;
+    }
+    return `新增：${operation.content ?? ""}`;
+  }).join("\n\n");
 }
 
 function formatSessionTime(value?: number | string | null) {
@@ -276,6 +350,14 @@ export function AiPanel({
   const [loading, setLoading] = useState(!frontendPreviewMode && !demoMode);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [memoryOpen, setMemoryOpen] = useState(false);
+  const [memories, setMemories] = useState<MemoryDocument[]>([]);
+  const [memoryCandidates, setMemoryCandidates] = useState<MemoryCandidate[]>([]);
+  const [contextCandidates, setContextCandidates] = useState<ContextCandidate[]>([]);
+  const [contextDrafts, setContextDrafts] = useState<Record<string, string>>({});
+  const [memoryLoading, setMemoryLoading] = useState(false);
+  const [memoryError, setMemoryError] = useState<string | null>(null);
+  const [reviewingCandidateId, setReviewingCandidateId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const codeContextRef = useRef<CodeContextDetail>({ questionId, questionTitle, questionContent, language: "java", code: "" });
   const judgeResultRef = useRef<string | undefined>(undefined);
@@ -286,6 +368,40 @@ export function AiPanel({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, tools, approval]);
+
+  const loadMemoryGovernance = useCallback(async () => {
+    if (previewMode) return;
+    setMemoryLoading(true);
+    setMemoryError(null);
+    try {
+      const [memoriesResponse, candidatesResponse, contextResponse] = await Promise.all([
+        fetch(appApiPath("/ai/runtime/memories"), { cache: "no-store" }),
+        fetch(appApiPath("/ai/runtime/memory-candidates"), { cache: "no-store" }),
+        fetch(appApiPath("/ai/runtime/context-candidates"), { cache: "no-store" })
+      ]);
+      if (!memoriesResponse.ok) throw new Error(await responseError(memoriesResponse, "读取长期记忆失败。"));
+      if (!candidatesResponse.ok) throw new Error(await responseError(candidatesResponse, "读取待审核记忆失败。"));
+      if (!contextResponse.ok) throw new Error(await responseError(contextResponse, "读取待审核上下文摘要失败。"));
+      const memoryPayload = await memoriesResponse.json() as { data?: MemoryDocument[] };
+      const candidatePayload = await candidatesResponse.json() as { data?: MemoryCandidate[] };
+      const contextPayload = await contextResponse.json() as { data?: ContextCandidate[] };
+      const pendingContext = (contextPayload.data ?? []).filter((candidate) => candidate.status === "pending");
+      setMemories(memoryPayload.data ?? []);
+      setMemoryCandidates(candidatePayload.data ?? []);
+      setContextCandidates(pendingContext);
+      setContextDrafts((current) => Object.fromEntries(
+        pendingContext.map((candidate) => [candidate.id, current[candidate.id] ?? candidate.summary])
+      ));
+    } catch (error) {
+      setMemoryError(error instanceof Error ? error.message : "读取记忆失败。");
+    } finally {
+      setMemoryLoading(false);
+    }
+  }, [previewMode]);
+
+  useEffect(() => {
+    void loadMemoryGovernance();
+  }, [loadMemoryGovernance]);
 
   const loadMessages = useCallback(async (session: AgentRuntimeSession) => {
     setLoading(true);
@@ -366,6 +482,14 @@ export function AiPanel({
       return;
     }
     if (name === "approval.request" && typeof event.run_id === "string") {
+      if (event.review_kind === "context_summary") {
+        setApproval(null);
+        setRunStatus("WAITING_FOR_CONTEXT_REVIEW");
+        setHistoryOpen(false);
+        setMemoryOpen(true);
+        void loadMemoryGovernance();
+        return;
+      }
       setApproval({ runId: event.run_id, requestId: event.request_id, toolName: event.tool ?? event.tool_name ?? "受控工具", command: event.command });
       setRunStatus("WAITING_FOR_APPROVAL");
       return;
@@ -373,14 +497,54 @@ export function AiPanel({
     if (name === "run.completed") {
       setMessages((current) => current.map((item) => item.id === assistantId ? { ...item, content: item.content || event.output || "", status: "complete" } : item));
       setRunStatus("COMPLETED");
-    } else if (name === "run.failed" || name === "run.cancelled") {
+      void loadMemoryGovernance();
+    } else if (name === "run.failed" || name === "run.cancelled" || name === "run.interrupted") {
       const fallback = name === "run.cancelled"
         ? "本轮已停止。"
         : typeof event.error === "string" ? event.error : "AI 助手执行失败。";
       setMessages((current) => current.map((item) => item.id === assistantId ? { ...item, content: item.content || fallback, status: "failed" } : item));
       setRunStatus(name === "run.cancelled" ? "CANCELLED" : "FAILED");
+      void loadMemoryGovernance();
     }
-  }, []);
+  }, [loadMemoryGovernance]);
+
+  const streamRun = useCallback(async (runId: string, assistantId: string) => {
+    let lastEventId: string | undefined;
+    let lastError: Error | undefined;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const headers = new Headers();
+        if (lastEventId) headers.set("Last-Event-ID", lastEventId);
+        const eventResponse = await fetch(
+          appApiPath(`/ai/runtime/runs/${encodeURIComponent(runId)}/events`),
+          { cache: "no-store", headers }
+        );
+        if (!eventResponse.ok) throw new Error(await responseError(eventResponse, "连接 AI 事件流失败。"));
+        const terminalEventSeen = await readSse(
+          eventResponse,
+          (name, event) => handleRuntimeEvent(assistantId, name, event),
+          (cursor) => { lastEventId = cursor; }
+        );
+        if (terminalEventSeen) return;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error("连接 AI 事件流失败。");
+      }
+
+      const statusResponse = await fetch(
+        appApiPath(`/ai/runtime/runs/${encodeURIComponent(runId)}`),
+        { cache: "no-store" }
+      );
+      if (statusResponse.ok) {
+        const run = await statusResponse.json() as AgentRunStatus;
+        if (["completed", "failed", "cancelled", "interrupted"].includes(run.status ?? "")) {
+          handleRuntimeEvent(assistantId, `run.${run.status}`, run);
+          return;
+        }
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 250 * (attempt + 1)));
+    }
+    throw lastError ?? new Error("AI 事件流中断，重连失败。");
+  }, [handleRuntimeEvent]);
 
   const submitPrompt = useCallback(async (text: string, runType: RunType = "interactive_tutor") => {
     const prompt = text.trim();
@@ -422,9 +586,7 @@ export function AiPanel({
       const run = await runResponse.json() as { run_id?: string };
       if (!run.run_id) throw new Error("AI 助手没有返回运行 ID。");
       setCurrentRunId(run.run_id);
-      const eventResponse = await fetch(appApiPath(`/ai/runtime/runs/${encodeURIComponent(run.run_id)}/events`), { cache: "no-store" });
-      if (!eventResponse.ok) throw new Error(await responseError(eventResponse, "连接 AI 事件流失败。"));
-      await readSse(eventResponse, (name, event) => handleRuntimeEvent(assistantId, name, event));
+      await streamRun(run.run_id, assistantId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "AI 助手执行失败。";
       setLoadError(message);
@@ -434,7 +596,48 @@ export function AiPanel({
       setRunning(false);
       setCurrentRunId(null);
     }
-  }, [activeSession, createSession, handleRuntimeEvent, loading, previewMode, running]);
+  }, [activeSession, createSession, loading, previewMode, running, streamRun]);
+
+  const reviewMemoryCandidate = useCallback(async (candidateId: string, action: "approve" | "reject") => {
+    setReviewingCandidateId(candidateId);
+    setMemoryError(null);
+    try {
+      const response = await fetch(
+        appApiPath(`/ai/runtime/memory-candidates/${encodeURIComponent(candidateId)}/${action}`),
+        { method: "POST" }
+      );
+      if (!response.ok) throw new Error(await responseError(response, "记忆审核失败。"));
+      await loadMemoryGovernance();
+    } catch (error) {
+      setMemoryError(error instanceof Error ? error.message : "记忆审核失败。");
+    } finally {
+      setReviewingCandidateId(null);
+    }
+  }, [loadMemoryGovernance]);
+
+  const reviewContextCandidate = useCallback(async (candidate: ContextCandidate, action: "approve" | "reject") => {
+    setReviewingCandidateId(candidate.id);
+    setMemoryError(null);
+    try {
+      const summary = (contextDrafts[candidate.id] ?? candidate.summary).trim();
+      if (action === "approve" && !summary) throw new Error("上下文摘要不能为空。");
+      const response = await fetch(
+        appApiPath(`/ai/runtime/context-candidates/${encodeURIComponent(candidate.id)}/${action}`),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: action === "approve" ? JSON.stringify({ summary }) : "{}"
+        }
+      );
+      if (!response.ok) throw new Error(await responseError(response, "上下文摘要审核失败。"));
+      setRunStatus("RUNNING");
+      await loadMemoryGovernance();
+    } catch (error) {
+      setMemoryError(error instanceof Error ? error.message : "上下文摘要审核失败。");
+    } finally {
+      setReviewingCandidateId(null);
+    }
+  }, [contextDrafts, loadMemoryGovernance]);
 
   const sendSteer = useCallback(async () => {
     const text = inputValue.trim();
@@ -512,6 +715,7 @@ export function AiPanel({
           </div>
           {!previewMode ? <div className="flex items-center gap-1">
             {running ? <button type="button" title="停止" aria-label="停止当前运行" onClick={() => void stopRun()} className="flex h-8 w-8 items-center justify-center rounded-[6px] text-[var(--danger)] hover:bg-[var(--surface-2)]"><Ban size={15} /></button> : null}
+            <button type="button" title="记忆" aria-label="查看上下文、长期记忆和待审核修改" onClick={() => { setHistoryOpen(false); setMemoryOpen(true); void loadMemoryGovernance(); }} className="relative flex h-8 w-8 items-center justify-center rounded-[6px] text-[var(--text-muted)] hover:bg-[var(--surface-2)]"><Brain size={15} />{memoryCandidates.length + contextCandidates.length > 0 ? <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--warning)] px-1 text-[9px] font-semibold text-white">{memoryCandidates.length + contextCandidates.length}</span> : null}</button>
             <button type="button" title="新建对话" aria-label="新建 Chat" onClick={() => void createSession()} disabled={running} className="flex h-8 w-8 items-center justify-center rounded-[6px] text-[var(--text-muted)] hover:bg-[var(--surface-2)]"><MessageSquarePlus size={15} /></button>
             <button type="button" title="历史" aria-label="Chat 历史" onClick={() => setHistoryOpen(true)} className="flex h-8 w-8 items-center justify-center rounded-[6px] text-[var(--text-muted)] hover:bg-[var(--surface-2)]"><History size={15} /></button>
           </div> : null}
@@ -564,6 +768,44 @@ export function AiPanel({
       {historyOpen ? <div className="absolute inset-0 z-30 flex flex-col bg-[var(--surface-1)]">
         <div className="flex h-14 items-center justify-between border-b border-[var(--border-soft)] px-4"><div><p className="text-sm font-semibold text-[var(--text-primary)]">AI 会话</p><p className="text-[10px] text-[var(--text-muted)]">{sessions.length} 个对话</p></div><button type="button" title="关闭" aria-label="关闭 Chat 历史" onClick={() => setHistoryOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-[6px]"><X size={15} /></button></div>
         <div className="flex-1 overflow-auto">{sessions.map((session) => <button type="button" key={session.id} onClick={() => void loadMessages(session)} className={`block w-full border-b border-[var(--border-soft)] px-4 py-3 text-left hover:bg-[var(--surface-2)] ${session.id === activeSession?.id ? "border-l-2 border-l-[var(--accent)] bg-[var(--surface-2)]" : ""}`}><p className="truncate text-sm font-semibold text-[var(--text-primary)]">{session.title || "未命名对话"}</p><p className="mt-1 truncate text-xs text-[var(--text-secondary)]">{session.preview || "暂无摘要"}</p><div className="mt-2 flex justify-between text-[10px] text-[var(--text-muted)]"><span>{session.message_count ?? 0} 条消息</span><span>{formatSessionTime(session.last_active ?? session.started_at)}</span></div></button>)}</div>
+      </div> : null}
+
+      {memoryOpen ? <div className="absolute inset-0 z-40 flex flex-col bg-[var(--surface-1)]">
+        <div className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--border-soft)] px-4">
+          <div><p className="text-sm font-semibold text-[var(--text-primary)]">上下文、记忆与审核</p><p className="text-[10px] text-[var(--text-muted)]">{contextCandidates.length + memoryCandidates.length} 条待审核内容</p></div>
+          <div className="flex items-center gap-1"><button type="button" title="刷新" aria-label="刷新记忆" onClick={() => void loadMemoryGovernance()} disabled={memoryLoading} className="flex h-8 w-8 items-center justify-center rounded-[6px] text-[var(--text-muted)] hover:bg-[var(--surface-2)]"><RefreshCw size={14} className={memoryLoading ? "animate-spin" : ""} /></button><button type="button" title="关闭" aria-label="关闭记忆审核" onClick={() => setMemoryOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-[6px]"><X size={15} /></button></div>
+        </div>
+        <div className="flex-1 overflow-auto">
+          {memoryError ? <div className="flex items-start gap-2 border-b border-[var(--danger)]/30 bg-[var(--danger)]/5 px-4 py-3 text-xs text-[var(--danger)]"><AlertTriangle size={14} className="mt-0.5 shrink-0" /><span>{memoryError}</span></div> : null}
+          <section className="border-b border-[var(--border-soft)] px-4 py-4">
+            <h4 className="text-xs font-semibold text-[var(--text-primary)]">上下文压缩审核</h4>
+            {contextCandidates.length === 0 ? <p className="mt-3 text-xs text-[var(--text-muted)]">暂无待审核摘要</p> : <div className="mt-2 divide-y divide-[var(--border-soft)]">{contextCandidates.map((candidate) => <div key={candidate.id} className="py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-semibold text-[var(--text-primary)]">压缩前 {candidate.source_tokens} tokens，摘要 {candidate.summary_tokens} tokens</p><span className="text-[10px] text-[var(--text-muted)]">保留 {candidate.retained_tokens} tokens · {candidate.runtime}</span></div>
+              <div className="mt-3 max-h-44 overflow-auto border-y border-[var(--border-soft)] bg-[var(--surface-2)] px-3 py-2">
+                {candidate.source_messages.map((message) => <div key={message.id} className="py-1.5 text-[11px] leading-5"><span className="mr-2 font-semibold uppercase text-[var(--text-muted)]">{message.role}</span><span className="whitespace-pre-wrap text-[var(--text-secondary)]">{message.content}</span></div>)}
+              </div>
+              <label className="mt-3 block text-[11px] font-semibold text-[var(--text-secondary)]" htmlFor={`context-summary-${candidate.id}`}>压缩后摘要</label>
+              <textarea id={`context-summary-${candidate.id}`} value={contextDrafts[candidate.id] ?? candidate.summary} onChange={(event) => setContextDrafts((current) => ({ ...current, [candidate.id]: event.target.value }))} maxLength={20_000} rows={7} className="mt-1 w-full resize-y rounded-[6px] border border-[var(--border-soft)] bg-[var(--surface-1)] px-3 py-2 text-xs leading-5 text-[var(--text-primary)] focus:border-[var(--accent)]/50 focus:outline-none" />
+              <div className="mt-3 flex justify-end gap-2"><Button size="sm" variant="secondary" disabled={reviewingCandidateId === candidate.id} onClick={() => void reviewContextCandidate(candidate, "reject")}>拒绝压缩</Button><Button size="sm" disabled={reviewingCandidateId === candidate.id} onClick={() => void reviewContextCandidate(candidate, "approve")}>{reviewingCandidateId === candidate.id ? "处理中" : "批准摘要"}</Button></div>
+            </div>)}</div>}
+          </section>
+          <section className="border-b border-[var(--border-soft)] px-4 py-4">
+            <h4 className="text-xs font-semibold text-[var(--text-primary)]">待审核修改</h4>
+            {memoryCandidates.length === 0 ? <p className="mt-3 text-xs text-[var(--text-muted)]">暂无待审核修改</p> : <div className="mt-2 divide-y divide-[var(--border-soft)]">{memoryCandidates.map((candidate) => <div key={candidate.id} className="py-3">
+              <div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold text-[var(--text-primary)]">{candidate.target === "user" ? "用户画像" : "Agent 记忆"} · {candidate.action}</p><span className="text-[10px] text-[var(--text-muted)]">{candidate.runtime}</span></div>
+              {candidate.summary ? <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{candidate.summary}</p> : null}
+              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap border-l-2 border-[var(--warning)] bg-[var(--surface-2)] px-3 py-2 text-[11px] leading-5 text-[var(--text-secondary)]">{memoryProposalText(candidate)}</pre>
+              <div className="mt-3 flex justify-end gap-2"><Button size="sm" variant="secondary" disabled={reviewingCandidateId === candidate.id} onClick={() => void reviewMemoryCandidate(candidate.id, "reject")}>拒绝</Button><Button size="sm" disabled={reviewingCandidateId === candidate.id} onClick={() => void reviewMemoryCandidate(candidate.id, "approve")}>{reviewingCandidateId === candidate.id ? "处理中" : "批准"}</Button></div>
+            </div>)}</div>}
+          </section>
+          <section className="px-4 py-4">
+            <h4 className="text-xs font-semibold text-[var(--text-primary)]">当前长期记忆</h4>
+            {memories.length === 0 && !memoryLoading ? <p className="mt-3 text-xs text-[var(--text-muted)]">暂无长期记忆</p> : <div className="mt-2 divide-y divide-[var(--border-soft)]">{memories.map((document) => <div key={`${document.runtime}-${document.target}`} className="py-3">
+              <div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold text-[var(--text-primary)]">{document.label}</p><span className="text-[10px] text-[var(--text-muted)]">{document.runtime}{document.active ? " · 当前" : ""}</span></div>
+              {document.entries.length === 0 ? <p className="mt-2 text-xs text-[var(--text-muted)]">暂无内容</p> : <ul className="mt-2 space-y-2">{document.entries.map((entry, index) => <li key={`${document.target}-${index}`} className="border-l-2 border-[var(--accent)] px-3 text-xs leading-5 text-[var(--text-secondary)]">{entry}</li>)}</ul>}
+            </div>)}</div>}
+          </section>
+        </div>
       </div> : null}
     </div>
   );

@@ -89,7 +89,8 @@ Copy the full content of [stack.env.prod.template](/D:/Project/OnlineOJ/bite-oj-
 - `WORKER_IMAGE_LIST` if more services move onto the worker
 - `JUDGE_HOST_USER_CODE_DIR` and `JUDGE_HOST_USER_CODE_POOL_DIR` if you want different host paths for judge sandbox files
 - `HERMES_BASE_IMAGE`, `HERMES_MODEL`, and `HERMES_DEEPSEEK_API_KEY`
-- `SYNCODE_HERMES_API_KEY`, `SYNCODE_HERMES_SESSION_SECRET`, `SYNCODE_HERMES_PROVISION_KEY`, and `SYNCODE_MCP_SERVICE_KEY`
+- `SYNCODE_HERMES_API_KEY`, `SYNCODE_HERMES_SESSION_SECRET`, `SYNCODE_HERMES_PROVISION_KEY`,
+  `SYNCODE_AGENT_RUNTIME_GATEWAY_KEY`, and `SYNCODE_MCP_SERVICE_KEY`
 
 Do not manually replace `sha-REPLACE_ME`. The workflow does that for each release.
 
@@ -128,9 +129,10 @@ the temporary stack environment at deploy time:
 - `SYNCODE_HERMES_API_KEY`
 - `SYNCODE_HERMES_SESSION_SECRET`
 - `SYNCODE_HERMES_PROVISION_KEY`
+- `SYNCODE_AGENT_RUNTIME_GATEWAY_KEY`
 - `SYNCODE_MCP_SERVICE_KEY`
 
-Set the five names in the `test` GitHub environment for isolated test deployment. Set the same names as
+Set the six names in the `test` GitHub environment for isolated test deployment. Set the same names as
 repository secrets before production deployment. Generate every `SYNCODE_*` value independently; do not
 reuse the DeepSeek provider key. The deployment stops before building images when any value is absent.
 - `MYSQL_PASSWORD`

@@ -4,7 +4,7 @@ import { requestJson, type ApiEnvelope, unwrapData } from "@aioj/api";
 
 import { getServerAccessToken } from "./server-auth";
 
-const PUBLIC_RESOURCE_ID_RE = /^rt[rs]\.[a-z][a-z0-9-]{0,31}\.[A-Za-z0-9_-]+$/;
+const PUBLIC_RESOURCE_ID_RE = /^rt[rsmc]\.[a-z][a-z0-9-]{0,31}\.[A-Za-z0-9_-]+$/;
 
 type BackendUserDetail = {
   userId?: string | number | null;

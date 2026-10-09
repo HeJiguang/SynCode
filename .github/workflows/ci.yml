@@ -126,6 +126,14 @@ jobs:
             exit 1
           fi
           printf '%s\n' "${output}" | tail -n 1
+          output="$(mysql --batch --skip-column-names --host=127.0.0.1 --user=root bitoj_dev < deploy/migrations/mysql/verification/verify_V2026100901__agent_recommendation_feedback.sql)"
+          violations="$(printf '%s\n' "${output}" | sed '$d')"
+          if [[ -n "${violations}" ]]; then
+            echo "Agent recommendation feedback migration verification returned violations:" >&2
+            echo "${violations}" >&2
+            exit 1
+          fi
+          printf '%s\n' "${output}" | tail -n 1
 
   oj-agent:
     name: Python Agent Tests
@@ -223,6 +231,7 @@ jobs:
           bash -n deploy/prod/scripts/*.sh deploy/test/scripts/*.sh
           deploy/prod/scripts/test-hermes-default-env.sh
           deploy/prod/scripts/test-hermes-skills-api-compat.sh
+          deploy/prod/scripts/test-hermes-governance-api-compat.sh
           TEST_BASE_URL=http://127.0.0.1 SYNCODE_IMPORT_DRY_RUN=1 deploy/test/scripts/import-leetcode-hot-100.sh
           deploy/prod/scripts/test-wait-for-stack.sh
 

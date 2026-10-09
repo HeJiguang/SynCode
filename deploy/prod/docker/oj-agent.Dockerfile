@@ -22,6 +22,6 @@ RUN pip install --no-cache-dir . \
 
 USER syncode
 
-EXPOSE 8015 8016 8017
+EXPOSE 8015 8016 8017 8018
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8015"]

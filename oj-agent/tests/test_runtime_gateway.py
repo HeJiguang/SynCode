@@ -15,6 +15,7 @@ from app.runtime_gateway.adapters import (
     translate_hermes_run_body,
 )
 from app.runtime_gateway.ids import PublicIdError, decode_public_id, encode_public_id
+from app.runtime_gateway.ledger import _status_from_event
 from app.runtime_gateway.registry import RegistryError, RuntimeConflictError, RuntimeRegistry, RuntimeSpec
 from app.runtime_gateway.server import GatewaySettings, _rewrite_sse_frame, create_app
 
@@ -30,6 +31,12 @@ def test_public_ids_round_trip_and_reject_wrong_resource_kind():
         decode_public_id(public_id, "run")
     with pytest.raises(PublicIdError):
         decode_public_id("rts.Hermes.bad", "session")
+
+
+def test_only_run_events_can_change_the_durable_run_status():
+    assert _status_from_event("run.completed", {"status": "completed"}) == "completed"
+    assert _status_from_event("tool.completed", {"status": "completed"}) is None
+    assert _status_from_event("subagent.complete", {"status": "failed"}) is None
 
 
 def test_registry_is_atomic_immutable_and_reloadable(tmp_path):
@@ -98,6 +105,10 @@ def test_hermes_adapter_translates_generic_workflow_and_hides_skill_prefix():
         "input": "/syncode-tutor 请给我一点提示",
         "session_id": "native",
     }
+    profile_body = translate_hermes_run_body(
+        json.dumps({"input": "refresh", "workflow": "learning-profile"}).encode()
+    )
+    assert json.loads(profile_body) == {"input": "/syncode-learning-profile refresh"}
     messages = translate_hermes_messages(
         {
             "data": [
@@ -132,6 +143,8 @@ class FakeRuntime:
         self.sessions: list[dict] = []
         self.calls: list[tuple] = []
         self.last_session_id: str | None = None
+        self.last_run_payload: dict | None = None
+        self.run_count = 0
 
     async def health(self) -> bool:
         self.calls.append(("health",))
@@ -160,14 +173,31 @@ class FakeRuntime:
 
     async def create_run(self, context: RuntimeContext, body: bytes) -> RuntimeResponse:
         payload = json.loads(body)
+        self.last_run_payload = payload
+        self.run_count += 1
         self.last_session_id = payload.get("session_id")
         self.calls.append(("create_run", self.last_session_id))
-        return self._json({"run_id": f"{self.name}-run-1", "session_id": self.last_session_id}, 201)
+        return self._json(
+            {"run_id": f"{self.name}-run-{self.run_count}", "session_id": self.last_session_id},
+            201,
+        )
 
-    async def run_events(self, context: RuntimeContext, run_id: str) -> FakeStream:
-        self.calls.append(("run_events", run_id))
+    async def get_run(self, context: RuntimeContext, run_id: str) -> RuntimeResponse:
+        self.calls.append(("get_run", run_id))
+        return self._json({"run_id": run_id, "session_id": f"{self.name}-session-1", "status": "completed"})
+
+    async def run_events(
+        self,
+        context: RuntimeContext,
+        run_id: str,
+        *,
+        last_seq: int | None = None,
+        last_event_id: str | None = None,
+    ) -> FakeStream:
+        self.calls.append(("run_events", run_id, last_seq, last_event_id))
         return FakeStream(
             [
+                "id: 3",
                 "event: message.delta",
                 f'data: {{"run_id":"{run_id}","session_id":"{self.name}-session-1","delta":"ok"}}',
                 "",
@@ -177,6 +207,57 @@ class FakeRuntime:
     async def control_run(self, context: RuntimeContext, run_id: str, action: str, body: bytes) -> RuntimeResponse:
         self.calls.append(("control_run", run_id, action))
         return self._json({"run_id": run_id, "accepted": True})
+
+    async def list_memories(self, context: RuntimeContext) -> RuntimeResponse:
+        self.calls.append(("list_memories", context.user_id))
+        return self._json(
+            {"data": [{"target": "memory", "label": "MEMORY.md", "entries": [f"{self.name}-fact"]}]}
+        )
+
+    async def list_memory_candidates(self, context: RuntimeContext) -> RuntimeResponse:
+        self.calls.append(("list_memory_candidates", context.user_id))
+        candidate_id = "aaaaaaaa" if self.name == "a" else "bbbbbbbb"
+        return self._json({"data": [{"id": candidate_id, "action": "add", "target": "memory"}]})
+
+    async def review_memory_candidate(
+        self,
+        context: RuntimeContext,
+        candidate_id: str,
+        action: str,
+    ) -> RuntimeResponse:
+        self.calls.append(("review_memory_candidate", candidate_id, action))
+        status = "approved" if action == "approve" else "rejected"
+        return self._json({"candidate_id": candidate_id, "status": status})
+
+    async def list_context_candidates(self, context: RuntimeContext) -> RuntimeResponse:
+        self.calls.append(("list_context_candidates", context.user_id))
+        candidate_id = "cccccccc" if self.name == "a" else "dddddddd"
+        return self._json(
+            {
+                "data": [
+                    {
+                        "id": candidate_id,
+                        "status": "pending",
+                        "summary": f"{self.name} summary",
+                        "source_message_ids": ["message-1"],
+                        "retained_message_ids": ["message-2"],
+                        "token_counts": {"before": 1200, "after": 300},
+                    }
+                ]
+            }
+        )
+
+    async def review_context_candidate(
+        self,
+        context: RuntimeContext,
+        candidate_id: str,
+        action: str,
+        body: bytes,
+    ) -> RuntimeResponse:
+        payload = json.loads(body)
+        self.calls.append(("review_context_candidate", candidate_id, action, payload))
+        status = "approved" if action == "approve" else "rejected"
+        return self._json({"candidate_id": candidate_id, "status": status})
 
     @staticmethod
     def _json(payload: dict, status_code: int = 200) -> RuntimeResponse:
@@ -239,11 +320,21 @@ def test_hot_switch_pins_existing_sessions_runs_events_and_control(gateway):
     assert runtimes["http://runtime-a"].last_session_id == "a-session-1"
     assert runtimes["http://runtime-b"].last_session_id is None
 
-    events = client.get(f"/v1/runs/{public_run}/events", headers=headers)
+    status_response = client.get(f"/v1/runs/{public_run}", headers=headers)
+    assert status_response.status_code == 200
+    assert status_response.json()["status"] == "completed"
+    assert decode_public_id(status_response.json()["run_id"], "run") == ("runtime-a", "a-run-1")
+
+    events = client.get(
+        f"/v1/runs/{public_run}/events?last_seq=1",
+        headers={**headers, "Last-Event-ID": "2"},
+    )
     assert events.status_code == 200
+    assert "id: 3" in events.text
     assert encode_public_id("run", "runtime-a", "a-run-1") in events.text
     assert encode_public_id("session", "runtime-a", "a-session-1") in events.text
     assert '"run_id":"a-run-1"' not in events.text
+    assert ("run_events", "a-run-1", 1, "2") in runtimes["http://runtime-a"].calls
 
     control = client.post(f"/v1/runs/{public_run}/stop", headers=headers, json={})
     assert control.status_code == 200
@@ -251,6 +342,98 @@ def test_hot_switch_pins_existing_sessions_runs_events_and_control(gateway):
 
     listed = client.get("/v1/sessions", headers=headers).json()["data"]
     assert {decode_public_id(row["id"], "session")[0] for row in listed} == {"runtime-a", "runtime-b"}
+
+
+def test_memory_candidates_are_runtime_pinned_across_hot_switch(gateway):
+    client, headers, runtimes = gateway
+    registration = {
+        "adapter": "hermes",
+        "base_url": "http://runtime-b",
+        "api_key": "key-b",
+    }
+    client.put("/internal/runtimes/runtime-b", headers=headers, json=registration)
+
+    before = client.get("/v1/memory-candidates", headers=headers)
+    assert before.status_code == 200
+    old_candidate = before.json()["data"][0]
+    assert decode_public_id(old_candidate["id"], "memory_candidate") == ("runtime-a", "aaaaaaaa")
+    assert old_candidate["active"] is True
+
+    client.post("/internal/runtimes/runtime-b/activate", headers=headers)
+    after = client.get("/v1/memory-candidates", headers=headers)
+    assert after.status_code == 200
+    assert {item["runtime"] for item in after.json()["data"]} == {"runtime-a", "runtime-b"}
+
+    approved = client.post(f"/v1/memory-candidates/{old_candidate['id']}/approve", headers=headers)
+    assert approved.status_code == 200
+    assert decode_public_id(approved.json()["candidate_id"], "memory_candidate") == (
+        "runtime-a",
+        "aaaaaaaa",
+    )
+    assert ("review_memory_candidate", "aaaaaaaa", "approve") in runtimes["http://runtime-a"].calls
+    assert not any(call[0] == "review_memory_candidate" for call in runtimes["http://runtime-b"].calls)
+
+    memories = client.get("/v1/memories", headers=headers)
+    assert memories.status_code == 200
+    assert {item["runtime"] for item in memories.json()["data"]} == {"runtime-a", "runtime-b"}
+
+
+def test_memory_review_rejects_wrong_id_kind_and_unknown_action(gateway):
+    client, headers, _ = gateway
+    run_id = encode_public_id("run", "runtime-a", "a-run-1")
+    assert client.post(f"/v1/memory-candidates/{run_id}/approve", headers=headers).status_code == 400
+    candidate_id = encode_public_id("memory_candidate", "runtime-a", "aaaaaaaa")
+    assert client.post(f"/v1/memory-candidates/{candidate_id}/erase", headers=headers).status_code == 404
+
+
+def test_context_candidates_are_runtime_pinned_and_support_edited_approval(gateway):
+    client, headers, runtimes = gateway
+    client.put(
+        "/internal/runtimes/runtime-b",
+        headers=headers,
+        json={"adapter": "hermes", "base_url": "http://runtime-b", "api_key": "key-b"},
+    )
+
+    listed = client.get("/v1/context-candidates", headers=headers)
+    assert listed.status_code == 200
+    assert {item["runtime"] for item in listed.json()["data"]} == {"runtime-a", "runtime-b"}
+    candidate = next(item for item in listed.json()["data"] if item["runtime"] == "runtime-a")
+    assert decode_public_id(candidate["id"], "context_candidate") == ("runtime-a", "cccccccc")
+
+    reviewed = client.post(
+        f"/v1/context-candidates/{candidate['id']}/approve",
+        headers=headers,
+        json={"summary": "edited by the user"},
+    )
+    assert reviewed.status_code == 200
+    assert decode_public_id(reviewed.json()["candidate_id"], "context_candidate") == (
+        "runtime-a",
+        "cccccccc",
+    )
+    assert (
+        "review_context_candidate",
+        "cccccccc",
+        "approve",
+        {"summary": "edited by the user"},
+    ) in runtimes["http://runtime-a"].calls
+    assert not any(
+        call[0] == "review_context_candidate" for call in runtimes["http://runtime-b"].calls
+    )
+
+
+def test_runtime_error_json_still_hides_native_ids(gateway):
+    client, headers, runtimes = gateway
+    candidate_id = encode_public_id("memory_candidate", "runtime-a", "aaaaaaaa")
+
+    async def fail_review(context, native_id, action):
+        assert native_id == "aaaaaaaa"
+        return FakeRuntime._json({"candidate_id": native_id, "status": "failed"}, 409)
+
+    runtimes["http://runtime-a"].review_memory_candidate = fail_review
+    response = client.post(f"/v1/memory-candidates/{candidate_id}/approve", headers=headers)
+    assert response.status_code == 409
+    assert response.json()["candidate_id"] == candidate_id
+    assert '"candidate_id":"aaaaaaaa"' not in response.text
 
 
 def test_failed_activation_keeps_current_runtime(gateway):
@@ -291,12 +474,292 @@ def test_gateway_requires_trusted_identity_headers(gateway):
     assert runtimes["runtime-a"]["api_key_configured"] is True
 
 
+def test_scheduled_learning_profile_refresh_is_user_bound_and_deduplicated(gateway):
+    client, headers, runtimes = gateway
+    internal_headers = {"Authorization": headers["Authorization"]}
+    source = {"user_id": "42", "source_watermark": "10:3:2026-10-09T10:00:00"}
+
+    scheduled = client.post(
+        "/internal/learning-profile-refreshes",
+        headers=internal_headers,
+        json=source,
+    )
+    assert scheduled.status_code == 202
+    assert scheduled.json()["scheduled"] is True
+    assert scheduled.json()["runtime"] == "runtime-a"
+    assert runtimes["http://runtime-a"].last_run_payload["workflow"] == "learning-profile"
+    assert "42" not in runtimes["http://runtime-a"].last_run_payload["input"]
+
+    duplicate = client.post(
+        "/internal/learning-profile-refreshes",
+        headers=internal_headers,
+        json=source,
+    )
+    assert duplicate.status_code == 200
+    assert duplicate.json() == {
+        "scheduled": False,
+        "reason": "unchanged",
+        "source_watermark": source["source_watermark"],
+    }
+    assert runtimes["http://runtime-a"].run_count == 1
+
+
+def test_scheduled_learning_profile_refresh_releases_watermark_after_failure(gateway):
+    client, headers, runtimes = gateway
+    internal_headers = {"Authorization": headers["Authorization"]}
+    source = {"user_id": "42", "source_watermark": "11:4:2026-10-09T11:00:00"}
+    runtime = runtimes["http://runtime-a"]
+    original = runtime.create_run
+
+    async def fail(_context, _body):
+        raise RuntimeAdapterError("offline")
+
+    runtime.create_run = fail
+    failed = client.post(
+        "/internal/learning-profile-refreshes",
+        headers=internal_headers,
+        json=source,
+    )
+    assert failed.status_code == 502
+
+    runtime.create_run = original
+    retried = client.post(
+        "/internal/learning-profile-refreshes",
+        headers=internal_headers,
+        json=source,
+    )
+    assert retried.status_code == 202
+    assert retried.json()["scheduled"] is True
+
+
+def test_scheduled_learning_profile_refresh_serializes_newer_watermarks(gateway):
+    client, headers, runtimes = gateway
+    internal_headers = {"Authorization": headers["Authorization"]}
+    first = {"user_id": "42", "source_watermark": "11:4:first"}
+    second = {"user_id": "42", "source_watermark": "12:5:second"}
+    runtime = runtimes["http://runtime-a"]
+
+    assert client.post(
+        "/internal/learning-profile-refreshes", headers=internal_headers, json=first
+    ).status_code == 202
+
+    async def still_running(_context, run_id):
+        return FakeRuntime._json({"run_id": run_id, "status": "running"})
+
+    runtime.get_run = still_running
+    blocked = client.post(
+        "/internal/learning-profile-refreshes", headers=internal_headers, json=second
+    )
+    assert blocked.status_code == 200
+    assert blocked.json()["reason"] == "in_progress"
+    assert runtime.run_count == 1
+
+
+def test_scheduled_learning_profile_refresh_rejects_untrusted_or_invalid_identity(gateway):
+    client, headers, _ = gateway
+    path = "/internal/learning-profile-refreshes"
+    assert client.post(path, json={"user_id": "42", "source_watermark": "v1"}).status_code == 401
+    assert client.post(
+        path,
+        headers={"Authorization": headers["Authorization"]},
+        json={"user_id": "../42", "source_watermark": "v1"},
+    ).status_code == 400
+
+
+def test_durable_run_events_and_artifacts_survive_gateway_restart(monkeypatch, tmp_path):
+    runtime = FakeRuntime("a")
+    monkeypatch.setattr("app.runtime_gateway.server.create_adapter", lambda _spec: runtime)
+    settings = GatewaySettings(
+        gateway_key="gateway-secret",
+        registry_path=tmp_path / "registry.json",
+        ledger_path=tmp_path / "ledger.sqlite3",
+        default_name="runtime-a",
+        default_spec=_spec("a"),
+    )
+    headers = {
+        "Authorization": "Bearer gateway-secret",
+        "X-SynCode-User-ID": "42",
+        "X-SynCode-Session-Key": "syncode-session-key",
+    }
+
+    async def terminal_events(context, run_id, *, last_seq=None, last_event_id=None):
+        return FakeStream(
+            [
+                "id: 4",
+                "event: run.completed",
+                f'data: {{"run_id":"{run_id}","status":"completed","output":"review result"}}',
+                "",
+            ]
+        )
+
+    runtime.run_events = terminal_events
+    with TestClient(create_app(settings)) as client:
+        created = client.post(
+            "/v1/runs",
+            headers=headers,
+            json={"input": "review", "workflow": "error-diagnosis"},
+        )
+        assert created.status_code == 201
+        run_id = created.json()["run_id"]
+        assert "event: run.completed" in client.get(f"/v1/runs/{run_id}/events", headers=headers).text
+        assert client.get(f"/v1/runs/{run_id}/artifacts", headers=headers).json()["data"][0][
+            "artifact_type"
+        ] == "diagnosis_report"
+
+    upstream_calls: list[str] = []
+
+    async def unavailable_get(context, run_id):
+        upstream_calls.append("get")
+        raise RuntimeAdapterError("offline")
+
+    async def unavailable_events(context, run_id, *, last_seq=None, last_event_id=None):
+        upstream_calls.append("events")
+        raise RuntimeAdapterError("offline")
+
+    runtime.get_run = unavailable_get
+    runtime.run_events = unavailable_events
+    with TestClient(create_app(settings)) as client:
+        stored = client.get(f"/v1/runs/{run_id}", headers=headers)
+        assert stored.status_code == 200
+        assert stored.json()["status"] == "completed"
+        assert stored.json()["runtime"] == "runtime-a"
+        assert stored.json()["runtime_available"] is False
+
+        replay = client.get(f"/v1/runs/{run_id}/events", headers=headers)
+        assert replay.status_code == 200
+        assert "review result" in replay.text
+        after_terminal = client.get(f"/v1/runs/{run_id}/events?last_seq=4", headers=headers)
+        assert after_terminal.status_code == 200
+        assert after_terminal.text == ""
+        assert upstream_calls == ["get"]
+
+        artifacts = client.get(f"/v1/runs/{run_id}/artifacts", headers=headers).json()["data"]
+        assert artifacts[0]["summary"] == "review result"
+
+
+def test_durable_run_resources_reject_cross_user_access(gateway):
+    client, headers, _ = gateway
+    created = client.post("/v1/runs", headers=headers, json={"input": "help"})
+    run_id = created.json()["run_id"]
+    other_user = {**headers, "X-SynCode-User-ID": "43"}
+
+    assert client.get(f"/v1/runs/{run_id}", headers=other_user).status_code == 404
+    assert client.get(f"/v1/runs/{run_id}/events", headers=other_user).status_code == 404
+    assert client.get(f"/v1/runs/{run_id}/artifacts", headers=other_user).status_code == 404
+    assert client.post(f"/v1/runs/{run_id}/stop", headers=other_user, json={}).status_code == 404
+
+
+def test_concurrency_admission_limits_user_and_runtime(monkeypatch, tmp_path):
+    runtime = FakeRuntime("a")
+    monkeypatch.setattr("app.runtime_gateway.server.create_adapter", lambda _spec: runtime)
+    headers = {
+        "Authorization": "Bearer gateway-secret",
+        "X-SynCode-User-ID": "42",
+        "X-SynCode-Session-Key": "syncode-session-key",
+    }
+
+    per_user = GatewaySettings(
+        gateway_key="gateway-secret",
+        registry_path=tmp_path / "user-registry.json",
+        ledger_path=tmp_path / "user-ledger.sqlite3",
+        default_name="runtime-a",
+        default_spec=_spec("a"),
+        max_concurrent_runs_per_user=1,
+        max_concurrent_runs_per_runtime=10,
+    )
+    with TestClient(create_app(per_user)) as client:
+        assert client.post("/v1/runs", headers=headers, json={"input": "first"}).status_code == 201
+        limited = client.post("/v1/runs", headers=headers, json={"input": "second"})
+        assert limited.status_code == 429
+        assert limited.json()["detail"]["scope"] == "this user"
+
+    per_runtime = GatewaySettings(
+        gateway_key="gateway-secret",
+        registry_path=tmp_path / "runtime-registry.json",
+        ledger_path=tmp_path / "runtime-ledger.sqlite3",
+        default_name="runtime-a",
+        default_spec=_spec("a"),
+        max_concurrent_runs_per_user=2,
+        max_concurrent_runs_per_runtime=1,
+    )
+    with TestClient(create_app(per_runtime)) as client:
+        assert client.post("/v1/runs", headers=headers, json={"input": "first"}).status_code == 201
+        other_user = {**headers, "X-SynCode-User-ID": "43"}
+        limited = client.post("/v1/runs", headers=other_user, json={"input": "second"})
+        assert limited.status_code == 429
+        assert limited.json()["detail"]["scope"] == "Runtime runtime-a"
+
+
+def test_new_resources_fail_over_but_pinned_sessions_do_not(monkeypatch, tmp_path):
+    runtime_a = FakeRuntime("a")
+    runtime_b = FakeRuntime("b")
+    runtimes = {"http://runtime-a": runtime_a, "http://runtime-b": runtime_b}
+    monkeypatch.setattr("app.runtime_gateway.server.create_adapter", lambda spec: runtimes[spec.base_url])
+    settings = GatewaySettings(
+        gateway_key="gateway-secret",
+        registry_path=tmp_path / "registry.json",
+        ledger_path=tmp_path / "ledger.sqlite3",
+        default_name="runtime-a",
+        default_spec=_spec("a"),
+    )
+    headers = {
+        "Authorization": "Bearer gateway-secret",
+        "X-SynCode-User-ID": "42",
+        "X-SynCode-Session-Key": "syncode-session-key",
+    }
+
+    with TestClient(create_app(settings)) as client:
+        client.put(
+            "/internal/runtimes/runtime-b",
+            headers=headers,
+            json={"adapter": "hermes", "base_url": "http://runtime-b", "api_key": "key-b"},
+        )
+        pinned_session = client.post("/v1/sessions", headers=headers, json={"title": "pinned"}).json()[
+            "session"
+        ]["id"]
+
+        async def fail_create_run(context, body):
+            raise RuntimeAdapterError("runtime-a is offline")
+
+        async def fail_create_session(context, body):
+            raise RuntimeAdapterError("runtime-a is offline")
+
+        runtime_a.create_run = fail_create_run
+        runtime_a.create_session = fail_create_session
+
+        pinned = client.post(
+            "/v1/runs",
+            headers=headers,
+            json={"session_id": pinned_session, "input": "must stay pinned"},
+        )
+        assert pinned.status_code == 502
+        assert runtime_b.run_count == 0
+
+        sessionless = client.post("/v1/runs", headers=headers, json={"input": "may fail over"})
+        assert sessionless.status_code == 201
+        assert sessionless.json()["runtime"] == "runtime-b"
+        assert sessionless.json()["degraded_from"] == "runtime-a"
+
+        new_session = client.post("/v1/sessions", headers=headers, json={"title": "may fail over"})
+        assert new_session.status_code == 201
+        assert new_session.json()["runtime"] == "runtime-b"
+        assert new_session.json()["degraded_from"] == "runtime-a"
+
+
 def test_sse_rewrite_preserves_event_and_rewrites_nested_ids():
     frame = _rewrite_sse_frame(
-        ["event: tool.started", 'data: {"run_id":"run-1","details":{"session_id":"session-1"}}'],
+        [
+            "event: approval.request",
+            'data: {"run_id":"run-1","details":{"session_id":"session-1"},'
+            '"context_candidate_id":"cafebabe"}',
+        ],
         "hermes",
     )
-    assert frame.startswith("event: tool.started\ndata: ")
+    assert frame.startswith("event: approval.request\ndata: ")
     payload = json.loads(frame.split("data: ", 1)[1])
     assert decode_public_id(payload["run_id"], "run") == ("hermes", "run-1")
     assert decode_public_id(payload["details"]["session_id"], "session") == ("hermes", "session-1")
+    assert decode_public_id(payload["context_candidate_id"], "context_candidate") == (
+        "hermes",
+        "cafebabe",
+    )
