@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/command/with-contenv sh
 
 set -eu
 
