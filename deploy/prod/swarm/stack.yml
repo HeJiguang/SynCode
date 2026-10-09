@@ -44,18 +44,14 @@ services:
       HOSTNAME: 0.0.0.0
       SYNCODE_BACKEND_BASE_URL: http://oj-gateway:19090
       AGENT_PUBLIC_BASE_URL: http://oj-agent:8015
-      SYNCODE_HERMES_BASE_URL: http://hermes:8642
-      SYNCODE_HERMES_API_KEY: ${SYNCODE_HERMES_API_KEY}
-      SYNCODE_HERMES_SESSION_SECRET: ${SYNCODE_HERMES_SESSION_SECRET}
-      SYNCODE_HERMES_PROVISION_URL: http://oj-agent-tools:8016/internal/profiles/ensure
-      SYNCODE_HERMES_PROVISION_KEY: ${SYNCODE_HERMES_PROVISION_KEY}
       SYNCODE_AGENT_RUNTIME_BASE_URL: http://agent-runtime-gateway:8017
-      SYNCODE_AGENT_RUNTIME_API_KEY: ${SYNCODE_HERMES_PROVISION_KEY}
+      SYNCODE_AGENT_RUNTIME_API_KEY: ${SYNCODE_AGENT_RUNTIME_GATEWAY_KEY}
       SYNCODE_AGENT_RUNTIME_SESSION_SECRET: ${SYNCODE_HERMES_SESSION_SECRET}
       SYNCODE_DEMO_LOGIN_ENABLED: ${SYNCODE_DEMO_LOGIN_ENABLED:-false}
     networks:
       - edge
       - backend
+      - agent-control
     deploy:
       placement:
         constraints:
@@ -176,6 +172,7 @@ services:
       - hermes_data:/var/lib/hermes
     networks:
       - backend
+      - agent-runtime
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8016/health', timeout=3)"]
       interval: 30s
@@ -191,8 +188,13 @@ services:
     image: ${AGENT_IMAGE}
     command: ["uvicorn", "app.runtime_gateway.server:app", "--host", "0.0.0.0", "--port", "8017"]
     environment:
-      SYNCODE_RUNTIME_GATEWAY_KEY: ${SYNCODE_HERMES_PROVISION_KEY}
+      SYNCODE_RUNTIME_GATEWAY_KEY: ${SYNCODE_AGENT_RUNTIME_GATEWAY_KEY}
       SYNCODE_RUNTIME_REGISTRY_PATH: /var/lib/syncode-runtime/registry.json
+      SYNCODE_RUNTIME_LEDGER_PATH: /var/lib/syncode-runtime/runtime-ledger.sqlite3
+      SYNCODE_RUNTIME_MAX_RUNS_PER_USER: ${SYNCODE_RUNTIME_MAX_RUNS_PER_USER:-2}
+      SYNCODE_RUNTIME_MAX_RUNS_PER_RUNTIME: ${SYNCODE_RUNTIME_MAX_RUNS_PER_RUNTIME:-20}
+      SYNCODE_RUNTIME_RUN_STALE_SECONDS: ${SYNCODE_RUNTIME_RUN_STALE_SECONDS:-3600}
+      SYNCODE_RUNTIME_AUTO_FAILOVER: ${SYNCODE_RUNTIME_AUTO_FAILOVER:-true}
       SYNCODE_RUNTIME_DEFAULT_NAME: hermes
       SYNCODE_RUNTIME_DEFAULT_ADAPTER: hermes
       SYNCODE_RUNTIME_DEFAULT_BASE_URL: http://hermes:8642
@@ -202,7 +204,8 @@ services:
     volumes:
       - runtime_gateway_data:/var/lib/syncode-runtime
     networks:
-      - backend
+      - agent-control
+      - agent-runtime
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8017/health', timeout=3)"]
       interval: 30s
@@ -213,6 +216,36 @@ services:
       placement:
         constraints:
           - ${MANAGER_CONSTRAINT}
+
+  learning-profile-scheduler:
+    image: ${AGENT_IMAGE}
+    command: ["uvicorn", "app.profile_scheduler.server:app", "--host", "0.0.0.0", "--port", "8018"]
+    env_file:
+      - ../env/runtime.env
+    environment:
+      OJ_AGENT_NACOS_CONFIG_ENABLED: "false"
+      OJ_AGENT_NACOS_ENABLED: "false"
+      SYNCODE_AGENT_RUNTIME_BASE_URL: http://agent-runtime-gateway:8017
+      SYNCODE_AGENT_RUNTIME_GATEWAY_KEY: ${SYNCODE_AGENT_RUNTIME_GATEWAY_KEY}
+      SYNCODE_LEARNING_PROFILE_POLL_SECONDS: ${SYNCODE_LEARNING_PROFILE_POLL_SECONDS:-900}
+      SYNCODE_LEARNING_PROFILE_BATCH_SIZE: ${SYNCODE_LEARNING_PROFILE_BATCH_SIZE:-500}
+      SYNCODE_LEARNING_PROFILE_MAX_RUNS_PER_SWEEP: ${SYNCODE_LEARNING_PROFILE_MAX_RUNS_PER_SWEEP:-5}
+    networks:
+      - backend
+      - agent-control
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8018/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      placement:
+        constraints:
+          - ${MANAGER_CONSTRAINT}
+      resources:
+        limits:
+          memory: 192M
 
   hermes:
     image: ${HERMES_IMAGE}
@@ -230,7 +263,7 @@ services:
     volumes:
       - hermes_data:/opt/data
     networks:
-      - backend
+      - agent-runtime
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8642/health"]
       interval: 30s
@@ -280,6 +313,10 @@ networks:
   edge:
     driver: overlay
   backend:
+    driver: overlay
+  agent-control:
+    driver: overlay
+  agent-runtime:
     driver: overlay
 
 volumes:

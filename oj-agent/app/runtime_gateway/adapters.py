@@ -15,8 +15,12 @@ HERMES_SKILL_BY_WORKFLOW = {
     "progressive-hint": "syncode-tutor",
     "error-diagnosis": "syncode-diagnosis",
     "training-plan": "syncode-training-plan",
+    "learning-profile": "syncode-learning-profile",
 }
-_HERMES_SKILL_PREFIX = re.compile(r"^/syncode-(?:tutor|diagnosis|training-plan)\s*", re.IGNORECASE)
+_HERMES_SKILL_PREFIX = re.compile(
+    r"^/syncode-(?:tutor|diagnosis|training-plan|learning-profile)\s*",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,10 +81,46 @@ class RuntimeAdapter:
     async def create_run(self, context: RuntimeContext, body: bytes) -> RuntimeResponse:
         raise NotImplementedError
 
-    async def run_events(self, context: RuntimeContext, run_id: str) -> RuntimeStream:
+    async def get_run(self, context: RuntimeContext, run_id: str) -> RuntimeResponse:
+        raise NotImplementedError
+
+    async def run_events(
+        self,
+        context: RuntimeContext,
+        run_id: str,
+        *,
+        last_seq: int | None = None,
+        last_event_id: str | None = None,
+    ) -> RuntimeStream:
         raise NotImplementedError
 
     async def control_run(self, context: RuntimeContext, run_id: str, action: str, body: bytes) -> RuntimeResponse:
+        raise NotImplementedError
+
+    async def list_memories(self, context: RuntimeContext) -> RuntimeResponse:
+        raise NotImplementedError
+
+    async def list_memory_candidates(self, context: RuntimeContext) -> RuntimeResponse:
+        raise NotImplementedError
+
+    async def review_memory_candidate(
+        self,
+        context: RuntimeContext,
+        candidate_id: str,
+        action: str,
+    ) -> RuntimeResponse:
+        raise NotImplementedError
+
+    async def list_context_candidates(self, context: RuntimeContext) -> RuntimeResponse:
+        raise NotImplementedError
+
+    async def review_context_candidate(
+        self,
+        context: RuntimeContext,
+        candidate_id: str,
+        action: str,
+        body: bytes,
+    ) -> RuntimeResponse:
         raise NotImplementedError
 
 
@@ -129,12 +169,26 @@ class HermesRuntimeAdapter(RuntimeAdapter):
         await self._ensure_profile(context)
         return await self._request(context, "POST", "/v1/runs", content=translate_hermes_run_body(body))
 
-    async def run_events(self, context: RuntimeContext, run_id: str) -> RuntimeStream:
+    async def get_run(self, context: RuntimeContext, run_id: str) -> RuntimeResponse:
+        return await self._request(context, "GET", f"/v1/runs/{quote(run_id, safe='')}")
+
+    async def run_events(
+        self,
+        context: RuntimeContext,
+        run_id: str,
+        *,
+        last_seq: int | None = None,
+        last_event_id: str | None = None,
+    ) -> RuntimeStream:
         client = httpx.AsyncClient(timeout=httpx.Timeout(connect=5.0, read=None, write=30.0, pool=5.0))
+        headers = self._headers(context)
+        if last_event_id is not None:
+            headers["Last-Event-ID"] = last_event_id
         request = client.build_request(
             "GET",
             self._profile_url(context, f"/v1/runs/{quote(run_id, safe='')}/events"),
-            headers=self._headers(context),
+            headers=headers,
+            params={"last_seq": str(last_seq)} if last_seq is not None else None,
         )
         try:
             response = await client.send(request, stream=True)
@@ -148,6 +202,45 @@ class HermesRuntimeAdapter(RuntimeAdapter):
             context,
             "POST",
             f"/v1/runs/{quote(run_id, safe='')}/{action}",
+            content=body,
+        )
+
+    async def list_memories(self, context: RuntimeContext) -> RuntimeResponse:
+        await self._ensure_profile(context)
+        return await self._request(context, "GET", "/v1/memories")
+
+    async def list_memory_candidates(self, context: RuntimeContext) -> RuntimeResponse:
+        await self._ensure_profile(context)
+        return await self._request(context, "GET", "/v1/memory-candidates")
+
+    async def review_memory_candidate(
+        self,
+        context: RuntimeContext,
+        candidate_id: str,
+        action: str,
+    ) -> RuntimeResponse:
+        return await self._request(
+            context,
+            "POST",
+            f"/v1/memory-candidates/{quote(candidate_id, safe='')}/{action}",
+            content=b"{}",
+        )
+
+    async def list_context_candidates(self, context: RuntimeContext) -> RuntimeResponse:
+        await self._ensure_profile(context)
+        return await self._request(context, "GET", "/v1/context-candidates")
+
+    async def review_context_candidate(
+        self,
+        context: RuntimeContext,
+        candidate_id: str,
+        action: str,
+        body: bytes,
+    ) -> RuntimeResponse:
+        return await self._request(
+            context,
+            "POST",
+            f"/v1/context-candidates/{quote(candidate_id, safe='')}/{action}",
             content=body,
         )
 
@@ -246,12 +339,26 @@ class SynCodeV1RuntimeAdapter(RuntimeAdapter):
     async def create_run(self, context: RuntimeContext, body: bytes) -> RuntimeResponse:
         return await self._request(context, "POST", "/v1/runs", content=body)
 
-    async def run_events(self, context: RuntimeContext, run_id: str) -> RuntimeStream:
+    async def get_run(self, context: RuntimeContext, run_id: str) -> RuntimeResponse:
+        return await self._request(context, "GET", f"/v1/runs/{quote(run_id, safe='')}")
+
+    async def run_events(
+        self,
+        context: RuntimeContext,
+        run_id: str,
+        *,
+        last_seq: int | None = None,
+        last_event_id: str | None = None,
+    ) -> RuntimeStream:
         client = httpx.AsyncClient(timeout=httpx.Timeout(connect=5.0, read=None, write=30.0, pool=5.0))
+        headers = self._headers(context)
+        if last_event_id is not None:
+            headers["Last-Event-ID"] = last_event_id
         request = client.build_request(
             "GET",
             f"{self.spec.base_url}/v1/runs/{quote(run_id, safe='')}/events",
-            headers=self._headers(context),
+            headers=headers,
+            params={"last_seq": str(last_seq)} if last_seq is not None else None,
         )
         try:
             response = await client.send(request, stream=True)
@@ -265,6 +372,42 @@ class SynCodeV1RuntimeAdapter(RuntimeAdapter):
             context,
             "POST",
             f"/v1/runs/{quote(run_id, safe='')}/{action}",
+            content=body,
+        )
+
+    async def list_memories(self, context: RuntimeContext) -> RuntimeResponse:
+        return await self._request(context, "GET", "/v1/memories")
+
+    async def list_memory_candidates(self, context: RuntimeContext) -> RuntimeResponse:
+        return await self._request(context, "GET", "/v1/memory-candidates")
+
+    async def review_memory_candidate(
+        self,
+        context: RuntimeContext,
+        candidate_id: str,
+        action: str,
+    ) -> RuntimeResponse:
+        return await self._request(
+            context,
+            "POST",
+            f"/v1/memory-candidates/{quote(candidate_id, safe='')}/{action}",
+            content=b"{}",
+        )
+
+    async def list_context_candidates(self, context: RuntimeContext) -> RuntimeResponse:
+        return await self._request(context, "GET", "/v1/context-candidates")
+
+    async def review_context_candidate(
+        self,
+        context: RuntimeContext,
+        candidate_id: str,
+        action: str,
+        body: bytes,
+    ) -> RuntimeResponse:
+        return await self._request(
+            context,
+            "POST",
+            f"/v1/context-candidates/{quote(candidate_id, safe='')}/{action}",
             content=body,
         )
 

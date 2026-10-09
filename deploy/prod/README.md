@@ -29,6 +29,8 @@ the anti-corruption layer and hot-switch control plane; it pins public session/r
 registration. `oj-agent-tools` exposes only the authenticated, user-scoped OJ MCP tools and profile provision
 endpoint. The compatibility `oj-agent` service is not the workspace chat orchestrator. Hermes and
 `oj-agent-tools` remain on the same manager node because they share the local `hermes_data` volume.
+`learning-profile-scheduler` compares database watermarks and asks the Runtime Gateway to start Hermes profile
+Runs; it does not summarize learning data or write `USER.md` itself.
 
 The compact layout is the default for the 4 vCPU / 8 GiB test host. It preserves the public `/system/**` and `/friend/**` contracts, performs gateway-equivalent JWT validation in a Servlet filter, and keeps the judge sandbox outside the business JVM.
 
@@ -60,10 +62,15 @@ The compact layout is the default for the 4 vCPU / 8 GiB test host. It preserves
 8. The manager runs `docker stack deploy --resolve-image never` and waits for the Swarm rollout to converge.
 
 Before the first Hermes rollout, generate independent values for `SYNCODE_HERMES_API_KEY`,
-`SYNCODE_HERMES_SESSION_SECRET`, `SYNCODE_HERMES_PROVISION_KEY`, and `SYNCODE_MCP_SERVICE_KEY`, then configure
-`HERMES_DEEPSEEK_API_KEY`. Preserve both `hermes_data` (Hermes sessions and memory) and
-`runtime_gateway_data` (Runtime registrations and active selection) across deploys and rollbacks. See
+`SYNCODE_HERMES_SESSION_SECRET`, `SYNCODE_HERMES_PROVISION_KEY`, `SYNCODE_AGENT_RUNTIME_GATEWAY_KEY`, and
+`SYNCODE_MCP_SERVICE_KEY`, then configure `HERMES_DEEPSEEK_API_KEY`. Preserve both `hermes_data` (Hermes sessions and memory) and
+`runtime_gateway_data` (Runtime registrations plus the durable Run/Event/Artifact ledger) across deploys and rollbacks. See
 `docs/architecture/hermes-agent-runtime.md` for the full boundary, hot-switch procedure, and smoke-test order.
+
+After rollout, confirm the `learning-profile-scheduler` service health reports `UP`. Create or finish a new
+submission, wait up to `SYNCODE_LEARNING_PROFILE_POLL_SECONDS`, and verify a single pending `USER.md` candidate
+appears in the learning assistant's governance drawer. Rejecting it must leave `USER.md` unchanged; approving a
+later candidate must update it through Hermes' native memory apply path.
 
 ## First-Time Bootstrap
 

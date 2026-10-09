@@ -5,7 +5,12 @@ import re
 
 
 RUNTIME_NAME_RE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
-_PREFIXES = {"session": "rts", "run": "rtr"}
+_PREFIXES = {
+    "session": "rts",
+    "run": "rtr",
+    "memory_candidate": "rtm",
+    "context_candidate": "rtc",
+}
 
 
 class PublicIdError(ValueError):
