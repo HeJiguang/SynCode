@@ -47,7 +47,7 @@ type RunType =
   | "interactive_review"
   | "interactive_plan";
 
-type HermesSession = {
+type AgentRuntimeSession = {
   id: string;
   title?: string | null;
   preview?: string | null;
@@ -56,7 +56,7 @@ type HermesSession = {
   started_at?: number | string | null;
 };
 
-type HermesMessage = {
+type AgentRuntimeMessage = {
   id?: string | number;
   role?: string;
   content?: unknown;
@@ -85,7 +85,7 @@ type ApprovalRequest = {
   command?: string;
 };
 
-type HermesEvent = Record<string, unknown> & {
+type AgentRuntimeEvent = Record<string, unknown> & {
   event?: string;
   run_id?: string;
   delta?: string;
@@ -107,12 +107,12 @@ const QUICK_ACTIONS: Array<{ label: string; runType: RunType }> = [
   { label: "接下来练什么", runType: "interactive_recommendation" }
 ];
 
-const SKILL_BY_RUN_TYPE: Record<RunType, string> = {
-  interactive_tutor: "syncode-tutor",
-  interactive_diagnosis: "syncode-diagnosis",
-  interactive_recommendation: "syncode-training-plan",
-  interactive_review: "syncode-diagnosis",
-  interactive_plan: "syncode-training-plan"
+const WORKFLOW_BY_RUN_TYPE: Record<RunType, string> = {
+  interactive_tutor: "progressive-hint",
+  interactive_diagnosis: "error-diagnosis",
+  interactive_recommendation: "training-plan",
+  interactive_review: "error-diagnosis",
+  interactive_plan: "training-plan"
 };
 
 function parseBlocks(text: string): TextBlock[] {
@@ -140,11 +140,7 @@ function contentText(content: unknown): string {
   }).join("\n");
 }
 
-function visibleUserText(content: string) {
-  return content.replace(/^\/syncode-(?:tutor|diagnosis|training-plan)\s*/i, "").trim();
-}
-
-function toChatMessages(rows: HermesMessage[]): ChatMessage[] {
+function toChatMessages(rows: AgentRuntimeMessage[]): ChatMessage[] {
   return rows.flatMap((row, index): ChatMessage[] => {
     if (row.display_kind || (row.role !== "user" && row.role !== "assistant")) return [];
     const content = contentText(row.content);
@@ -152,7 +148,7 @@ function toChatMessages(rows: HermesMessage[]): ChatMessage[] {
     return [{
       id: String(row.id ?? `history-${index}`),
       role: row.role,
-      content: row.role === "user" ? visibleUserText(content) : content,
+      content,
       status: "complete"
     }];
   });
@@ -185,8 +181,8 @@ async function responseError(response: Response, fallback: string) {
   return payload?.message ?? payload?.error?.message ?? fallback;
 }
 
-async function readSse(response: Response, onEvent: (name: string, payload: HermesEvent) => void) {
-  if (!response.body) throw new Error("Hermes 没有返回事件流。");
+async function readSse(response: Response, onEvent: (name: string, payload: AgentRuntimeEvent) => void) {
+  if (!response.body) throw new Error("AI 助手没有返回事件流。");
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -200,7 +196,7 @@ async function readSse(response: Response, onEvent: (name: string, payload: Herm
       if (line.startsWith("data:")) data.push(line.slice(5).trimStart());
     }
     if (!data.length) return;
-    const payload = JSON.parse(data.join("\n")) as HermesEvent;
+    const payload = JSON.parse(data.join("\n")) as AgentRuntimeEvent;
     onEvent(name === "message" && typeof payload.event === "string" ? payload.event : name, payload);
   };
 
@@ -268,8 +264,8 @@ export function AiPanel({
   questionTitle,
   questionContent
 }: AiPanelProps) {
-  const [sessions, setSessions] = useState<HermesSession[]>([]);
-  const [activeSession, setActiveSession] = useState<HermesSession | null>(null);
+  const [sessions, setSessions] = useState<AgentRuntimeSession[]>([]);
+  const [activeSession, setActiveSession] = useState<AgentRuntimeSession | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>(() => initialArtifactMessages(initialArtifacts));
   const [tools, setTools] = useState<ToolProgress[]>([]);
   const [approval, setApproval] = useState<ApprovalRequest | null>(null);
@@ -291,34 +287,34 @@ export function AiPanel({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, tools, approval]);
 
-  const loadMessages = useCallback(async (session: HermesSession) => {
+  const loadMessages = useCallback(async (session: AgentRuntimeSession) => {
     setLoading(true);
     setLoadError(null);
     try {
-      const response = await fetch(appApiPath(`/ai/hermes/sessions/${encodeURIComponent(session.id)}/messages?order=oldest&limit=500`), { cache: "no-store" });
-      if (!response.ok) throw new Error(await responseError(response, "加载 Hermes 消息失败。"));
-      const payload = await response.json() as { data?: HermesMessage[] };
+      const response = await fetch(appApiPath(`/ai/runtime/sessions/${encodeURIComponent(session.id)}/messages?order=oldest&limit=500`), { cache: "no-store" });
+      if (!response.ok) throw new Error(await responseError(response, "加载 AI 消息失败。"));
+      const payload = await response.json() as { data?: AgentRuntimeMessage[] };
       setActiveSession(session);
       setMessages(toChatMessages(payload.data ?? []));
       setTools([]);
       setApproval(null);
       setHistoryOpen(false);
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "加载 Hermes 消息失败。");
+      setLoadError(error instanceof Error ? error.message : "加载 AI 消息失败。");
     } finally {
       setLoading(false);
     }
   }, []);
 
   const createSession = useCallback(async () => {
-    const response = await fetch(appApiPath("/ai/hermes/sessions"), {
+    const response = await fetch(appApiPath("/ai/runtime/sessions"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: questionTitle ? `${questionTitle} 学习对话` : "新的学习对话", source: "syncode" })
     });
-    if (!response.ok) throw new Error(await responseError(response, "创建 Hermes 会话失败。"));
-    const payload = await response.json() as { session?: HermesSession };
-    if (!payload.session?.id) throw new Error("Hermes 没有返回会话 ID。");
+    if (!response.ok) throw new Error(await responseError(response, "创建 AI 会话失败。"));
+    const payload = await response.json() as { session?: AgentRuntimeSession };
+    if (!payload.session?.id) throw new Error("AI 助手没有返回会话 ID。");
     setSessions((current) => [payload.session!, ...current.filter((item) => item.id !== payload.session!.id)]);
     setActiveSession(payload.session);
     setMessages([]);
@@ -337,16 +333,16 @@ export function AiPanel({
     void (async () => {
       setLoading(true);
       try {
-        const response = await fetch(appApiPath("/ai/hermes/sessions?limit=50&offset=0"), { cache: "no-store" });
-        if (!response.ok) throw new Error(await responseError(response, "加载 Hermes 会话失败。"));
-        const payload = await response.json() as { data?: HermesSession[] };
+        const response = await fetch(appApiPath("/ai/runtime/sessions?limit=50&offset=0"), { cache: "no-store" });
+        if (!response.ok) throw new Error(await responseError(response, "加载 AI 会话失败。"));
+        const payload = await response.json() as { data?: AgentRuntimeSession[] };
         const rows = payload.data ?? [];
         if (cancelled) return;
         setSessions(rows);
         if (rows[0]) await loadMessages(rows[0]);
         else await createSession();
       } catch (error) {
-        if (!cancelled) setLoadError(error instanceof Error ? error.message : "初始化 Hermes 失败。");
+        if (!cancelled) setLoadError(error instanceof Error ? error.message : "初始化 AI 助手失败。");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -354,7 +350,7 @@ export function AiPanel({
     return () => { cancelled = true; };
   }, [createSession, loadMessages, previewMode]);
 
-  const handleHermesEvent = useCallback((assistantId: string, name: string, event: HermesEvent) => {
+  const handleRuntimeEvent = useCallback((assistantId: string, name: string, event: AgentRuntimeEvent) => {
     if (typeof event.run_id === "string") setCurrentRunId(event.run_id);
     if (name === "message.delta" && typeof event.delta === "string") {
       setMessages((current) => current.map((item) => item.id === assistantId ? { ...item, content: item.content + event.delta } : item));
@@ -380,7 +376,7 @@ export function AiPanel({
     } else if (name === "run.failed" || name === "run.cancelled") {
       const fallback = name === "run.cancelled"
         ? "本轮已停止。"
-        : typeof event.error === "string" ? event.error : "Hermes 执行失败。";
+        : typeof event.error === "string" ? event.error : "AI 助手执行失败。";
       setMessages((current) => current.map((item) => item.id === assistantId ? { ...item, content: item.content || fallback, status: "failed" } : item));
       setRunStatus(name === "run.cancelled" ? "CANCELLED" : "FAILED");
     }
@@ -392,7 +388,7 @@ export function AiPanel({
     if (previewMode) {
       setMessages((current) => [...current,
         { id: `user-${Date.now()}`, role: "user", content: prompt, status: "complete" },
-        { id: `preview-${Date.now()}`, role: "assistant", content: "当前为预览模式，不会连接 Hermes。正式登录后可以使用真实 AI 辅助。", status: "complete" }
+        { id: `preview-${Date.now()}`, role: "assistant", content: "当前为预览模式。正式登录后可以使用真实 AI 辅助。", status: "complete" }
       ]);
       setInputValue("");
       setRunStatus("PREVIEW");
@@ -412,24 +408,25 @@ export function AiPanel({
         { id: `user-${Date.now()}`, role: "user", content: prompt, status: "complete" },
         { id: assistantId, role: "assistant", content: "", status: "streaming" }
       ]);
-      const runResponse = await fetch(appApiPath("/ai/hermes/runs"), {
+      const runResponse = await fetch(appApiPath("/ai/runtime/runs"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          input: `/${SKILL_BY_RUN_TYPE[runType]} ${prompt}`,
+          input: prompt,
+          workflow: WORKFLOW_BY_RUN_TYPE[runType],
           instructions: workspaceInstructions(codeContextRef.current, judgeResultRef.current),
           session_id: session.id
         })
       });
-      if (!runResponse.ok) throw new Error(await responseError(runResponse, "Hermes 拒绝了本轮请求。"));
+      if (!runResponse.ok) throw new Error(await responseError(runResponse, "AI 助手拒绝了本轮请求。"));
       const run = await runResponse.json() as { run_id?: string };
-      if (!run.run_id) throw new Error("Hermes 没有返回运行 ID。");
+      if (!run.run_id) throw new Error("AI 助手没有返回运行 ID。");
       setCurrentRunId(run.run_id);
-      const eventResponse = await fetch(appApiPath(`/ai/hermes/runs/${encodeURIComponent(run.run_id)}/events`), { cache: "no-store" });
-      if (!eventResponse.ok) throw new Error(await responseError(eventResponse, "连接 Hermes 事件流失败。"));
-      await readSse(eventResponse, (name, event) => handleHermesEvent(assistantId, name, event));
+      const eventResponse = await fetch(appApiPath(`/ai/runtime/runs/${encodeURIComponent(run.run_id)}/events`), { cache: "no-store" });
+      if (!eventResponse.ok) throw new Error(await responseError(eventResponse, "连接 AI 事件流失败。"));
+      await readSse(eventResponse, (name, event) => handleRuntimeEvent(assistantId, name, event));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Hermes 执行失败。";
+      const message = error instanceof Error ? error.message : "AI 助手执行失败。";
       setLoadError(message);
       setMessages((current) => current.map((item) => item.status === "streaming" ? { ...item, content: item.content || message, status: "failed" } : item));
       setRunStatus("FAILED");
@@ -437,18 +434,18 @@ export function AiPanel({
       setRunning(false);
       setCurrentRunId(null);
     }
-  }, [activeSession, createSession, handleHermesEvent, loading, previewMode, running]);
+  }, [activeSession, createSession, handleRuntimeEvent, loading, previewMode, running]);
 
   const sendSteer = useCallback(async () => {
     const text = inputValue.trim();
     if (!currentRunId || !text) return;
-    const response = await fetch(appApiPath(`/ai/hermes/runs/${encodeURIComponent(currentRunId)}/steer`), {
+    const response = await fetch(appApiPath(`/ai/runtime/runs/${encodeURIComponent(currentRunId)}/steer`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ input: text })
     });
     if (!response.ok) {
-      setLoadError(await responseError(response, "Hermes 未接受本轮调整。"));
+      setLoadError(await responseError(response, "AI 助手未接受本轮调整。"));
       return;
     }
     setInputValue("");
@@ -456,7 +453,7 @@ export function AiPanel({
 
   const stopRun = useCallback(async () => {
     if (!currentRunId) return;
-    await fetch(appApiPath(`/ai/hermes/runs/${encodeURIComponent(currentRunId)}/stop`), {
+    await fetch(appApiPath(`/ai/runtime/runs/${encodeURIComponent(currentRunId)}/stop`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: "{}"
@@ -465,7 +462,7 @@ export function AiPanel({
 
   const resolveApproval = useCallback(async (choice: "once" | "deny") => {
     if (!approval) return;
-    const response = await fetch(appApiPath(`/ai/hermes/runs/${encodeURIComponent(approval.runId)}/approval`), {
+    const response = await fetch(appApiPath(`/ai/runtime/runs/${encodeURIComponent(approval.runId)}/approval`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ choice, request_id: approval.requestId })
@@ -510,7 +507,7 @@ export function AiPanel({
       <div className="shrink-0 border-b border-[var(--border-soft)] px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="kicker">Hermes Agent</p>
+            <p className="kicker">AI Agent</p>
             <h3 className="mt-0.5 truncate text-base font-semibold text-[var(--text-primary)]">{activeSession?.title ?? "学习助手"}</h3>
           </div>
           {!previewMode ? <div className="flex items-center gap-1">
@@ -532,12 +529,12 @@ export function AiPanel({
       </div> : null}
 
       {approval ? <div className="mx-4 mt-3 border-y border-[var(--warning)]/40 bg-[var(--warning)]/5 px-3 py-3">
-        <div className="flex items-start gap-2"><ShieldAlert size={15} className="mt-0.5 text-[var(--warning)]" /><div className="min-w-0"><p className="text-xs font-semibold text-[var(--text-primary)]">Hermes 请求执行 {approval.toolName}</p>{approval.command ? <p className="mt-1 break-all font-mono text-[10px] text-[var(--text-muted)]">{approval.command}</p> : null}</div></div>
+        <div className="flex items-start gap-2"><ShieldAlert size={15} className="mt-0.5 text-[var(--warning)]" /><div className="min-w-0"><p className="text-xs font-semibold text-[var(--text-primary)]">AI 助手请求执行 {approval.toolName}</p>{approval.command ? <p className="mt-1 break-all font-mono text-[10px] text-[var(--text-muted)]">{approval.command}</p> : null}</div></div>
         <div className="mt-3 flex justify-end gap-2"><Button size="sm" variant="secondary" onClick={() => void resolveApproval("deny")}>拒绝</Button><Button size="sm" onClick={() => void resolveApproval("once")}>本次允许</Button></div>
       </div> : null}
 
       <div ref={scrollRef} className="flex-1 divide-y divide-[var(--border-soft)] overflow-auto px-4">
-        {loading ? <div className="flex items-center justify-center gap-2 py-8 text-xs text-[var(--text-muted)]"><LoaderCircle size={14} className="animate-spin" />正在连接 Hermes</div> : null}
+        {loading ? <div className="flex items-center justify-center gap-2 py-8 text-xs text-[var(--text-muted)]"><LoaderCircle size={14} className="animate-spin" />正在连接 AI 助手</div> : null}
         {messages.length === 0 ? <div data-testid="ai-empty-state" className="py-8"><p className="text-xs font-semibold uppercase text-[var(--text-muted)]">开始提问</p></div> : null}
         {messages.map((message) => <MessageRow key={message.id} message={message} />)}
       </div>
@@ -555,7 +552,7 @@ export function AiPanel({
                 else void submitPrompt(inputValue);
               }
             }}
-            placeholder={running ? "补充要求会在下一个工具边界交给 Hermes。" : "输入你当前卡住的问题。回车发送，Shift + 回车换行。"}
+            placeholder={running ? "补充要求会在下一个工具边界交给 AI 助手。" : "输入你当前卡住的问题。回车发送，Shift + 回车换行。"}
             rows={2}
             disabled={loading}
             className="flex-1 resize-none rounded-[8px] border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 py-2 text-[13px] leading-relaxed text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]/50 focus:outline-none"
@@ -565,7 +562,7 @@ export function AiPanel({
       </div>
 
       {historyOpen ? <div className="absolute inset-0 z-30 flex flex-col bg-[var(--surface-1)]">
-        <div className="flex h-14 items-center justify-between border-b border-[var(--border-soft)] px-4"><div><p className="text-sm font-semibold text-[var(--text-primary)]">Hermes 会话</p><p className="text-[10px] text-[var(--text-muted)]">{sessions.length} 个对话</p></div><button type="button" title="关闭" aria-label="关闭 Chat 历史" onClick={() => setHistoryOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-[6px]"><X size={15} /></button></div>
+        <div className="flex h-14 items-center justify-between border-b border-[var(--border-soft)] px-4"><div><p className="text-sm font-semibold text-[var(--text-primary)]">AI 会话</p><p className="text-[10px] text-[var(--text-muted)]">{sessions.length} 个对话</p></div><button type="button" title="关闭" aria-label="关闭 Chat 历史" onClick={() => setHistoryOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-[6px]"><X size={15} /></button></div>
         <div className="flex-1 overflow-auto">{sessions.map((session) => <button type="button" key={session.id} onClick={() => void loadMessages(session)} className={`block w-full border-b border-[var(--border-soft)] px-4 py-3 text-left hover:bg-[var(--surface-2)] ${session.id === activeSession?.id ? "border-l-2 border-l-[var(--accent)] bg-[var(--surface-2)]" : ""}`}><p className="truncate text-sm font-semibold text-[var(--text-primary)]">{session.title || "未命名对话"}</p><p className="mt-1 truncate text-xs text-[var(--text-secondary)]">{session.preview || "暂无摘要"}</p><div className="mt-2 flex justify-between text-[10px] text-[var(--text-muted)]"><span>{session.message_count ?? 0} 条消息</span><span>{formatSessionTime(session.last_active ?? session.started_at)}</span></div></button>)}</div>
       </div> : null}
     </div>

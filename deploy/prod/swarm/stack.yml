@@ -49,6 +49,9 @@ services:
       SYNCODE_HERMES_SESSION_SECRET: ${SYNCODE_HERMES_SESSION_SECRET}
       SYNCODE_HERMES_PROVISION_URL: http://oj-agent-tools:8016/internal/profiles/ensure
       SYNCODE_HERMES_PROVISION_KEY: ${SYNCODE_HERMES_PROVISION_KEY}
+      SYNCODE_AGENT_RUNTIME_BASE_URL: http://agent-runtime-gateway:8017
+      SYNCODE_AGENT_RUNTIME_API_KEY: ${SYNCODE_HERMES_PROVISION_KEY}
+      SYNCODE_AGENT_RUNTIME_SESSION_SECRET: ${SYNCODE_HERMES_SESSION_SECRET}
       SYNCODE_DEMO_LOGIN_ENABLED: ${SYNCODE_DEMO_LOGIN_ENABLED:-false}
     networks:
       - edge
@@ -184,6 +187,33 @@ services:
         constraints:
           - ${MANAGER_CONSTRAINT}
 
+  agent-runtime-gateway:
+    image: ${AGENT_IMAGE}
+    command: ["uvicorn", "app.runtime_gateway.server:app", "--host", "0.0.0.0", "--port", "8017"]
+    environment:
+      SYNCODE_RUNTIME_GATEWAY_KEY: ${SYNCODE_HERMES_PROVISION_KEY}
+      SYNCODE_RUNTIME_REGISTRY_PATH: /var/lib/syncode-runtime/registry.json
+      SYNCODE_RUNTIME_DEFAULT_NAME: hermes
+      SYNCODE_RUNTIME_DEFAULT_ADAPTER: hermes
+      SYNCODE_RUNTIME_DEFAULT_BASE_URL: http://hermes:8642
+      SYNCODE_RUNTIME_DEFAULT_API_KEY: ${SYNCODE_HERMES_API_KEY}
+      SYNCODE_RUNTIME_DEFAULT_PROVISION_URL: http://oj-agent-tools:8016/internal/profiles/ensure
+      SYNCODE_RUNTIME_DEFAULT_PROVISION_KEY: ${SYNCODE_HERMES_PROVISION_KEY}
+    volumes:
+      - runtime_gateway_data:/var/lib/syncode-runtime
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8017/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      placement:
+        constraints:
+          - ${MANAGER_CONSTRAINT}
+
   hermes:
     image: ${HERMES_IMAGE}
     command: ["gateway", "run"]
@@ -258,4 +288,5 @@ volumes:
   job_id_state:
   judge_id_state:
   agent_runtime_data:
+  runtime_gateway_data:
   hermes_data:
