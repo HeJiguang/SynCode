@@ -15,7 +15,7 @@
 - 基于 WebSocket + Redis Pub/Sub 的判题结果推送
 - 基于逻辑时钟与持久化水位的趋势递增 Snowflake 主键
 - 基于 Python `oj-agent` 的 AI/训练规划能力探索
-- 可插拔 Agent Runtime，支持 Hermes + DeepSeek、持久会话、超时终止与 Direct 回退
+- 带防腐层的可插拔 Agent Runtime，支持运行时热切换、会话归属固定、Hermes 持久记忆与原生工具调用
 - 多用户 Agent Run 准入控制，支持用户级活跃/频率限制与全局执行并发上限
 
 ## 核心模块

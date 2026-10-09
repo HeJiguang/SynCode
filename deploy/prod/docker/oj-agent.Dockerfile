@@ -17,11 +17,11 @@ COPY oj-agent/app /app/app
 RUN pip install --no-cache-dir . \
     && groupadd --system --gid 10000 syncode \
     && useradd --system --uid 10000 --gid syncode --home-dir /app syncode \
-    && mkdir -p /app/runtime-artifacts /var/lib/hermes \
-    && chown -R syncode:syncode /app/runtime-artifacts /var/lib/hermes
+    && mkdir -p /app/runtime-artifacts /var/lib/hermes /var/lib/syncode-runtime \
+    && chown -R syncode:syncode /app/runtime-artifacts /var/lib/hermes /var/lib/syncode-runtime
 
 USER syncode
 
-EXPOSE 8015
+EXPOSE 8015 8016 8017
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8015"]
