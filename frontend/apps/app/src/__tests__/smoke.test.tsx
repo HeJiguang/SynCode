@@ -4,10 +4,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import DashboardPage from "../app/page.tsx";
-import ExamsPage from "../app/exams/page.tsx";
-import ProblemsPage from "../app/problems/page.tsx";
-import WorkspacePage from "../app/workspace/[questionId]/page.tsx";
+import DashboardPage from "../app/page";
+import ExamsPage from "../app/exams/page";
+import ProblemsPage from "../app/problems/page";
+import WorkspacePage from "../app/workspace/[questionId]/page";
 
 async function main() {
   const dashboardHtml = renderToStaticMarkup(await DashboardPage());

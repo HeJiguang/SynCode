@@ -4,9 +4,6 @@ import logging
 from pathlib import Path
 from threading import Lock
 
-from app.core.jsonl_store import append_jsonl
-
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -35,7 +32,9 @@ class HermesSessionStore:
                 return
             self._sessions[key] = session_id
             try:
-                append_jsonl(self.path, {"conversation_key": key, "session_id": session_id})
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                with self.path.open("a", encoding="utf-8") as handle:
+                    handle.write(json.dumps({"conversation_key": key, "session_id": session_id}) + "\n")
             except OSError:
                 LOGGER.warning("Failed to persist Hermes session mapping.", exc_info=True)
 

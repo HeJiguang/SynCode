@@ -43,16 +43,18 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       SYNCODE_BACKEND_BASE_URL: http://oj-gateway:19090
-      AGENT_PUBLIC_BASE_URL: http://oj-agent:8015
       SYNCODE_HERMES_BASE_URL: http://hermes:8642
       SYNCODE_HERMES_API_KEY: ${SYNCODE_HERMES_API_KEY}
       SYNCODE_HERMES_SESSION_SECRET: ${SYNCODE_HERMES_SESSION_SECRET}
       SYNCODE_HERMES_PROVISION_URL: http://oj-agent-tools:8016/internal/profiles/ensure
+      SYNCODE_SKILL_TELEMETRY_URL: http://oj-agent-tools:8016/internal/skill-events
       SYNCODE_HERMES_PROVISION_KEY: ${SYNCODE_HERMES_PROVISION_KEY}
       SYNCODE_DEMO_LOGIN_ENABLED: ${SYNCODE_DEMO_LOGIN_ENABLED:-false}
+      SYNCODE_HERMES_RUNS_PER_MINUTE: ${SYNCODE_HERMES_RUNS_PER_MINUTE:-12}
     networks:
       - edge
       - backend
+      - agent
     deploy:
       placement:
         constraints:
@@ -66,9 +68,12 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       SYNCODE_BACKEND_BASE_URL: http://oj-gateway:19090
+      SYNCODE_SKILL_GOVERNANCE_URL: http://oj-agent-tools:8016
+      SYNCODE_HERMES_PROVISION_KEY: ${SYNCODE_HERMES_PROVISION_KEY}
     networks:
       - edge
       - backend
+      - agent
     deploy:
       placement:
         constraints:
@@ -109,6 +114,7 @@ services:
     env_file:
       - ../env/runtime.env
     environment:
+      AGENT_PUBLIC_BASE_URL: http://oj-agent:8015
       SYNCODE_ID_LOGICAL_CLOCK_ENABLED: "true"
       SYNCODE_ID_LOGICAL_CLOCK_WORKER_ID: "12"
       SYNCODE_ID_LOGICAL_CLOCK_STATE_FILE: /app/id-state/high-watermark.properties
@@ -143,13 +149,14 @@ services:
     env_file:
       - ../env/runtime.env
     environment:
-      OJ_AGENT_AUTH_BASE_URL: http://oj-gateway:19090
-      OJ_AGENT_ALLOW_INSECURE_USER_ID_BODY: "false"
+      OJ_AGENT_HERMES_BASE_URL: http://hermes:8642
+      OJ_AGENT_HERMES_API_KEY: ${SYNCODE_HERMES_API_KEY}
       OJ_AGENT_RUNTIME_DATA_DIR: /app/runtime-artifacts
     volumes:
       - agent_runtime_data:/app/runtime-artifacts
     networks:
       - backend
+      - agent
     deploy:
       placement:
         constraints:
@@ -166,17 +173,34 @@ services:
       HERMES_MODEL: ${HERMES_MODEL:-deepseek-chat}
       DEEPSEEK_API_KEY: ${HERMES_DEEPSEEK_API_KEY}
       SYNCODE_HERMES_PROVISION_KEY: ${SYNCODE_HERMES_PROVISION_KEY}
-      SYNCODE_HERMES_SKILLS_DIR: /opt/syncode/hermes/skills
+      SYNCODE_HERMES_BUNDLED_SKILLS_DIR: /opt/syncode/hermes/skills
+      SYNCODE_HERMES_PLATFORM_SKILLS_DIR: /opt/platform-data/platform-skills
+      SYNCODE_PLATFORM_SKILL_STORE: /var/lib/hermes/platform-skills
+      SYNCODE_SKILL_GOVERNANCE_HEARTBEAT_ENABLED: "true"
+      SYNCODE_SKILL_GOVERNANCE_HEARTBEAT_SECONDS: ${SYNCODE_SKILL_GOVERNANCE_HEARTBEAT_SECONDS:-3600}
+      SYNCODE_ELASTICSEARCH_URL: ${SYNCODE_ELASTICSEARCH_URL:-http://elasticsearch:9200}
+      SYNCODE_SKILL_EMBEDDING_URL: ${SYNCODE_SKILL_EMBEDDING_URL:-}
+      SYNCODE_SKILL_EMBEDDING_API_KEY: ${SYNCODE_SKILL_EMBEDDING_API_KEY:-}
+      SYNCODE_SKILL_EMBEDDING_MODEL: ${SYNCODE_SKILL_EMBEDDING_MODEL:-}
+      SYNCODE_SKILL_EMBEDDING_DIMENSIONS: ${SYNCODE_SKILL_EMBEDDING_DIMENSIONS:-1024}
+      SYNCODE_SKILL_MIN_RRF_SCORE: ${SYNCODE_SKILL_MIN_RRF_SCORE:-0.03}
+      SYNCODE_LEARNING_MEMORY_INDEX: ${SYNCODE_LEARNING_MEMORY_INDEX:-syncode-learning-memory-v1}
+      SYNCODE_LEARNING_MEMORY_MIN_RRF_SCORE: ${SYNCODE_LEARNING_MEMORY_MIN_RRF_SCORE:-0.012}
+      SYNCODE_PLATFORM_SKILL_STALE_DAYS: ${SYNCODE_PLATFORM_SKILL_STALE_DAYS:-30}
+      SYNCODE_PLATFORM_SKILL_MAX_USAGE_30D: ${SYNCODE_PLATFORM_SKILL_MAX_USAGE_30D:-1}
       SYNCODE_MCP_PUBLIC_URL: http://oj-agent-tools:8016/mcp
       SYNCODE_MCP_SERVICE_KEY: ${SYNCODE_MCP_SERVICE_KEY}
+      SYNCODE_PRODUCTION_READINESS_STRICT: ${SYNCODE_PRODUCTION_READINESS_STRICT:-true}
     volumes:
       - hermes_data:/var/lib/hermes
+      - hermes_platform_skills:/var/lib/hermes/platform-skills
     networks:
       - backend
+      - agent
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8016/health', timeout=3)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8016/ready', timeout=5)"]
       interval: 30s
-      timeout: 5s
+      timeout: 8s
       retries: 5
       start_period: 20s
     deploy:
@@ -187,6 +211,9 @@ services:
   hermes:
     image: ${HERMES_IMAGE}
     command: ["gateway", "run"]
+    init: true
+    security_opt:
+      - no-new-privileges:true
     environment:
       HERMES_UID: "10000"
       HERMES_GID: "10000"
@@ -199,8 +226,12 @@ services:
       DEEPSEEK_API_KEY: ${HERMES_DEEPSEEK_API_KEY}
     volumes:
       - hermes_data:/opt/data
+      - type: volume
+        source: hermes_platform_skills
+        target: /opt/platform-data/platform-skills
+        read_only: true
     networks:
-      - backend
+      - agent
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8642/health"]
       interval: 30s
@@ -251,6 +282,8 @@ networks:
     driver: overlay
   backend:
     driver: overlay
+  agent:
+    driver: overlay
 
 volumes:
   system_id_state:
@@ -259,3 +292,6 @@ volumes:
   judge_id_state:
   agent_runtime_data:
   hermes_data:
+    name: ${STACK_NAME}_hermes_data
+  hermes_platform_skills:
+    name: ${STACK_NAME}_hermes_platform_skills

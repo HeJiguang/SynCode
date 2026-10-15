@@ -43,11 +43,6 @@ async function main() {
   const aiSource = fs.readFileSync(path.resolve(testDir, "../components/ai-panel.tsx"), "utf8");
   const appShellSource = fs.readFileSync(path.resolve(testDir, "../components/app-shell.tsx"), "utf8");
   const logoutButtonSource = fs.readFileSync(path.resolve(testDir, "../components/logout-button.tsx"), "utf8");
-  const aiRouteSources = [
-    fs.readFileSync(path.resolve(testDir, "../app/api/ai/runs/route.ts"), "utf8"),
-    fs.readFileSync(path.resolve(testDir, "../app/api/ai/runs/[runId]/events/route.ts"), "utf8"),
-    fs.readFileSync(path.resolve(testDir, "../app/api/ai/runs/[runId]/artifacts/route.ts"), "utf8")
-  ];
 
   assert.match(loginSource, /立即体验 Demo（无需注册）/);
   assert.match(loginSource, /一键进入测试账号/);
@@ -67,10 +62,6 @@ async function main() {
   assert.match(logoutButtonSource, /退出登录/);
   assert.match(logoutButtonSource, /\/auth\/logout/);
   assert.match(logoutButtonSource, /clearBrowserAccessToken/);
-  for (const routeSource of aiRouteSources) {
-    assert.match(routeSource, /if \(!token\)/);
-    assert.match(routeSource, /status: 401/);
-  }
 }
 
 void main();

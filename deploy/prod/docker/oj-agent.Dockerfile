@@ -13,12 +13,14 @@ WORKDIR /app
 
 COPY oj-agent/pyproject.toml /app/pyproject.toml
 COPY oj-agent/app /app/app
+COPY hermes/skills /opt/syncode/hermes/skills
+COPY hermes/plugins /opt/syncode/hermes/plugins
 
 RUN pip install --no-cache-dir . \
     && groupadd --system --gid 10000 syncode \
     && useradd --system --uid 10000 --gid syncode --home-dir /app syncode \
-    && mkdir -p /app/runtime-artifacts /var/lib/hermes \
-    && chown -R syncode:syncode /app/runtime-artifacts /var/lib/hermes
+    && mkdir -p /app/runtime-artifacts /var/lib/hermes /opt/syncode/hermes/skills /opt/syncode/hermes/plugins \
+    && chown -R syncode:syncode /app/runtime-artifacts /var/lib/hermes /opt/syncode/hermes/skills /opt/syncode/hermes/plugins
 
 USER syncode
 

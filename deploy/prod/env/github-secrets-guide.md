@@ -88,8 +88,11 @@ Copy the full content of [stack.env.prod.template](/D:/Project/OnlineOJ/bite-oj-
 - `WORKER_SSH_HOST`, `WORKER_SSH_USER`, `WORKER_SSH_PORT` if needed
 - `WORKER_IMAGE_LIST` if more services move onto the worker
 - `JUDGE_HOST_USER_CODE_DIR` and `JUDGE_HOST_USER_CODE_POOL_DIR` if you want different host paths for judge sandbox files
-- `HERMES_BASE_IMAGE`, `HERMES_MODEL`, and `HERMES_DEEPSEEK_API_KEY`
+- `HERMES_BASE_IMAGE`, pinned to the reviewed digest in the template, plus `HERMES_MODEL` and `HERMES_DEEPSEEK_API_KEY`
 - `SYNCODE_HERMES_API_KEY`, `SYNCODE_HERMES_SESSION_SECRET`, `SYNCODE_HERMES_PROVISION_KEY`, and `SYNCODE_MCP_SERVICE_KEY`
+- `SYNCODE_ELASTICSEARCH_URL` and the real `SYNCODE_SKILL_EMBEDDING_URL`,
+  `SYNCODE_SKILL_EMBEDDING_API_KEY`, `SYNCODE_SKILL_EMBEDDING_MODEL`, and
+  `SYNCODE_SKILL_EMBEDDING_DIMENSIONS` values used by Skill discovery and learning-memory retrieval
 
 Do not manually replace `sha-REPLACE_ME`. The workflow does that for each release.
 
@@ -141,15 +144,7 @@ reuse the DeepSeek provider key. The deployment stops before building images whe
 - `RABBITMQ_PORT`
 - `RABBITMQ_DEFAULT_USER`
 - `RABBITMQ_DEFAULT_PASS`
-- `OJ_AGENT_NACOS_ENABLED=true`
-- `OJ_AGENT_NACOS_CONFIG_ENABLED=false`
-- `OJ_AGENT_NACOS_SERVER_ADDR`
-- `OJ_AGENT_NACOS_NAMESPACE`
-- `OJ_AGENT_NACOS_GROUP`
-- `OJ_AGENT_NACOS_USERNAME`
-- `OJ_AGENT_NACOS_PASSWORD`
-- `OJ_AGENT_NACOS_SERVICE_NAME`
-- `OJ_AGENT_NACOS_PORT`
+- `OJ_AGENT_PORT`
 - `OJ_AGENT_LLM_PROVIDER`
 - `OJ_AGENT_LLM_BASE_URL`
 - `OJ_AGENT_LLM_API_KEY`

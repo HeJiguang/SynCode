@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AiArtifact, CodeLanguage } from "@aioj/api";
+import type { CodeLanguage } from "@aioj/api";
 import { frontendPreviewMode } from "@aioj/config";
 import {
   AlertTriangle,
@@ -24,7 +24,6 @@ import type { JudgeResultDetail } from "../lib/judge-result";
 import { appApiPath } from "../lib/paths";
 
 type AiPanelProps = {
-  initialArtifacts?: AiArtifact[];
   demoMode?: boolean;
   questionId?: string;
   questionTitle?: string;
@@ -39,13 +38,6 @@ type CodeContextDetail = {
   code: string;
   selectedCode?: string;
 };
-
-type RunType =
-  | "interactive_tutor"
-  | "interactive_diagnosis"
-  | "interactive_recommendation"
-  | "interactive_review"
-  | "interactive_plan";
 
 type HermesSession = {
   id: string;
@@ -101,19 +93,7 @@ type HermesEvent = Record<string, unknown> & {
 
 type TextBlock = { type: "text"; content: string } | { type: "code"; lang: string; content: string };
 
-const QUICK_ACTIONS: Array<{ label: string; runType: RunType }> = [
-  { label: "解题提示", runType: "interactive_tutor" },
-  { label: "分析提交", runType: "interactive_diagnosis" },
-  { label: "接下来练什么", runType: "interactive_recommendation" }
-];
-
-const SKILL_BY_RUN_TYPE: Record<RunType, string> = {
-  interactive_tutor: "syncode-tutor",
-  interactive_diagnosis: "syncode-diagnosis",
-  interactive_recommendation: "syncode-training-plan",
-  interactive_review: "syncode-diagnosis",
-  interactive_plan: "syncode-training-plan"
-};
+const QUICK_ACTIONS = ["解题提示", "分析提交", "接下来练什么"] as const;
 
 function parseBlocks(text: string): TextBlock[] {
   const blocks: TextBlock[] = [];
@@ -155,14 +135,6 @@ function toChatMessages(rows: HermesMessage[]): ChatMessage[] {
       content: row.role === "user" ? visibleUserText(content) : content,
       status: "complete"
     }];
-  });
-}
-
-function initialArtifactMessages(artifacts: AiArtifact[]): ChatMessage[] {
-  return artifacts.flatMap((artifact): ChatMessage[] => {
-    const answer = typeof artifact.body.answer === "string" ? artifact.body.answer : artifact.summary ?? "";
-    const nextAction = typeof artifact.body.nextAction === "string" ? `\n\n${artifact.body.nextAction}` : "";
-    return answer ? [{ id: artifact.artifactId, role: "assistant", content: `${artifact.title}\n\n${answer}${nextAction}`, status: "complete" }] : [];
   });
 }
 
@@ -262,7 +234,6 @@ function MessageRow({ message }: { message: ChatMessage }) {
 }
 
 export function AiPanel({
-  initialArtifacts = [],
   demoMode = false,
   questionId,
   questionTitle,
@@ -270,7 +241,7 @@ export function AiPanel({
 }: AiPanelProps) {
   const [sessions, setSessions] = useState<HermesSession[]>([]);
   const [activeSession, setActiveSession] = useState<HermesSession | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>(() => initialArtifactMessages(initialArtifacts));
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [tools, setTools] = useState<ToolProgress[]>([]);
   const [approval, setApproval] = useState<ApprovalRequest | null>(null);
   const [inputValue, setInputValue] = useState("");
@@ -386,7 +357,7 @@ export function AiPanel({
     }
   }, []);
 
-  const submitPrompt = useCallback(async (text: string, runType: RunType = "interactive_tutor") => {
+  const submitPrompt = useCallback(async (text: string) => {
     const prompt = text.trim();
     if (!prompt || loading || running) return;
     if (previewMode) {
@@ -416,7 +387,7 @@ export function AiPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          input: `/${SKILL_BY_RUN_TYPE[runType]} ${prompt}`,
+          input: prompt,
           instructions: workspaceInstructions(codeContextRef.current, judgeResultRef.current),
           session_id: session.id
         })
@@ -437,7 +408,7 @@ export function AiPanel({
       setRunning(false);
       setCurrentRunId(null);
     }
-  }, [activeSession, createSession, handleHermesEvent, loading, previewMode, running]);
+  }, [activeSession, createSession, handleHermesEvent, loading, previewMode, questionId, running]);
 
   const sendSteer = useCallback(async () => {
     const text = inputValue.trim();
@@ -485,10 +456,10 @@ export function AiPanel({
       codeContextRef.current = detail;
     };
     const aiPromptHandler = (event: Event) => {
-      const detail = (event as CustomEvent<{ prompt?: string; runType?: RunType; selectedCode?: string }>).detail;
+      const detail = (event as CustomEvent<{ prompt?: string; selectedCode?: string }>).detail;
       if (!detail?.prompt) return;
       codeContextRef.current.selectedCode = detail.selectedCode;
-      void submitPrompt(detail.prompt, detail.runType ?? "interactive_tutor");
+      void submitPrompt(detail.prompt);
     };
     const judgeResultHandler = (event: Event) => {
       const detail = (event as CustomEvent<JudgeResultDetail>).detail;
@@ -543,7 +514,7 @@ export function AiPanel({
       </div>
 
       <div className="shrink-0 border-t border-[var(--border-soft)] px-4 pb-2 pt-3">
-        <div className="mb-3 flex flex-wrap gap-1.5">{QUICK_ACTIONS.map((item) => <Button key={item.label} size="sm" variant="secondary" className="h-7 rounded-[8px] text-[11px]" onClick={() => void submitPrompt(item.label, item.runType)} disabled={loading || running}>{item.label}</Button>)}</div>
+        <div className="mb-3 flex flex-wrap gap-1.5">{QUICK_ACTIONS.map((label) => <Button key={label} size="sm" variant="secondary" className="h-7 rounded-[8px] text-[11px]" onClick={() => void submitPrompt(label)} disabled={loading || running}>{label}</Button>)}</div>
         <div className="flex items-end gap-2">
           <textarea
             value={inputValue}

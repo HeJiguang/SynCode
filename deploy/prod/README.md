@@ -24,28 +24,28 @@ Two application layouts are supported from the same module sources:
 - `swarm/stack.yml` keeps gateway, system, friend, job, and judge as separate JVMs.
 - `swarm/stack-compact.yml` runs system, friend, and trusted-exam jobs in `oj-runtime`; judge remains a separate JVM and the Python agent remains a separate process.
 
-Both layouts run Hermes as the workspace AI agent core. `oj-agent-tools` exposes only the authenticated,
-user-scoped OJ MCP tools and profile provision endpoint; the existing `oj-agent` service is retained during
-the migration but is not the workspace chat orchestrator. Hermes and `oj-agent-tools` must remain on the same
-manager node because they share the local `hermes_data` volume.
+Both layouts run Hermes as the workspace AI agent core. `oj-agent-tools` exposes the authenticated,
+user-scoped OJ MCP tools, the internal learning-memory prefetch endpoint and profile provision endpoint. `oj-agent` only serves training-plan requests from
+the Java training flow. Hermes and `oj-agent-tools` must remain on the same manager node because they share
+the local `hermes_data` profile volume and `hermes_platform_skills` catalog volume.
 
 The compact layout is the default for the 4 vCPU / 8 GiB test host. It preserves the public `/system/**` and `/friend/**` contracts, performs gateway-equivalent JWT validation in a Servlet filter, and keeps the judge sandbox outside the business JVM.
 
 ## Key Files
 
-- [docker/java-service.Dockerfile](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/docker/java-service.Dockerfile)
-- [docker/next-app.Dockerfile](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/docker/next-app.Dockerfile)
-- [docker/oj-agent.Dockerfile](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/docker/oj-agent.Dockerfile)
+- `docker/java-service.Dockerfile`
+- `docker/next-app.Dockerfile`
+- `docker/oj-agent.Dockerfile`
 - `docker/hermes.Dockerfile`
-- [swarm/stack.yml](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/swarm/stack.yml)
+- `swarm/stack.yml`
 - `swarm/stack-compact.yml`
 - `../test/swarm/infra.yml`
-- [scripts/build-images.sh](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/scripts/build-images.sh)
-- [scripts/sync-worker-images.sh](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/scripts/sync-worker-images.sh)
-- [scripts/deploy.sh](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/scripts/deploy.sh)
-- [env/stack.env.prod.template](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/env/stack.env.prod.template)
-- [env/runtime.env.prod.template](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/env/runtime.env.prod.template)
-- [env/github-secrets-guide.md](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/env/github-secrets-guide.md)
+- `scripts/build-images.sh`
+- `scripts/sync-worker-images.sh`
+- `scripts/deploy.sh`
+- `env/stack.env.prod.template`
+- `env/runtime.env.prod.template`
+- `env/github-secrets-guide.md`
 
 ## Release Flow
 
@@ -57,16 +57,31 @@ The compact layout is the default for the 4 vCPU / 8 GiB test host. It preserves
 6. The manager builds the production images locally.
 7. The manager saves and copies the worker image set to `101.96.200.77`, then verifies those images exist on the worker.
 8. The manager runs `docker stack deploy --resolve-image never` and waits for the Swarm rollout to converge.
+9. The deploy script validates the Hermes profile policy, memory provider, platform catalog, Elasticsearch,
+   read-only mount and one real Hermes/MCP/SSE turn.
 
 Before the first Hermes rollout, generate independent values for `SYNCODE_HERMES_API_KEY`,
 `SYNCODE_HERMES_SESSION_SECRET`, `SYNCODE_HERMES_PROVISION_KEY`, and `SYNCODE_MCP_SERVICE_KEY`, then configure
-`HERMES_DEEPSEEK_API_KEY`. Preserve the `hermes_data` volume across deploys and rollbacks because it is the
-source of truth for Hermes sessions and memory. See `docs/architecture/hermes-agent-runtime.md` for the full
+`HERMES_DEEPSEEK_API_KEY`. Preserve `hermes_data` across deploys and rollbacks because it is the source of
+truth for Hermes profiles, sessions and native memory. Preserve `hermes_platform_skills` because it contains
+administrator-approved shared Skill releases. See `docs/architecture/hermes-agent-runtime.md` for the full
 boundary and smoke-test order.
+
+Skill governance also requires a reachable Elasticsearch service and an OpenAI-compatible multilingual
+embedding endpoint. Set `SYNCODE_ELASTICSEARCH_URL`, `SYNCODE_SKILL_EMBEDDING_URL`,
+`SYNCODE_SKILL_EMBEDDING_MODEL`, `SYNCODE_SKILL_EMBEDDING_DIMENSIONS`, and the provider key before enabling
+the hourly heartbeat. Without these values, personal Skill isolation and versioning still work, but automatic
+cross-user discovery deliberately reports a failed heartbeat. The platform catalog is stored in the separate
+`hermes_platform_skills` volume. `oj-agent-tools` owns the writable mount; Hermes receives the same volume
+read-only at `/opt/platform-data/platform-skills`.
+
+The same embedding provider powers user-scoped layered learning-memory recall through the separate
+`SYNCODE_LEARNING_MEMORY_INDEX`. When embeddings are unavailable, learning-memory tools continue with
+database retrieval and report the fallback mode explicitly.
 
 ## First-Time Bootstrap
 
-1. Fill in the required GitHub Secrets described in [env/github-secrets-guide.md](/D:/Project/OnlineOJ/bite-oj-master/bite-oj-master/deploy/prod/env/github-secrets-guide.md).
+1. Fill in the required GitHub Secrets described in `env/github-secrets-guide.md`.
 2. Generate a fresh runner registration token for this repository.
 3. Save that token as `SELF_HOSTED_RUNNER_BOOTSTRAP_TOKEN`.
 4. Run `bootstrap-runner.yml`; for test use labels `syncode-test,onlineoj-test`, otherwise keep the production defaults.
@@ -87,6 +102,10 @@ deploy/prod/scripts/deploy.sh
 For compact deployment, set `DEPLOYMENT_MODE=compact`, `RUNTIME_IMAGE`, and `BACKEND_NETWORK`, then use `STACK_FILE=deploy/prod/swarm/stack-compact.yml`. The external backend overlay network must exist before deploying the infrastructure and application stacks.
 
 `STACK_WAIT_TIMEOUT_SECONDS` controls the rollout timeout (default `600`), and `STACK_WAIT_POLL_SECONDS` controls its polling interval (default `5`). A paused, rolling-back, or timed-out service update fails the deployment before acceptance tests begin.
+
+Hermes acceptance is enabled by default. `VERIFY_HERMES_PRODUCTION=false` skips all Hermes post-deploy checks,
+and `VERIFY_HERMES_LIVE_RUN=false` skips only the paid model turn. These switches are intended for diagnosed
+recovery work; a normal test or production release must leave both checks enabled.
 
 ## Production Login Email
 

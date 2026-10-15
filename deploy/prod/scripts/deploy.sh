@@ -11,6 +11,8 @@ SYNC_WORKER_IMAGES="${SYNC_WORKER_IMAGES:-false}"
 WORKER_SSH_KEY_FILE="${WORKER_SSH_KEY_FILE:-}"
 STACK_WAIT_TIMEOUT_SECONDS="${STACK_WAIT_TIMEOUT_SECONDS:-600}"
 STACK_WAIT_POLL_SECONDS="${STACK_WAIT_POLL_SECONDS:-5}"
+VERIFY_HERMES_PRODUCTION="${VERIFY_HERMES_PRODUCTION:-true}"
+VERIFY_HERMES_LIVE_RUN="${VERIFY_HERMES_LIVE_RUN:-true}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
@@ -35,6 +37,8 @@ Environment variables:
   WORKER_SSH_KEY_FILE  Private key used when SYNC_WORKER_IMAGES=true
   STACK_WAIT_TIMEOUT_SECONDS  Maximum time to wait for Swarm convergence. Default: 600
   STACK_WAIT_POLL_SECONDS     Swarm convergence polling interval. Default: 5
+  VERIFY_HERMES_PRODUCTION    Run post-deploy Hermes acceptance checks. Default: true
+  VERIFY_HERMES_LIVE_RUN      Include one real model/MCP/SSE turn. Default: true
 EOF
 }
 
@@ -90,6 +94,10 @@ if [[ "$SYNC_WORKER_IMAGES" == "true" ]]; then
   STACK_ENV_FILE="$STACK_ENV_FILE" WORKER_SSH_KEY_FILE="$WORKER_SSH_KEY_FILE" "$SCRIPT_DIR/sync-worker-images.sh"
 fi
 
+chmod +x "$SCRIPT_DIR/migrate-hermes-platform-volume.sh"
+STACK_NAME="$STACK_NAME" AGENT_IMAGE="${AGENT_IMAGE:?AGENT_IMAGE is required}" \
+  "$SCRIPT_DIR/migrate-hermes-platform-volume.sh"
+
 echo "[deploy] rendering stack config"
 docker stack config --compose-file "$STACK_FILE" > /dev/null
 
@@ -108,3 +116,12 @@ STACK_WAIT_POLL_SECONDS="$STACK_WAIT_POLL_SECONDS" \
   "$SCRIPT_DIR/wait-for-stack.sh"
 
 echo "[deploy] stack deploy converged"
+
+if [[ "$VERIFY_HERMES_PRODUCTION" == "true" ]]; then
+  chmod +x "$SCRIPT_DIR/verify-hermes-production.sh"
+  STACK_NAME="$STACK_NAME" VERIFY_HERMES_LIVE_RUN="$VERIFY_HERMES_LIVE_RUN" \
+    "$SCRIPT_DIR/verify-hermes-production.sh"
+elif [[ "$VERIFY_HERMES_PRODUCTION" != "false" ]]; then
+  echo "VERIFY_HERMES_PRODUCTION must be true or false" >&2
+  exit 1
+fi
