@@ -8,6 +8,7 @@ ENV PYTHONUNBUFFERED=1
 ENV PIP_INDEX_URL=${PIP_INDEX_URL}
 ENV PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST}
 ENV PIP_DEFAULT_TIMEOUT=100
+ENV FASTEMBED_CACHE_PATH=/opt/fastembed-cache
 
 WORKDIR /app
 
@@ -17,10 +18,11 @@ COPY hermes/skills /opt/syncode/hermes/skills
 COPY hermes/plugins /opt/syncode/hermes/plugins
 
 RUN pip install --no-cache-dir . \
+    && python -c 'from fastembed import TextEmbedding; TextEmbedding(model_name="BAAI/bge-small-zh-v1.5", cache_dir="/opt/fastembed-cache", threads=1)' \
     && groupadd --system --gid 10000 syncode \
     && useradd --system --uid 10000 --gid syncode --home-dir /app syncode \
     && mkdir -p /app/runtime-artifacts /var/lib/hermes /opt/syncode/hermes/skills /opt/syncode/hermes/plugins \
-    && chown -R syncode:syncode /app/runtime-artifacts /var/lib/hermes /opt/syncode/hermes/skills /opt/syncode/hermes/plugins
+    && chown -R syncode:syncode /app/runtime-artifacts /var/lib/hermes /opt/fastembed-cache /opt/syncode/hermes/skills /opt/syncode/hermes/plugins
 
 USER syncode
 

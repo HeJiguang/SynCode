@@ -5,7 +5,7 @@ from hashlib import sha256
 import os
 import re
 from threading import Lock
-from typing import Iterable
+from typing import Any, Iterable
 
 import httpx
 
@@ -34,6 +34,9 @@ class SkillSearchError(RuntimeError):
 
 
 class EmbeddingClient:
+    _local_models: dict[tuple[str, str], Any] = {}
+    _local_models_lock = Lock()
+
     def __init__(self) -> None:
         self.url = (os.getenv("SYNCODE_SKILL_EMBEDDING_URL") or "").strip()
         self.api_key = (os.getenv("SYNCODE_SKILL_EMBEDDING_API_KEY") or "").strip()
@@ -44,22 +47,53 @@ class EmbeddingClient:
     def enabled(self) -> bool:
         return bool(self.url and self.model and self.dimensions > 0)
 
+    @property
+    def local(self) -> bool:
+        return self.url == "local://fastembed"
+
+    def _local_model(self):
+        cache_dir = os.getenv("FASTEMBED_CACHE_PATH", "/opt/fastembed-cache")
+        key = (self.model, cache_dir)
+        with self._local_models_lock:
+            model = self._local_models.get(key)
+            if model is None:
+                try:
+                    from fastembed import TextEmbedding
+                except ImportError as exc:
+                    raise SkillSearchError("Local embedding runtime is unavailable.") from exc
+                threads = max(1, int(os.getenv("SYNCODE_SKILL_EMBEDDING_THREADS", "2")))
+                model = TextEmbedding(
+                    model_name=self.model,
+                    cache_dir=cache_dir,
+                    threads=threads,
+                )
+                self._local_models[key] = model
+            return model
+
     def embed(self, texts: list[str]) -> list[list[float]]:
         if not self.enabled:
             raise SkillSearchError("Skill embedding service is not configured.")
-        headers = {"Content-Type": "application/json"}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-        with httpx.Client(timeout=30.0) as client:
-            response = client.post(
-                self.url,
-                headers=headers,
-                json={"model": self.model, "input": texts, "dimensions": self.dimensions},
-            )
-            response.raise_for_status()
-            payload = response.json()
-        rows = sorted(payload.get("data") or [], key=lambda item: int(item.get("index", 0)))
-        vectors = [item.get("embedding") for item in rows]
+        if self.local:
+            try:
+                vectors = [vector.tolist() for vector in self._local_model().embed(texts)]
+            except SkillSearchError:
+                raise
+            except Exception as exc:
+                raise SkillSearchError("Local embedding generation failed.") from exc
+        else:
+            headers = {"Content-Type": "application/json"}
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+            with httpx.Client(timeout=30.0) as client:
+                response = client.post(
+                    self.url,
+                    headers=headers,
+                    json={"model": self.model, "input": texts, "dimensions": self.dimensions},
+                )
+                response.raise_for_status()
+                payload = response.json()
+            rows = sorted(payload.get("data") or [], key=lambda item: int(item.get("index", 0)))
+            vectors = [item.get("embedding") for item in rows]
         if len(vectors) != len(texts) or any(not isinstance(vector, list) for vector in vectors):
             raise SkillSearchError("Embedding service returned an invalid response.")
         if any(len(vector) != self.dimensions for vector in vectors):

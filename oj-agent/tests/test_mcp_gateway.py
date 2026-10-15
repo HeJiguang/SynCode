@@ -84,6 +84,42 @@ def test_production_schema_readiness_requires_every_agent_table():
         engine.dispose()
 
 
+def test_local_embedding_is_valid_for_strict_production_readiness(monkeypatch):
+    monkeypatch.setenv("SYNCODE_PRODUCTION_READINESS_STRICT", "true")
+    monkeypatch.setenv("OJ_AGENT_DATABASE_URL", "mysql+pymysql://user:password@mysql/syncode")
+    monkeypatch.setenv("SYNCODE_ELASTICSEARCH_URL", "http://elasticsearch:9200")
+    monkeypatch.setenv("SYNCODE_SKILL_EMBEDDING_URL", "local://fastembed")
+    monkeypatch.setenv("SYNCODE_SKILL_EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5")
+    monkeypatch.setenv("SYNCODE_SKILL_EMBEDDING_DIMENSIONS", "512")
+    monkeypatch.delenv("SYNCODE_SKILL_EMBEDDING_API_KEY", raising=False)
+    monkeypatch.setenv("SYNCODE_MCP_SERVICE_KEY", "mcp-key")
+    monkeypatch.setenv("SYNCODE_HERMES_PROVISION_KEY", "provision-key")
+    monkeypatch.setenv("HERMES_API_SERVER_KEY", "hermes-key")
+
+    assert gateway_server._production_config_check() == (
+        True,
+        "production configuration ready",
+    )
+
+
+def test_remote_embedding_requires_api_key_in_strict_mode(monkeypatch):
+    monkeypatch.setenv("SYNCODE_PRODUCTION_READINESS_STRICT", "true")
+    monkeypatch.setenv("OJ_AGENT_DATABASE_URL", "mysql+pymysql://user:password@mysql/syncode")
+    monkeypatch.setenv("SYNCODE_ELASTICSEARCH_URL", "http://elasticsearch:9200")
+    monkeypatch.setenv("SYNCODE_SKILL_EMBEDDING_URL", "https://embedding.example/v1/embeddings")
+    monkeypatch.setenv("SYNCODE_SKILL_EMBEDDING_MODEL", "embedding-model")
+    monkeypatch.setenv("SYNCODE_SKILL_EMBEDDING_DIMENSIONS", "512")
+    monkeypatch.delenv("SYNCODE_SKILL_EMBEDDING_API_KEY", raising=False)
+    monkeypatch.setenv("SYNCODE_MCP_SERVICE_KEY", "mcp-key")
+    monkeypatch.setenv("SYNCODE_HERMES_PROVISION_KEY", "provision-key")
+    monkeypatch.setenv("HERMES_API_SERVER_KEY", "hermes-key")
+
+    assert gateway_server._production_config_check() == (
+        False,
+        "missing production settings: SYNCODE_SKILL_EMBEDDING_API_KEY",
+    )
+
+
 def test_profile_identity_is_strict():
     assert user_id_from_profile("syncode-u123") == "123"
     for invalid in ("syncode-u", "syncode-u1/../2", "alice", "syncode-u-1"):

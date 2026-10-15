@@ -238,6 +238,11 @@ jobs:
           docker stack config --compose-file deploy/prod/swarm/stack-compact.yml > /tmp/stack-compact.rendered.yml
           docker stack config --compose-file deploy/test/swarm/infra.yml > /dev/null
           grep -A 45 '^  oj-agent-tools:' /tmp/stack-compact.rendered.yml | grep -q 'MYSQL_HOST: mysql'
+          grep -A 45 '^  oj-agent-tools:' /tmp/stack-compact.rendered.yml | grep -q 'SYNCODE_SKILL_EMBEDDING_URL: local://fastembed'
+          if grep -A 35 '^  hermes:' /tmp/stack-compact.rendered.yml | grep -q 'init: true'; then
+            echo "Hermes must remain PID 1 so s6 can start the API server" >&2
+            exit 1
+          fi
           docker run --rm \
             -v "$(pwd)/deploy/prod/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
             -v "$(pwd)/deploy/prod/nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro" \
