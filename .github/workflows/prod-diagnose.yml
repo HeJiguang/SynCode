@@ -25,6 +25,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Collect failed Hermes test stack logs
+        shell: bash
+        run: |
+          set +e
+          for service in \
+            "onlineoj-test_nginx" \
+            "onlineoj-test_app" \
+            "onlineoj-test_hermes" \
+            "onlineoj-test_oj-agent-tools"
+          do
+            echo "=== failed test service status: ${service} ==="
+            docker service ps --no-trunc "${service}" | head -8
+            echo "=== failed test service logs: ${service} ==="
+            timeout 15 docker service logs --tail 150 --timestamps "${service}" 2>&1 | tail -150
+          done
+          exit 0
+
       - name: Collect manager diagnostics
         shell: bash
         run: |
@@ -67,7 +84,7 @@ jobs:
             echo "=== service ps: ${service} ==="
             docker service ps "${service}" --no-trunc || true
             echo "=== service logs: ${service} ==="
-            docker service logs --tail 120 "${service}" || true
+            timeout 15 docker service logs --tail 120 "${service}" || true
           done
 
       - name: Collect serving stack diagnostics
@@ -90,7 +107,7 @@ jobs:
             echo "=== service status: ${service} ==="
             docker service ps --no-trunc "${service}" | head -5
             echo "=== service raw logs (tail 150): ${service} ==="
-            docker service logs --tail 150 --timestamps "${service}" 2>&1 | tail -150
+            timeout 15 docker service logs --tail 150 --timestamps "${service}" 2>&1 | tail -150
           done
           exit 0
 
