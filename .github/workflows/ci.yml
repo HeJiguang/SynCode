@@ -258,6 +258,9 @@ jobs:
           TEST_BASE_URL=http://127.0.0.1 SYNCODE_IMPORT_DRY_RUN=1 deploy/test/scripts/import-leetcode-hot-100.sh
           deploy/prod/scripts/test-wait-for-stack.sh
 
+      - name: Stage pinned embedding model
+        run: deploy/prod/scripts/fetch-fastembed-model.sh
+
       - name: Create source bundle
         run: |
           bundle_path="${RUNNER_TEMP}/deploy-source.tar.gz"

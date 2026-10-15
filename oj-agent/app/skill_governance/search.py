@@ -34,7 +34,7 @@ class SkillSearchError(RuntimeError):
 
 
 class EmbeddingClient:
-    _local_models: dict[tuple[str, str], Any] = {}
+    _local_models: dict[tuple[str, str, str], Any] = {}
     _local_models_lock = Lock()
 
     def __init__(self) -> None:
@@ -53,7 +53,8 @@ class EmbeddingClient:
 
     def _local_model(self):
         cache_dir = os.getenv("FASTEMBED_CACHE_PATH", "/opt/fastembed-cache")
-        key = (self.model, cache_dir)
+        model_path = os.getenv("FASTEMBED_MODEL_PATH", "/opt/fastembed-model")
+        key = (self.model, cache_dir, model_path)
         with self._local_models_lock:
             model = self._local_models.get(key)
             if model is None:
@@ -66,6 +67,8 @@ class EmbeddingClient:
                     model_name=self.model,
                     cache_dir=cache_dir,
                     threads=threads,
+                    local_files_only=True,
+                    specific_model_path=model_path,
                 )
                 self._local_models[key] = model
             return model

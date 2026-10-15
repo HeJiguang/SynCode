@@ -76,6 +76,10 @@ model through `SYNCODE_SKILL_EMBEDDING_URL`, `SYNCODE_SKILL_EMBEDDING_API_KEY`,
 `hermes_platform_skills` volume. `oj-agent-tools` owns the writable mount; Hermes receives the same volume
 read-only at `/opt/platform-data/platform-skills`.
 
+CI pins, verifies, and stages the local model in the tested deployment bundle. The Agent image loads that directory
+with FastEmbed's offline mode, so image builds and runtime inference never depend on Hugging Face availability.
+For a manual source checkout build, run `deploy/prod/scripts/fetch-fastembed-model.sh` before `build-images.sh`.
+
 The same embedding provider powers user-scoped layered learning-memory recall through the separate
 `SYNCODE_LEARNING_MEMORY_INDEX`. When embeddings are unavailable, learning-memory tools continue with
 database retrieval and report the fallback mode explicitly.
