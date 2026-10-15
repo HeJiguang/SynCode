@@ -237,9 +237,13 @@ jobs:
           docker stack config --compose-file deploy/prod/swarm/stack.yml > /dev/null
           docker stack config --compose-file deploy/prod/swarm/stack-compact.yml > /tmp/stack-compact.rendered.yml
           docker stack config --compose-file deploy/test/swarm/infra.yml > /dev/null
-          grep -A 45 '^  oj-agent-tools:' /tmp/stack-compact.rendered.yml | grep -q 'MYSQL_HOST: mysql'
-          grep -A 45 '^  oj-agent-tools:' /tmp/stack-compact.rendered.yml | grep -q 'SYNCODE_SKILL_EMBEDDING_URL: local://fastembed'
-          if grep -A 35 '^  hermes:' /tmp/stack-compact.rendered.yml | grep -q 'init: true'; then
+          awk '/^  oj-agent-tools:/{capture=1} capture{print} capture && /^  [a-zA-Z0-9_-]+:/ && $0 !~ /^  oj-agent-tools:/{exit}' \
+            /tmp/stack-compact.rendered.yml > /tmp/oj-agent-tools.rendered.yml
+          awk '/^  hermes:/{capture=1} capture{print} capture && /^  [a-zA-Z0-9_-]+:/ && $0 !~ /^  hermes:/{exit}' \
+            /tmp/stack-compact.rendered.yml > /tmp/hermes.rendered.yml
+          grep -q 'MYSQL_HOST: mysql' /tmp/oj-agent-tools.rendered.yml
+          grep -q 'SYNCODE_SKILL_EMBEDDING_URL: local://fastembed' /tmp/oj-agent-tools.rendered.yml
+          if grep -q 'init: true' /tmp/hermes.rendered.yml; then
             echo "Hermes must remain PID 1 so s6 can start the API server" >&2
             exit 1
           fi
