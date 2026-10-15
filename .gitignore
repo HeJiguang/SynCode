@@ -9,6 +9,9 @@ Thumbs.db
 # Build outputs
 **/target/
 **/out/
+**/dist/
+**/*.tsbuildinfo
+.tmp-tools/
 
 # Logs and runtime artifacts
 logs/
@@ -30,6 +33,9 @@ tmp-*.sql
 
 # Python caches
 **/__pycache__/
+**/.pytest_cache/
+**/.venv/
+*.egg-info/
 *.pyc
 *.pyo
 oj-agent/.env.local
@@ -64,6 +70,8 @@ tool/question-curation/data/sqlite/
 
 # Local load-testing binaries
 tool/load-testing/bin/
+tool/load-testing/results/*.json
+tool/load-testing/results/*.txt
 
 # Keep production deploy verification scripts versioned
 !deploy/prod/scripts/

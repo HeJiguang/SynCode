@@ -1,5 +1,6 @@
 export const previewAdminProfile = {
-  nickName: "Preview Admin"
+  nickName: "Preview Admin",
+  userAccount: "preview-admin"
 };
 
 export const previewAdminDashboardSummary = {

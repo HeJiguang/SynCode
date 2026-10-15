@@ -15,6 +15,7 @@ import {
 
 type AdminInfo = {
   nickName?: string | null;
+  userAccount?: string | null;
 };
 
 type BackendQuestionRow = {
@@ -206,7 +207,8 @@ export async function getAdminProfile(token?: string | null) {
   const payload = await requestJson<ApiEnvelope<AdminInfo>>("/system/sysUser/info", { token });
   const data = unwrapData(payload);
   return {
-    nickName: data.nickName ?? "管理员"
+    nickName: data.nickName ?? "管理员",
+    userAccount: data.userAccount ?? data.nickName ?? "admin"
   };
 }
 

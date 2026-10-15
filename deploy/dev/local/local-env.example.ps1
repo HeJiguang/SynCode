@@ -8,7 +8,6 @@ $env:NACOS_DISCOVERY_ENABLED = "false"
 # Local service addresses.
 $env:OJ_FRIEND_BASE_URL = "http://127.0.0.1:9202"
 $env:OJ_JUDGE_BASE_URL = "http://127.0.0.1:9204"
-$env:AI_GATEWAY_URI = "http://127.0.0.1:8016"
 $env:AGENT_PUBLIC_BASE_URL = "http://127.0.0.1:8016"
 $env:OJ_AGENT_PORT = "8016"
 $env:FRONTEND_WEB_PORT = "4000"

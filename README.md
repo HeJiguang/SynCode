@@ -2,7 +2,7 @@
 
 面向编程测评与训练场景的多模块工程项目。
 
-当前公开版本以后端能力为主，重点放在异步判题链路、结果推送机制、训练/AI 能力探索和本地微服务协作。前端整体体验和正式线上部署仍在持续建设中，因此本仓库暂不以“完整网站成品”作为展示重点。
+当前公开版本重点覆盖异步判题、结果推送、训练规划和基于 Hermes 的智能助教。
 
 ## 项目简介
 
@@ -14,9 +14,9 @@
 - 基于 RabbitMQ 的异步判题主链路
 - 基于 WebSocket + Redis Pub/Sub 的判题结果推送
 - 基于逻辑时钟与持久化水位的趋势递增 Snowflake 主键
-- 基于 Python `oj-agent` 的 AI/训练规划能力探索
-- 带防腐层的可插拔 Agent Runtime，支持运行时热切换、会话归属固定、Hermes 持久记忆与原生工具调用
-- 多用户 Agent Run 准入控制，支持用户级活跃/频率限制与全局执行并发上限
+- 基于 Hermes 的会话、记忆、技能、工具调用和流式智能助教
+- 面向 Hermes 的用户隔离配置与只读 OJ MCP 工具
+- Java 训练流程通过精简的 Python 服务生成个性化训练计划
 
 ## 核心模块
 
@@ -39,7 +39,10 @@
   服务间共享的 DTO、接口约定和公共传输对象定义。
 
 - `oj-agent`
-  基于 FastAPI + LangGraph 的独立 Python 服务，用于 AI 助教、训练规划等能力扩展。
+  精简的 FastAPI 服务，提供训练规划、Hermes 用户配置和只读 OJ MCP 工具。工作区聊天直接使用 Hermes。
+
+- `hermes`
+  智能体核心，负责会话、记忆、技能、审批、模型调用和事件流。
 
 ## 技术栈
 
@@ -52,14 +55,16 @@
 - RabbitMQ
 - Python 3.11+
 - FastAPI
-- LangGraph
+- Hermes Agent
+- FastMCP
 
 ## 当前进度
 
 - 已形成多模块后端工程结构，核心业务拆分基本清晰
 - 已具备异步判题链路和请求级 `requestId` 跟踪能力
 - 已接入判题结果 WebSocket 推送机制
-- 已纳入 Python `oj-agent` 服务用于 AI 能力探索
+- 已接入 Hermes 工作区智能助教与用户级隔离
+- 已保留独立训练规划接口供 Java 训练流程调用
 - 当前公开仓库以后端、本地运行和架构演进为主
 - 前端整体仍在建设中，暂不作为当前仓库首页展示重点
 - 暂无正式公网演示地址
@@ -101,7 +106,7 @@ pip install -e .[dev]
 uvicorn app.main:app --host 0.0.0.0 --port 8015
 ```
 
-Hermes sidecar、DeepSeek 和安全隔离配置参见 [`docs/architecture/hermes-agent-runtime.md`](docs/architecture/hermes-agent-runtime.md)。
+Hermes、DeepSeek 和安全隔离配置参见 [`docs/architecture/hermes-agent-runtime.md`](docs/architecture/hermes-agent-runtime.md)。
 
 具体端口、Nacos 配置和本地环境参数请以各模块的 `bootstrap.yml`、`application-local.yml` 及相关本地配置文件为准。
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import WorkspacePage from "../app/workspace/[questionId]/page.tsx";
+import WorkspacePage from "../app/workspace/[questionId]/page";
 
 async function main() {
   const html = renderToStaticMarkup(

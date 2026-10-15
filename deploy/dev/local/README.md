@@ -78,8 +78,8 @@ Notes:
 - Local mode keeps Nacos off unless you explicitly export `NACOS_ENABLED=true`.
 - `oj-friend` calls `oj-judge` through Spring simple discovery in local mode, so
   `OJ_JUDGE_BASE_URL` must match the actual local judge address.
-- `oj-gateway` routes to local `oj-friend` and `oj-agent`, so `OJ_FRIEND_BASE_URL`
-  and `AI_GATEWAY_URI` must match the actual addresses.
+- `oj-gateway` routes to local `oj-friend`; `OJ_FRIEND_BASE_URL` must match its address.
+- `oj-friend` calls the training planner directly through `AGENT_PUBLIC_BASE_URL`.
 - `local-env.ps1` is wired for the current local-test setup: cloud MySQL plus
   local Redis, RabbitMQ, Elasticsearch, and local application services.
 - The checked-in template `local-env.example.ps1` uses agent port `8016` to avoid

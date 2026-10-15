@@ -8,6 +8,21 @@ USE bitoj_dev;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS tb_ai_learning_state_projection;
+DROP TABLE IF EXISTS tb_ai_learning_state_evidence;
+DROP TABLE IF EXISTS tb_ai_learning_state_memory;
+DROP TABLE IF EXISTS tb_ai_learning_memory_projection_state;
+DROP TABLE IF EXISTS tb_ai_learning_memory_evidence;
+DROP TABLE IF EXISTS tb_ai_learning_memory;
+DROP TABLE IF EXISTS tb_ai_skill_usage_event;
+DROP TABLE IF EXISTS tb_ai_skill_governance_heartbeat;
+DROP TABLE IF EXISTS tb_ai_skill_lifecycle_review;
+DROP TABLE IF EXISTS tb_ai_skill_release;
+DROP TABLE IF EXISTS tb_ai_skill_promotion_review_action;
+DROP TABLE IF EXISTS tb_ai_skill_promotion_member;
+DROP TABLE IF EXISTS tb_ai_skill_promotion_candidate;
+DROP TABLE IF EXISTS tb_ai_skill_version;
+DROP TABLE IF EXISTS tb_ai_skill;
 DROP TABLE IF EXISTS tb_training_task;
 DROP TABLE IF EXISTS tb_training_plan;
 DROP TABLE IF EXISTS tb_training_profile;
