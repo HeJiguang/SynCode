@@ -128,7 +128,7 @@ jobs:
       - name: Collect worker diagnostics
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
           if [[ ! -f .cd-tmp/worker_id_ed25519 ]]; then
             echo "worker ssh key not prepared, skip worker diagnostics"
             exit 0
@@ -148,3 +148,7 @@ jobs:
           echo "=== worker docker images (judge/agent) ==="
           docker images | grep -E 'oj-agent|oj-judge' || true
           EOF
+          if [[ "$?" -ne 0 ]]; then
+            echo "worker diagnostics unavailable; manager diagnostics were collected successfully"
+          fi
+          exit 0
