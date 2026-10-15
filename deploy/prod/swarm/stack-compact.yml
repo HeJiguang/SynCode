@@ -257,7 +257,7 @@ services:
       - backend
       - agent
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8016/ready', timeout=5)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8016/health', timeout=5)"]
       interval: 30s
       timeout: 8s
       retries: 5
@@ -273,7 +273,6 @@ services:
   hermes:
     image: ${HERMES_IMAGE}
     command: ["gateway", "run"]
-    init: true
     security_opt:
       - no-new-privileges:true
     environment:
