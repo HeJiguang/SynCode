@@ -25,6 +25,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Collect failed Hermes test stack logs
+        shell: bash
+        run: |
+          set +e
+          for service in \
+            "onlineoj-test_nginx" \
+            "onlineoj-test_app" \
+            "onlineoj-test_hermes" \
+            "onlineoj-test_oj-agent-tools"
+          do
+            echo "=== failed test service status: ${service} ==="
+            docker service ps --no-trunc "${service}" | head -8
+            echo "=== failed test service environment names: ${service} ==="
+            docker service inspect --format '{{range .Spec.TaskTemplate.ContainerSpec.Env}}{{println .}}{{end}}' \
+              "${service}" | sed 's/=.*$/=<redacted>/' | sort
+            echo "=== failed test service logs: ${service} ==="
+            timeout 15 docker service logs --tail 150 --timestamps "${service}" 2>&1 | tail -150
+          done
+          exit 0
+
       - name: Collect manager diagnostics
         shell: bash
         run: |
@@ -67,7 +87,7 @@ jobs:
             echo "=== service ps: ${service} ==="
             docker service ps "${service}" --no-trunc || true
             echo "=== service logs: ${service} ==="
-            docker service logs --tail 120 "${service}" || true
+            timeout 15 docker service logs --tail 120 "${service}" || true
           done
 
       - name: Collect serving stack diagnostics
@@ -80,13 +100,17 @@ jobs:
           curl -s --max-time 15 "http://127.0.0.1/friend/question/semiLogin/detail?questionId=20001" | head -c 120
           echo
           for service in \
+            "onlineoj-test_nginx" \
+            "onlineoj-test_app" \
+            "onlineoj-test_hermes" \
+            "onlineoj-test_oj-agent-tools" \
             "onlineoj-test_oj-runtime" \
             "onlineoj-test_oj-judge"
           do
             echo "=== service status: ${service} ==="
             docker service ps --no-trunc "${service}" | head -5
             echo "=== service raw logs (tail 150): ${service} ==="
-            docker service logs --tail 150 --timestamps "${service}" 2>&1 | tail -150
+            timeout 15 docker service logs --tail 150 --timestamps "${service}" 2>&1 | tail -150
           done
           exit 0
 
@@ -104,7 +128,7 @@ jobs:
       - name: Collect worker diagnostics
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
           if [[ ! -f .cd-tmp/worker_id_ed25519 ]]; then
             echo "worker ssh key not prepared, skip worker diagnostics"
             exit 0
@@ -124,3 +148,7 @@ jobs:
           echo "=== worker docker images (judge/agent) ==="
           docker images | grep -E 'oj-agent|oj-judge' || true
           EOF
+          if [[ "$?" -ne 0 ]]; then
+            echo "worker diagnostics unavailable; manager diagnostics were collected successfully"
+          fi
+          exit 0
