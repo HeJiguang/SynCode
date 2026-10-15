@@ -191,17 +191,20 @@ from __future__ import annotations
 
 import json
 import os
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+from uuid import uuid4
 
 
 user_id = os.environ["VERIFY_HERMES_USER_ID"]
 profile = f"syncode-u{user_id}"
 api_key = os.environ["HERMES_API_SERVER_KEY"]
 base_url = f"http://hermes:8642/p/{profile}"
+verification_key = f"syncode-production-verification-{uuid4().hex}"
 headers = {
     "Authorization": f"Bearer {api_key}",
     "Content-Type": "application/json",
-    "X-Hermes-Session-Key": "syncode-production-verification",
+    "X-Hermes-Session-Key": verification_key,
 }
 request = Request(
     f"{base_url}/v1/runs",
@@ -211,16 +214,19 @@ request = Request(
                 "先用 skill_view 加载 syncode-training-plan Skill，"
                 "再调用 get_my_learning_profile 工具读取当前学习档案，"
                 "然后只用一句中文报告已做题数；不要猜测工具没有返回的数据。"
-            ),
-            "session_id": "syncode-production-verification",
+            )
         },
         ensure_ascii=False,
     ).encode("utf-8"),
     headers=headers,
     method="POST",
 )
-with urlopen(request, timeout=30) as response:
-    created = json.loads(response.read(256_000))
+try:
+    with urlopen(request, timeout=30) as response:
+        created = json.loads(response.read(256_000))
+except HTTPError as exc:
+    detail = exc.read(256_000).decode("utf-8", errors="replace")
+    raise RuntimeError(f"Hermes run creation failed with HTTP {exc.code}: {detail}") from exc
 run_id = str(created.get("run_id") or "")
 if not run_id:
     raise RuntimeError(f"Hermes did not return run_id: {created}")
