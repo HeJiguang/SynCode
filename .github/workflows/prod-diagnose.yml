@@ -37,6 +37,9 @@ jobs:
           do
             echo "=== failed test service status: ${service} ==="
             docker service ps --no-trunc "${service}" | head -8
+            echo "=== failed test service environment names: ${service} ==="
+            docker service inspect --format '{{range .Spec.TaskTemplate.ContainerSpec.Env}}{{println .}}{{end}}' \
+              "${service}" | sed 's/=.*$/=<redacted>/' | sort
             echo "=== failed test service logs: ${service} ==="
             timeout 15 docker service logs --tail 150 --timestamps "${service}" 2>&1 | tail -150
           done
