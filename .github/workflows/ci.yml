@@ -233,10 +233,12 @@ jobs:
               export "${line}"
             done < "${env_file}"
           done
+          export NGINX_CONFIG_DIGEST=ci-validation
           docker stack config --compose-file deploy/prod/swarm/stack.yml > /dev/null
           docker stack config --compose-file deploy/prod/swarm/stack-compact.yml > /dev/null
           docker stack config --compose-file deploy/test/swarm/infra.yml > /dev/null
           bash -n deploy/prod/scripts/*.sh deploy/test/scripts/*.sh
+          deploy/prod/scripts/test-configure-database-password.sh
           deploy/prod/scripts/test-hermes-default-env.sh
           deploy/prod/scripts/test-hermes-skills-api-compat.sh
           TEST_BASE_URL=http://127.0.0.1 SYNCODE_IMPORT_DRY_RUN=1 deploy/test/scripts/import-leetcode-hot-100.sh

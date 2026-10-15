@@ -12,6 +12,7 @@ This directory contains the production deploy assets for the domestic-first rele
 - The manager copies worker-only images to `101.96.200.77`.
 - The manager runs `docker stack deploy` after both nodes have the required images.
 - `docker stack deploy` uses `--resolve-image never`, so Swarm does not try to resolve tags against an external registry during rollout.
+- Nginx Swarm configs use a content digest in their resource names so immutable configs can be updated safely.
 - The deploy command waits for every service update and desired replica to converge before smoke or end-to-end tests start.
 
 This avoids two unstable dependencies:

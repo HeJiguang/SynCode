@@ -31,6 +31,7 @@ env:
   STACK_ENV_FILE: deploy/prod/env/stack.env
   RUNTIME_ENV_FILE: deploy/prod/env/runtime.env
   RUNNER_WORKER_SSH_KEY_FILE: /opt/syncode-runner/.ssh/onlineoj_worker_ci
+  MYSQL_APP_PASSWORD: ${{ secrets.MYSQL_APP_PASSWORD }}
   HERMES_DEEPSEEK_API_KEY: ${{ secrets.HERMES_DEEPSEEK_API_KEY }}
   SYNCODE_HERMES_API_KEY: ${{ secrets.SYNCODE_HERMES_API_KEY }}
   SYNCODE_HERMES_SESSION_SECRET: ${{ secrets.SYNCODE_HERMES_SESSION_SECRET }}
@@ -103,6 +104,8 @@ jobs:
             echo "NACOS_CONFIG_ENABLED=true"
             echo "NACOS_DISCOVERY_ENABLED=true"
           } >> "${RUNTIME_ENV_FILE}"
+          chmod +x deploy/prod/scripts/configure-database-password.sh
+          deploy/prod/scripts/configure-database-password.sh "${RUNTIME_ENV_FILE}"
           chmod +x deploy/prod/scripts/configure-hermes.sh
           deploy/prod/scripts/configure-hermes.sh "${STACK_ENV_FILE}"
           chmod +x deploy/prod/scripts/configure-login-mail.sh

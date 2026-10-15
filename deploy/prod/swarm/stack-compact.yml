@@ -308,8 +308,10 @@ services:
 
 configs:
   compact_nginx_conf:
+    name: ${STACK_NAME}_compact_nginx_conf_${NGINX_CONFIG_DIGEST}
     file: ../nginx/nginx.conf
   compact_nginx_default_conf:
+    name: ${STACK_NAME}_compact_nginx_default_conf_${NGINX_CONFIG_DIGEST}
     file: ../nginx/conf.d/default.conf
 
 networks:
