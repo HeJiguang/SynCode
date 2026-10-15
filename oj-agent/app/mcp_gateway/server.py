@@ -318,7 +318,6 @@ def _production_config_check() -> tuple[bool, str]:
     required = (
         "SYNCODE_ELASTICSEARCH_URL",
         "SYNCODE_SKILL_EMBEDDING_URL",
-        "SYNCODE_SKILL_EMBEDDING_API_KEY",
         "SYNCODE_SKILL_EMBEDDING_MODEL",
         "SYNCODE_SKILL_EMBEDDING_DIMENSIONS",
         "SYNCODE_MCP_SERVICE_KEY",
@@ -332,6 +331,11 @@ def _production_config_check() -> tuple[bool, str]:
             missing.append(name)
     if missing:
         return False, f"missing production settings: {', '.join(missing)}"
+    embedding_url = os.environ["SYNCODE_SKILL_EMBEDDING_URL"].strip()
+    if embedding_url != "local://fastembed":
+        embedding_api_key = (os.getenv("SYNCODE_SKILL_EMBEDDING_API_KEY") or "").strip()
+        if not embedding_api_key or "REPLACE" in embedding_api_key.upper():
+            return False, "missing production settings: SYNCODE_SKILL_EMBEDDING_API_KEY"
     try:
         if int(os.environ["SYNCODE_SKILL_EMBEDDING_DIMENSIONS"]) <= 0:
             raise ValueError

@@ -42,6 +42,15 @@ jobs:
               "${service}" | sed 's/=.*$/=<redacted>/' | sort
             echo "=== failed test service logs: ${service} ==="
             timeout 15 docker service logs --tail 150 --timestamps "${service}" 2>&1 | tail -150
+            container_id="$(docker ps --filter "label=com.docker.swarm.service.name=${service}" --format '{{.ID}}' | head -1)"
+            if [[ -n "$container_id" ]]; then
+              echo "=== failed test container health: ${service} ==="
+              docker inspect --format '{{json .State.Health}}' "$container_id" || true
+              if [[ "$service" == "onlineoj-test_oj-agent-tools" ]]; then
+                echo "=== failed test readiness response: ${service} ==="
+                docker exec "$container_id" python -c $'import urllib.error\nimport urllib.request\ntry:\n    response = urllib.request.urlopen("http://127.0.0.1:8016/ready", timeout=5)\n    print(response.read().decode())\nexcept urllib.error.HTTPError as exc:\n    print(exc.read().decode())' || true
+              fi
+            fi
           done
           exit 0
 

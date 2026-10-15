@@ -68,11 +68,11 @@ truth for Hermes profiles, sessions and native memory. Preserve `hermes_platform
 administrator-approved shared Skill releases. See `docs/architecture/hermes-agent-runtime.md` for the full
 boundary and smoke-test order.
 
-Skill governance also requires a reachable Elasticsearch service and an OpenAI-compatible multilingual
-embedding endpoint. Set `SYNCODE_ELASTICSEARCH_URL`, `SYNCODE_SKILL_EMBEDDING_URL`,
-`SYNCODE_SKILL_EMBEDDING_MODEL`, `SYNCODE_SKILL_EMBEDDING_DIMENSIONS`, and the provider key before enabling
-the hourly heartbeat. Without these values, personal Skill isolation and versioning still work, but automatic
-cross-user discovery deliberately reports a failed heartbeat. The platform catalog is stored in the separate
+Skill governance also requires a reachable Elasticsearch service and dense multilingual embeddings. The Agent
+image includes the 512-dimensional `BAAI/bge-small-zh-v1.5` model and uses it through
+`SYNCODE_SKILL_EMBEDDING_URL=local://fastembed` by default. An OpenAI-compatible endpoint can override the local
+model through `SYNCODE_SKILL_EMBEDDING_URL`, `SYNCODE_SKILL_EMBEDDING_API_KEY`,
+`SYNCODE_SKILL_EMBEDDING_MODEL`, and `SYNCODE_SKILL_EMBEDDING_DIMENSIONS`. The platform catalog is stored in the separate
 `hermes_platform_skills` volume. `oj-agent-tools` owns the writable mount; Hermes receives the same volume
 read-only at `/opt/platform-data/platform-skills`.
 
