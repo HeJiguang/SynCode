@@ -118,7 +118,6 @@ export default async function WorkspacePage({ params }: PageProps) {
         aiPanel={
           <AiPanel
             demoMode={demoMode}
-            initialArtifacts={[]}
             questionId={questionId}
             questionTitle={detail.title}
             questionContent={questionContent}

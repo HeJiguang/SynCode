@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 
-import { DEFAULT_AGENT_API_BASE_URL, resolveAgentApiBaseUrl } from "../lib/agent-base-url";
 import {
   buildJudgeResultParams,
   buildJudgeRunPayload,
@@ -44,33 +43,6 @@ async function main() {
   assert.equal(params?.get("examId"), "2041108424049139714");
   assert.equal(params?.get("requestId"), "req-1");
 
-  const originalAgentBaseUrl = process.env.AGENT_PUBLIC_BASE_URL;
-  const originalSyncodeAgentBaseUrl = process.env.SYNCODE_AGENT_BASE_URL;
-
-  try {
-    delete process.env.AGENT_PUBLIC_BASE_URL;
-    delete process.env.SYNCODE_AGENT_BASE_URL;
-    assert.equal(resolveAgentApiBaseUrl(), DEFAULT_AGENT_API_BASE_URL);
-
-    process.env.AGENT_PUBLIC_BASE_URL = "http://127.0.0.1:8016/";
-    assert.equal(resolveAgentApiBaseUrl(), "http://127.0.0.1:8016");
-
-    delete process.env.AGENT_PUBLIC_BASE_URL;
-    process.env.SYNCODE_AGENT_BASE_URL = "http://127.0.0.1:18016/";
-    assert.equal(resolveAgentApiBaseUrl(), "http://127.0.0.1:18016");
-  } finally {
-    if (typeof originalAgentBaseUrl === "string") {
-      process.env.AGENT_PUBLIC_BASE_URL = originalAgentBaseUrl;
-    } else {
-      delete process.env.AGENT_PUBLIC_BASE_URL;
-    }
-
-    if (typeof originalSyncodeAgentBaseUrl === "string") {
-      process.env.SYNCODE_AGENT_BASE_URL = originalSyncodeAgentBaseUrl;
-    } else {
-      delete process.env.SYNCODE_AGENT_BASE_URL;
-    }
-  }
 }
 
 void main();

@@ -41,7 +41,7 @@ foreach ($path in $envPaths) {
         "RABBITMQ_HOST=",
         "RABBITMQ_DEFAULT_USER=",
         "RABBITMQ_DEFAULT_PASS=",
-        "OJ_AGENT_NACOS_CONFIG_ENABLED=false",
+        "OJ_AGENT_PORT=",
         "OJ_AGENT_LLM_BASE_URL=",
         "OJ_AGENT_LLM_API_KEY=",
         "OJ_AGENT_CHAT_MODEL=",

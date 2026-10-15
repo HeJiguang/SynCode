@@ -13,7 +13,6 @@ from app.core.config import load_settings
 
 
 def _hermes_settings(tmp_path: Path, monkeypatch, **changes):
-    monkeypatch.setattr("app.core.config._resolve_default_nacos_ip", lambda: "127.0.0.1")
     settings = replace(
         load_settings(),
         agent_runtime_provider="hermes",

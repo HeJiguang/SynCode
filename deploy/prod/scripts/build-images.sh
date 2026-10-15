@@ -90,9 +90,14 @@ echo "[build] oj-agent image -> $AGENT_IMAGE"
 docker build -f deploy/prod/docker/oj-agent.Dockerfile -t "$AGENT_IMAGE" .
 
 : "${HERMES_IMAGE:?HERMES_IMAGE is required}"
+: "${HERMES_BASE_IMAGE:?HERMES_BASE_IMAGE must be pinned to an approved sha256 digest}"
+if [[ ! "${HERMES_BASE_IMAGE}" =~ @sha256:[0-9a-fA-F]{64}$ ]]; then
+  echo "HERMES_BASE_IMAGE must use an immutable @sha256 digest, got: ${HERMES_BASE_IMAGE}" >&2
+  exit 1
+fi
 echo "[build] Hermes image -> $HERMES_IMAGE"
 docker build -f deploy/prod/docker/hermes.Dockerfile \
-  --build-arg HERMES_BASE_IMAGE="${HERMES_BASE_IMAGE:-nousresearch/hermes-agent:latest}" \
+  --build-arg HERMES_BASE_IMAGE="${HERMES_BASE_IMAGE}" \
   -t "$HERMES_IMAGE" .
 
 echo "[build] image build completed"

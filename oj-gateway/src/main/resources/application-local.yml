@@ -30,16 +30,3 @@ spring:
             - Path=/friend/**
           filters:
             - StripPrefix=1
-        - id: oj-agent
-          uri: ${AI_GATEWAY_URI:http://127.0.0.1:8015}
-          predicates:
-            - Path=/ai/**
-          filters:
-            - StripPrefix=1
-
-ai:
-  gateway:
-    route-enabled: true
-    uri: ${AI_GATEWAY_URI:http://127.0.0.1:8015}
-    public-prefix: /ai
-    target-prefix: /api

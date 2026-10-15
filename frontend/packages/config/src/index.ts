@@ -19,6 +19,7 @@ export const appNav = [
   { label: "题库", href: "/problems" },
   { label: "训练", href: "/training" },
   { label: "考试", href: "/exams" },
+  { label: "Skills", href: "/skills" },
   { label: "我的", href: "/me" }
 ];
 
@@ -30,6 +31,7 @@ export const appQuickLinks = [
 
 export const adminNav = [
   { label: "概览", href: "/" },
+  { label: "Skill 治理", href: "/skills" },
   { label: "公告管理", href: "/notices" },
   { label: "题目管理", href: "/questions" },
   { label: "考试管理", href: "/exams" },

@@ -9,14 +9,3 @@ spring:
           uri: lb://oj-friend
           predicates:
             - Path=/friend/**
-        - id: oj-agent
-          uri: lb://oj-agent
-          predicates:
-            - Path=/ai/**
-
-ai:
-  gateway:
-    route-enabled: true
-    uri: ${AI_GATEWAY_URI:lb://oj-agent}
-    public-prefix: /ai
-    target-prefix: /api
