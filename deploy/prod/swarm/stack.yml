@@ -273,8 +273,10 @@ services:
 
 configs:
   prod_nginx_conf:
+    name: ${STACK_NAME}_prod_nginx_conf_${NGINX_CONFIG_DIGEST}
     file: ../nginx/nginx.conf
   prod_nginx_default_conf:
+    name: ${STACK_NAME}_prod_nginx_default_conf_${NGINX_CONFIG_DIGEST}
     file: ../nginx/conf.d/default.conf
 
 networks:

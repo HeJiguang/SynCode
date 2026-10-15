@@ -82,6 +82,29 @@ load_env_file "$STACK_ENV_FILE"
 
 cd "$REPO_ROOT"
 
+hash_nginx_configs() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | awk '{print substr($1, 1, 12)}'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 | awk '{print substr($1, 1, 12)}'
+  else
+    echo "sha256sum or shasum is required to version Swarm configs" >&2
+    return 1
+  fi
+}
+
+if [[ -z "${NGINX_CONFIG_DIGEST:-}" ]]; then
+  NGINX_CONFIG_DIGEST="$(
+    {
+      cat deploy/prod/nginx/nginx.conf
+      printf '\n--syncode-nginx-config-boundary--\n'
+      cat deploy/prod/nginx/conf.d/default.conf
+    } | hash_nginx_configs
+  )"
+fi
+export NGINX_CONFIG_DIGEST
+echo "[deploy] nginx config version: ${NGINX_CONFIG_DIGEST}"
+
 if [[ "$BUILD_LOCAL_IMAGES" == "true" ]]; then
   STACK_ENV_FILE="$STACK_ENV_FILE" "$SCRIPT_DIR/build-images.sh"
 fi

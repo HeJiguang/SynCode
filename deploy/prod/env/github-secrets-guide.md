@@ -32,10 +32,14 @@ The test values must not reference production databases, queues, Redis namespace
 - `SYNCODE_DB_URL_PROD`
 - `SYNCODE_DB_USER_PROD`
 - `SYNCODE_DB_PASSWORD_PROD`
+- `MYSQL_APP_PASSWORD`: current password used by deployed services when dedicated migration credentials are absent.
 
 These are used only by the manually approved production workflow to run Flyway before service rollout. Grant schema migration permissions without granting unrelated administrative privileges.
 
-When these secrets are absent, the production workflow falls back to the `MYSQL_HOST` / `MYSQL_DATABASE` / `MYSQL_APP_USER` / `MYSQL_PASSWORD` values inside `RUNTIME_ENV_PROD`, so production can still migrate with the application database account. Prefer the dedicated secrets when tighter privileges are required.
+When these secrets are absent, the production workflow derives the host, database, and user from
+`RUNTIME_ENV_PROD` and uses the repository-level `MYSQL_APP_PASSWORD`. The same current password is written
+to the temporary runtime env before rollout, so Flyway and the deployed services cannot drift after a
+database password rotation. Prefer the dedicated migration secrets when tighter privileges are required.
 
 ### `DEPLOY_SSH_HOST`
 
