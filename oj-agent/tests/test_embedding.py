@@ -15,11 +15,21 @@ class _Vector:
 
 
 def test_local_fastembed_generates_configured_vectors(monkeypatch, tmp_path):
-    created: list[tuple[str, str, int]] = []
+    created: list[tuple[str, str, int, bool, str]] = []
 
     class FakeTextEmbedding:
-        def __init__(self, *, model_name: str, cache_dir: str, threads: int) -> None:
-            created.append((model_name, cache_dir, threads))
+        def __init__(
+            self,
+            *,
+            model_name: str,
+            cache_dir: str,
+            threads: int,
+            local_files_only: bool,
+            specific_model_path: str,
+        ) -> None:
+            created.append(
+                (model_name, cache_dir, threads, local_files_only, specific_model_path)
+            )
 
         def embed(self, texts: list[str]):
             return [_Vector([float(index), 1.0, 2.0]) for index, _ in enumerate(texts)]
@@ -30,6 +40,7 @@ def test_local_fastembed_generates_configured_vectors(monkeypatch, tmp_path):
     monkeypatch.setenv("SYNCODE_SKILL_EMBEDDING_DIMENSIONS", "3")
     monkeypatch.setenv("SYNCODE_SKILL_EMBEDDING_THREADS", "1")
     monkeypatch.setenv("FASTEMBED_CACHE_PATH", str(tmp_path / "models"))
+    monkeypatch.setenv("FASTEMBED_MODEL_PATH", str(tmp_path / "bge-small-zh"))
     EmbeddingClient._local_models.clear()
 
     client = EmbeddingClient()
@@ -38,5 +49,12 @@ def test_local_fastembed_generates_configured_vectors(monkeypatch, tmp_path):
         [0.0, 1.0, 2.0],
         [1.0, 1.0, 2.0],
     ]
-    assert created == [("test-zh-model", str(tmp_path / "models"), 1)]
-
+    assert created == [
+        (
+            "test-zh-model",
+            str(tmp_path / "models"),
+            1,
+            True,
+            str(tmp_path / "bge-small-zh"),
+        )
+    ]
