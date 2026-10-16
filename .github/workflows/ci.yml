@@ -255,6 +255,7 @@ jobs:
           deploy/prod/scripts/test-configure-database-password.sh
           deploy/prod/scripts/test-hermes-default-env.sh
           deploy/prod/scripts/test-hermes-skills-api-compat.sh
+          deploy/prod/scripts/test-hermes-skills-toolset-policy.sh
           TEST_BASE_URL=http://127.0.0.1 SYNCODE_IMPORT_DRY_RUN=1 deploy/test/scripts/import-leetcode-hot-100.sh
           deploy/prod/scripts/test-wait-for-stack.sh
 

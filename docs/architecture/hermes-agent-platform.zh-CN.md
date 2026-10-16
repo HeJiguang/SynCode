@@ -108,6 +108,7 @@ memory:
 platform_toolsets:
   api_server:
     - memory
+    - skills
     - syncode
 ```
 
@@ -434,7 +435,7 @@ Skill 包先写入临时目录，完成校验后原子替换目标目录。数�
 - 做题 Event、Episode、Pattern 和知识状态投影。
 - Hermes `MemoryProvider.prefetch()` 核心召回和证据展开工具。
 - 数据指纹增量刷新、ES 检索降级、原子写入和失败补偿。
-- Profile 工具集限制为 `memory + syncode`。
+- Profile 工具集限制为 `memory + skills + syncode`，其中 `skills` 在镜像构建时强制校验为只读的 `skills_list + skill_view`。
 
 ### 12.2 仍需完成的生产验收
 

@@ -118,7 +118,7 @@ class HermesProfileProvisioner:
                     "timeout_seconds": 4.0,
                 },
             },
-            "platform_toolsets": {"api_server": ["memory", "syncode"]},
+            "platform_toolsets": {"api_server": ["memory", "skills", "syncode"]},
             "mcp_servers": {
                 "syncode": {
                     "url": self.mcp_url,
