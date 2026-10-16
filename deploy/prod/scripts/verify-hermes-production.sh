@@ -86,8 +86,8 @@ if memory_result.get("memory_domain") != "syncode_learning":
 
 config_path = Path("/var/lib/hermes/profiles") / profile / "config.yaml"
 config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-if config.get("platform_toolsets", {}).get("api_server") != ["memory", "syncode"]:
-    raise RuntimeError("profile exposes toolsets other than memory + syncode")
+if config.get("platform_toolsets", {}).get("api_server") != ["memory", "skills", "syncode"]:
+    raise RuntimeError("profile does not expose exactly memory + read-only skills + syncode")
 memory = config.get("memory", {})
 if memory.get("provider") != "syncode-learning-memory":
     raise RuntimeError("SynCode learning memory is not the Hermes core memory provider")
@@ -236,12 +236,29 @@ events_request = Request(
     headers={key: value for key, value in headers.items() if key != "Content-Type"},
 )
 with urlopen(events_request, timeout=240) as response:
-    events = response.read(2_000_000).decode("utf-8", errors="replace")
-if "event: run.completed" not in events:
-    raise RuntimeError(f"Hermes run did not complete; final stream tail: {events[-1200:]}")
-if "get_my_learning_profile" not in events:
+    event_stream = response.read(2_000_000).decode("utf-8", errors="replace")
+
+events = []
+for line in event_stream.splitlines():
+    if not line.startswith("data:"):
+        continue
+    try:
+        payload = json.loads(line.removeprefix("data:").lstrip())
+    except json.JSONDecodeError:
+        continue
+    if isinstance(payload, dict):
+        events.append(payload)
+
+if not any(event.get("event") == "run.completed" for event in events):
+    raise RuntimeError(f"Hermes run did not complete; final stream tail: {event_stream[-1200:]}")
+started_tools = [event for event in events if event.get("event") == "tool.started"]
+if not any(event.get("tool") == "get_my_learning_profile" for event in started_tools):
     raise RuntimeError("Hermes completed without the required SynCode MCP tool call")
-if "skill_view" not in events or "syncode-training-plan" not in events:
+if not any(
+    event.get("tool") == "skill_view"
+    and str(event.get("preview") or "").split(" → ", 1)[0].strip() == "syncode-training-plan"
+    for event in started_tools
+):
     raise RuntimeError("Hermes completed without loading the required platform Skill")
 print(f"[verify-hermes] live run completed: {run_id}")
 PY

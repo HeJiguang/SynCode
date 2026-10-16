@@ -179,7 +179,7 @@ def test_profile_provisioning_is_idempotent_and_scoped(monkeypatch, tmp_path):
 
     profile_dir = tmp_path / "hermes" / "profiles" / "syncode-u7"
     config = yaml.safe_load((profile_dir / "config.yaml").read_text(encoding="utf-8"))
-    assert config["platform_toolsets"]["api_server"] == ["memory", "syncode"]
+    assert config["platform_toolsets"]["api_server"] == ["memory", "skills", "syncode"]
     assert config["memory"] == {
         "provider": "syncode-learning-memory",
         "syncode-learning-memory": {
@@ -195,6 +195,21 @@ def test_profile_provisioning_is_idempotent_and_scoped(monkeypatch, tmp_path):
     assert (profile_dir / ".env").stat().st_mode & 0o777 == 0o600
     assert (profile_dir / "config.yaml").stat().st_mode & 0o777 == 0o600
     assert (profile_dir / "plugins" / "syncode-learning-memory" / "__init__.py").is_file()
+
+
+def test_existing_profile_reconciles_read_only_skills_toolset(monkeypatch, tmp_path):
+    _profile_environment(monkeypatch, tmp_path)
+    provisioner = HermesProfileProvisioner()
+    assert provisioner.ensure(user_id="7", profile="syncode-u7") is True
+
+    config_file = tmp_path / "hermes" / "profiles" / "syncode-u7" / "config.yaml"
+    config = yaml.safe_load(config_file.read_text(encoding="utf-8"))
+    config["platform_toolsets"]["api_server"] = ["memory", "syncode"]
+    config_file.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    assert provisioner.ensure(user_id="7", profile="syncode-u7") is False
+    reconciled = yaml.safe_load(config_file.read_text(encoding="utf-8"))
+    assert reconciled["platform_toolsets"]["api_server"] == ["memory", "skills", "syncode"]
 
 
 def test_core_learning_memory_context_uses_profile_scoped_user_and_related_tags(monkeypatch):

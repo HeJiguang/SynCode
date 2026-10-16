@@ -6,7 +6,7 @@
 
 ### 30 秒版本
 
-我基于 Hermes 做了一套适合多用户教育平台的 Agent 基础设施。第一部分是 Skill 演化：用 Profile 隔离个人 Skill，通过 Elasticsearch 的 BM25、Dense Vector 和 RRF 发现跨用户共性，再经过 LLM 泛化和管理员审核发布为只读平台 Skill。第二部分是学习记忆：把提交和考试投影成事件、经历、模式和知识状态，通过 Hermes MemoryProvider 在每轮推理前自动召回。第三部分是执行安全：服务端固定只开放 `memory + syncode` 工具，用户代码仍然进入判题沙箱，Hermes 不接触宿主机命令执行。
+我基于 Hermes 做了一套适合多用户教育平台的 Agent 基础设施。第一部分是 Skill 演化：用 Profile 隔离个人 Skill，通过 Elasticsearch 的 BM25、Dense Vector 和 RRF 发现跨用户共性，再经过 LLM 泛化和管理员审核发布为只读平台 Skill。第二部分是学习记忆：把提交和考试投影成事件、经历、模式和知识状态，通过 Hermes MemoryProvider 在每轮推理前自动召回。第三部分是执行安全：服务端固定只开放 `memory + skills + syncode`，其中 `skills` 只允许列出和读取 Skill；用户代码仍然进入判题沙箱，Hermes 不接触宿主机命令执行。
 
 ### 2 分钟版本
 
@@ -18,7 +18,7 @@
 
 学习记忆方面，我把提交和考试投影为 Event、Episode 和 Pattern，再按知识点计算掌握度、置信度、趋势和复习优先级。它不是模型主动调用的 MCP 召回工具，而是接入 Hermes MemoryManager 的 Provider，在每轮主要推理前自动注入相关记忆。MCP 只在需要核实时展开证据。
 
-安全上，Profile 只启用 `memory + syncode`，不暴露 terminal、execute code 和 file 等工具。用户代码继续走受限判题容器。这样保留了 Hermes 的自主规划能力，同时把身份、数据和执行权限控制在服务端。
+安全上，Profile 只启用 `memory + skills + syncode`，并在镜像构建时校验 `skills` 只能包含 `skills_list` 和 `skill_view`，不暴露 terminal、execute code 和 file 等工具。用户代码继续走受限判题容器。这样保留了 Hermes 的自主规划能力，同时把身份、数据和执行权限控制在服务端。
 
 ## 2. 架构与边界
 
@@ -154,7 +154,7 @@ Hermes 原生记忆保存目标和偏好，例如用户希望先提示再给答�
 
 ### Q32：用户让 Hermes 执行系统命令怎么办？
 
-模型只能调用服务端注册给它的工具。SynCode Profile 当前只启用 `memory + syncode`，没有 terminal、execute code、process manage、file 或 browser。用户即使在提示词或个人 Skill 中要求执行命令，也无法获得一个不存在的工具。
+模型只能调用服务端注册给它的工具。SynCode Profile 当前只启用 `memory + skills + syncode`，其中 `skills` 只包含 `skills_list` 和 `skill_view`；没有 terminal、execute code、process manage、file 或 browser。用户即使在提示词或个人 Skill 中要求执行命令，也无法获得一个不存在的工具。
 
 ### Q33：如果以后需要让 Agent 运行代码怎么办？
 
