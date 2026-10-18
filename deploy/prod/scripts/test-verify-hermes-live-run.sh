@@ -24,7 +24,7 @@ stream = """event: tool.started
 data: {"tool":"skill_view","preview":"syncode-training-plan → SKILL.md"}
 
 event: tool.started
-data: {"tool_name":"get_my_learning_profile","preview":""}
+data: {"tool_name":"mcp__syncode__get_my_learning_profile","preview":""}
 
 event: run.completed
 data: {"output":"已做 3 题"}
@@ -36,6 +36,12 @@ assert [event["event"] for event in events] == [
     "run.completed",
 ]
 module.assert_required_tools(events)
+module.assert_required_tools(
+    [
+        {"event": "tool.started", "tool": "skill_view", "preview": "syncode-training-plan"},
+        {"event": "tool.started", "tool": "get_my_learning_profile", "preview": ""},
+    ]
+)
 
 try:
     module.assert_required_tools(

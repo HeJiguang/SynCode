@@ -68,7 +68,11 @@ def started_tools(events: Iterable[dict[str, Any]]) -> list[dict[str, str]]:
 def assert_required_tools(events: list[dict[str, Any]]) -> None:
     tools = started_tools(events)
     diagnostics = json.dumps(tools, ensure_ascii=False)
-    if not any(tool["tool"] == "get_my_learning_profile" for tool in tools):
+    accepted_profile_tools = {
+        "get_my_learning_profile",
+        "mcp__syncode__get_my_learning_profile",
+    }
+    if not any(tool["tool"] in accepted_profile_tools for tool in tools):
         raise RuntimeError(
             "Hermes completed without the required SynCode MCP tool call; "
             f"started_tools={diagnostics}"
