@@ -43,6 +43,7 @@ def test_training_plan_filters_unknown_questions(monkeypatch):
             trace_id="trace-1",
             user_id=1,
             conversation_id="training-user-1",
+            user_request="两周内补强哈希表和边界处理",
             candidate_questions=[QuestionCandidate(question_id=101, title="Two Sum")],
         )
     )
@@ -50,3 +51,46 @@ def test_training_plan_filters_unknown_questions(monkeypatch):
     assert [task.question_id for task in response.tasks] == [101]
     assert response.weak_points == "hash table、边界处理"
     assert response.tasks[0].knowledge_tags_snapshot == "array、hash table"
+
+
+def test_training_plan_prompt_requires_public_skill_and_includes_user_request(monkeypatch):
+    captured = []
+
+    class Runtime:
+        def generate_json(self, request):
+            captured.append(request)
+            return (
+                AgentRunResult(
+                    text="{}",
+                    runtime_name="hermes",
+                    provider="deepseek",
+                    model_name="deepseek-chat",
+                ),
+                {
+                    "tasks": [
+                        {
+                            "task_type": "question",
+                            "question_id": 101,
+                            "title_snapshot": "Two Sum",
+                            "task_order": 1,
+                        }
+                    ]
+                },
+            )
+
+    import app.services.training_planner as planner
+
+    monkeypatch.setattr(planner, "build_agent_runtime", lambda: Runtime())
+    build_training_plan(
+        TrainingPlanRequest(
+            trace_id="trace-2",
+            user_id=7,
+            conversation_id="training-plan:7",
+            user_request="每天训练 40 分钟，重点补动态规划",
+            candidate_questions=[QuestionCandidate(question_id=101, title="Two Sum")],
+        )
+    )
+
+    assert "skill_view" in captured[0].system_prompt
+    assert "syncode-training-plan" in captured[0].system_prompt
+    assert "每天训练 40 分钟，重点补动态规划" in captured[0].user_prompt

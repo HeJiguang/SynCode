@@ -15,6 +15,10 @@ public class AgentTrainingPlanRequest {
 
     private Long userId;
 
+    private String conversationId;
+
+    private String userRequest;
+
     private String currentLevel;
 
     private String targetDirection;

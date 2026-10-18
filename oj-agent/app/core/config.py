@@ -24,6 +24,8 @@ class AgentSettings:
     agent_runtime_fallback_to_direct: bool = True
     hermes_base_url: str | None = None
     hermes_api_key: str | None = None
+    hermes_provision_url: str | None = None
+    hermes_provision_key: str | None = None
     hermes_provider: str = "deepseek"
     hermes_chat_model: str | None = None
     hermes_training_model: str | None = None
@@ -103,6 +105,8 @@ def load_settings() -> AgentSettings:
         agent_runtime_fallback_to_direct=_bool("OJ_AGENT_RUNTIME_FALLBACK_TO_DIRECT", True),
         hermes_base_url=os.getenv("OJ_AGENT_HERMES_BASE_URL"),
         hermes_api_key=os.getenv("OJ_AGENT_HERMES_API_KEY"),
+        hermes_provision_url=os.getenv("OJ_AGENT_HERMES_PROVISION_URL"),
+        hermes_provision_key=os.getenv("OJ_AGENT_HERMES_PROVISION_KEY"),
         hermes_provider=os.getenv("OJ_AGENT_HERMES_PROVIDER", "deepseek"),
         hermes_chat_model=os.getenv("OJ_AGENT_HERMES_CHAT_MODEL"),
         hermes_training_model=os.getenv("OJ_AGENT_HERMES_TRAINING_MODEL"),

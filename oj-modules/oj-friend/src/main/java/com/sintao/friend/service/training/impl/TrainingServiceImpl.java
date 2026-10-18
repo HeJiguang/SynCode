@@ -42,6 +42,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -53,6 +54,7 @@ public class TrainingServiceImpl implements ITrainingService {
     private static final int PLAN_STATUS_EXPIRED = 3;
     private static final int TASK_STATUS_PENDING = 0;
     private static final int TASK_STATUS_DONE = 1;
+    private static final int MAX_USER_REQUEST_LENGTH = 1000;
 
     @Autowired
     private TrainingProfileMapper trainingProfileMapper;
@@ -114,6 +116,10 @@ public class TrainingServiceImpl implements ITrainingService {
     public TrainingCurrentVO generate(TrainingGenerateDTO trainingGenerateDTO) {
         Long userId = currentUserId();
         TrainingGenerateDTO requestDTO = trainingGenerateDTO == null ? new TrainingGenerateDTO() : trainingGenerateDTO;
+        if (StrUtil.isBlank(requestDTO.getPrompt()) || requestDTO.getPrompt().trim().length() > MAX_USER_REQUEST_LENGTH) {
+            throw new ServiceException(ResultCode.FAILED_PARAMS_VALIDATE);
+        }
+        requestDTO.setPrompt(requestDTO.getPrompt().trim());
         TrainingProfile profile = loadProfile(userId);
 
         List<UserSubmit> recentSubmissions = loadRecentSubmissions(userId);
@@ -137,9 +143,7 @@ public class TrainingServiceImpl implements ITrainingService {
                 candidateExams
         );
         AgentTrainingPlanResponse agentResponse = trainingAgentClient.generatePlan(agentRequest);
-        if (agentResponse == null || agentResponse.getTasks() == null || agentResponse.getTasks().isEmpty()) {
-            throw new ServiceException(ResultCode.ERROR);
-        }
+        validateAgentResponse(agentResponse, candidateQuestions, candidateExams, requestDTO.getBasedOnExamId());
 
         expireActivePlans(userId);
 
@@ -339,6 +343,8 @@ public class TrainingServiceImpl implements ITrainingService {
         AgentTrainingPlanRequest request = new AgentTrainingPlanRequest();
         request.setTraceId(UUID.randomUUID().toString());
         request.setUserId(userId);
+        request.setConversationId("training-plan:" + userId);
+        request.setUserRequest(trainingGenerateDTO.getPrompt());
         request.setCurrentLevel(profile == null ? "starter" : defaultIfBlank(profile.getCurrentLevel(), "starter"));
         request.setTargetDirection(resolveTargetDirection(trainingGenerateDTO, profile));
         request.setBasedOnExamId(trainingGenerateDTO.getBasedOnExamId());
@@ -390,6 +396,46 @@ public class TrainingServiceImpl implements ITrainingService {
         }
         request.setCandidateExams(examCandidates);
         return request;
+    }
+
+    private void validateAgentResponse(
+            AgentTrainingPlanResponse response,
+            List<Question> candidateQuestions,
+            List<Exam> candidateExams,
+            Long basedOnExamId) {
+        if (response == null || response.getTasks() == null || response.getTasks().isEmpty()) {
+            throw new ServiceException(ResultCode.ERROR);
+        }
+        Set<Long> allowedQuestionIds = candidateQuestions.stream()
+                .map(Question::getQuestionId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Set<Long> allowedExamIds = candidateExams.stream()
+                .map(Exam::getExamId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (basedOnExamId != null) {
+            allowedExamIds.add(basedOnExamId);
+        }
+
+        for (AgentTrainingPlanResponse.PlanTask task : response.getTasks()) {
+            if (task == null || StrUtil.isBlank(task.getTaskType())) {
+                throw new ServiceException(ResultCode.ERROR);
+            }
+            String taskType = task.getTaskType().trim().toLowerCase();
+            if ("test".equals(taskType)) {
+                if (task.getQuestionId() != null || !allowedExamIds.contains(task.getExamId())) {
+                    throw new ServiceException(ResultCode.ERROR);
+                }
+                continue;
+            }
+            if (("question".equals(taskType) || "review".equals(taskType))
+                    && task.getExamId() == null
+                    && allowedQuestionIds.contains(task.getQuestionId())) {
+                continue;
+            }
+            throw new ServiceException(ResultCode.ERROR);
+        }
     }
 
     private List<TrainingTask> buildTasks(Long userId, Long planId, AgentTrainingPlanResponse agentResponse) {

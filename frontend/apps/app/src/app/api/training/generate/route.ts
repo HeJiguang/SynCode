@@ -7,6 +7,7 @@ import { resolveApiRouteError } from "../../../../lib/api-route-error";
 import { getServerAccessToken } from "../../../../lib/server-auth";
 
 type GenerateBody = {
+  prompt?: string;
   targetDirection?: string;
   preferredCount?: number;
   basedOnExamId?: number;
@@ -21,10 +22,18 @@ export async function POST(request: Request) {
 
   try {
     const body = (await request.json().catch(() => ({}))) as GenerateBody;
+    const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
+    if (!prompt) {
+      return NextResponse.json({ message: "请填写本轮训练诉求。" }, { status: 400 });
+    }
+    if (prompt.length > 1000) {
+      return NextResponse.json({ message: "训练诉求不能超过 1000 个字符。" }, { status: 400 });
+    }
     const payload = await requestJson<ApiEnvelope<unknown>>("/friend/training/generate", {
       method: "POST",
       token,
       body: JSON.stringify({
+        prompt,
         targetDirection: body.targetDirection?.trim() || undefined,
         preferredCount: body.preferredCount,
         basedOnExamId: body.basedOnExamId,

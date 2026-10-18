@@ -3,7 +3,7 @@
 import * as React from "react";
 
 import type { TrainingTask } from "@aioj/api";
-import { Button, Panel, Tag } from "@aioj/ui";
+import { Button, Panel, Tag, Textarea } from "@aioj/ui";
 
 import { appApiPath, appPublicPath } from "../lib/paths";
 import { getTrainingStatusLabel, getTrainingStatusTone } from "../lib/presentation";
@@ -27,12 +27,18 @@ function resolveTaskHref(task: TrainingTask) {
 }
 
 export function TrainingActions({ direction, tasks, demoMode = false }: TrainingActionsProps) {
+  const [prompt, setPrompt] = React.useState("");
   const [loadingKey, setLoadingKey] = React.useState<string | null>(null);
   const [message, setMessage] = React.useState<string | null>(null);
 
   async function generatePlan() {
     if (demoMode) {
       setMessage("测试体验模式不会生成或保存新的训练计划。");
+      return;
+    }
+    const userRequest = prompt.trim();
+    if (!userRequest) {
+      setMessage("请先填写本轮训练诉求。");
       return;
     }
     setLoadingKey("generate");
@@ -42,7 +48,10 @@ export function TrainingActions({ direction, tasks, demoMode = false }: Training
       const response = await fetch(appApiPath("/training/generate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetDirection: direction || undefined })
+        body: JSON.stringify({
+          prompt: userRequest,
+          targetDirection: direction || undefined
+        })
       });
       const payload = (await response.json().catch(() => null)) as { message?: string } | null;
       if (!response.ok) {
@@ -84,14 +93,35 @@ export function TrainingActions({ direction, tasks, demoMode = false }: Training
 
   return (
     <Panel className="syncode-page-section p-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <h3 className="text-base font-semibold text-[var(--text-primary)]">任务</h3>
-        <Button data-testid="training-generate" onClick={() => void generatePlan()} disabled={loadingKey === "generate"}>
-          {loadingKey === "generate" ? "生成中..." : "生成计划"}
-        </Button>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <label htmlFor="training-request" className="text-sm font-medium text-[var(--text-primary)]">
+            本轮训练诉求
+          </label>
+          <span className="text-xs text-[var(--text-muted)]">{prompt.length}/1000</span>
+        </div>
+        <Textarea
+          id="training-request"
+          data-testid="training-request"
+          value={prompt}
+          maxLength={1000}
+          rows={4}
+          onChange={(event) => {
+            setPrompt(event.target.value);
+            if (message) setMessage(null);
+          }}
+          placeholder="例如：我想在两周内补强动态规划，每天可以训练 40 分钟。"
+          disabled={loadingKey === "generate"}
+        />
+        <div className="flex justify-end">
+          <Button data-testid="training-generate" onClick={() => void generatePlan()} disabled={loadingKey === "generate"}>
+            {loadingKey === "generate" ? "生成中..." : "生成计划"}
+          </Button>
+        </div>
       </div>
 
-      <div className="mt-4 space-y-3">
+      <h3 className="mt-6 text-base font-semibold text-[var(--text-primary)]">任务</h3>
+      <div className="mt-3 space-y-3">
         {tasks.map((task) => {
           const href = resolveTaskHref(task);
           return (

@@ -195,8 +195,15 @@ services:
     env_file:
       - ../env/runtime.env
     environment:
+      OJ_AGENT_RUNTIME_PROVIDER: hermes
+      OJ_AGENT_RUNTIME_FALLBACK_TO_DIRECT: "false"
       OJ_AGENT_HERMES_BASE_URL: http://hermes:8642
       OJ_AGENT_HERMES_API_KEY: ${SYNCODE_HERMES_API_KEY}
+      OJ_AGENT_HERMES_PROVISION_URL: http://oj-agent-tools:8016/internal/profiles/ensure
+      OJ_AGENT_HERMES_PROVISION_KEY: ${SYNCODE_HERMES_PROVISION_KEY}
+      OJ_AGENT_HERMES_PROVIDER: deepseek
+      OJ_AGENT_HERMES_CHAT_MODEL: ${HERMES_MODEL:-deepseek-chat}
+      OJ_AGENT_HERMES_TRAINING_MODEL: ${HERMES_MODEL:-deepseek-chat}
       OJ_AGENT_RUNTIME_DATA_DIR: /app/runtime-artifacts
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
@@ -206,7 +213,7 @@ services:
       - backend
       - agent
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8015/health', timeout=3)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8015/ready', timeout=3)"]
       interval: 30s
       timeout: 5s
       retries: 5

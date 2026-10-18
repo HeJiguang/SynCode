@@ -28,7 +28,8 @@ def build_agent_runtime(settings: AgentSettings | None = None) -> AgentRuntime:
     if not hermes.is_available():
         raise RuntimeError(
             "Hermes Agent Runtime 配置不完整，请设置 OJ_AGENT_HERMES_BASE_URL、"
-            "OJ_AGENT_HERMES_API_KEY 和模型名称。"
+            "OJ_AGENT_HERMES_API_KEY、OJ_AGENT_HERMES_PROVISION_URL、"
+            "OJ_AGENT_HERMES_PROVISION_KEY 和模型名称。"
         )
     if settings.agent_runtime_fallback_to_direct and direct.is_available():
         return FallbackAgentRuntime(hermes, direct)
