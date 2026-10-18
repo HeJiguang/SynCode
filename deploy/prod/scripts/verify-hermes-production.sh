@@ -2,6 +2,7 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STACK_NAME="${STACK_NAME:-onlineoj-prod}"
 VERIFY_HERMES_LIVE_RUN="${VERIFY_HERMES_LIVE_RUN:-true}"
 VERIFY_HERMES_USER_ID="${VERIFY_HERMES_USER_ID:-900000000000000001}"
@@ -186,82 +187,7 @@ if [[ "$VERIFY_HERMES_LIVE_RUN" == "true" ]]; then
   echo "[verify-hermes] running a real Hermes + core-memory + MCP + SSE acceptance turn"
   docker exec -i \
     -e "VERIFY_HERMES_USER_ID=${VERIFY_HERMES_USER_ID}" \
-    "$tools_container" python - <<'PY'
-from __future__ import annotations
-
-import json
-import os
-from urllib.error import HTTPError
-from urllib.request import Request, urlopen
-from uuid import uuid4
-
-
-user_id = os.environ["VERIFY_HERMES_USER_ID"]
-profile = f"syncode-u{user_id}"
-api_key = os.environ["HERMES_API_SERVER_KEY"]
-base_url = f"http://hermes:8642/p/{profile}"
-verification_key = f"syncode-production-verification-{uuid4().hex}"
-headers = {
-    "Authorization": f"Bearer {api_key}",
-    "Content-Type": "application/json",
-    "X-Hermes-Session-Key": verification_key,
-}
-request = Request(
-    f"{base_url}/v1/runs",
-    data=json.dumps(
-        {
-            "input": (
-                "先用 skill_view 加载 syncode-training-plan Skill，"
-                "再调用 get_my_learning_profile 工具读取当前学习档案，"
-                "然后只用一句中文报告已做题数；不要猜测工具没有返回的数据。"
-            )
-        },
-        ensure_ascii=False,
-    ).encode("utf-8"),
-    headers=headers,
-    method="POST",
-)
-try:
-    with urlopen(request, timeout=30) as response:
-        created = json.loads(response.read(256_000))
-except HTTPError as exc:
-    detail = exc.read(256_000).decode("utf-8", errors="replace")
-    raise RuntimeError(f"Hermes run creation failed with HTTP {exc.code}: {detail}") from exc
-run_id = str(created.get("run_id") or "")
-if not run_id:
-    raise RuntimeError(f"Hermes did not return run_id: {created}")
-
-events_request = Request(
-    f"{base_url}/v1/runs/{run_id}/events",
-    headers={key: value for key, value in headers.items() if key != "Content-Type"},
-)
-with urlopen(events_request, timeout=240) as response:
-    event_stream = response.read(2_000_000).decode("utf-8", errors="replace")
-
-events = []
-for line in event_stream.splitlines():
-    if not line.startswith("data:"):
-        continue
-    try:
-        payload = json.loads(line.removeprefix("data:").lstrip())
-    except json.JSONDecodeError:
-        continue
-    if isinstance(payload, dict):
-        events.append(payload)
-
-if not any(event.get("event") == "run.completed" for event in events):
-    raise RuntimeError(f"Hermes run did not complete; final stream tail: {event_stream[-1200:]}")
-started_tools = [event for event in events if event.get("event") == "tool.started"]
-if not any(event.get("tool") == "get_my_learning_profile" for event in started_tools):
-    raise RuntimeError("Hermes completed without the required SynCode MCP tool call")
-if not any(
-    event.get("tool") == "skill_view"
-    and str(event.get("preview") or "").split(" → ", 1)[0].strip() == "syncode-training-plan"
-    for event in started_tools
-):
-    raise RuntimeError("Hermes completed without loading the required platform Skill")
-print(f"[verify-hermes] live run completed: {run_id}")
-PY
+    "$tools_container" python - < "$SCRIPT_DIR/verify-hermes-live-run.py"
 elif [[ "$VERIFY_HERMES_LIVE_RUN" != "false" ]]; then
   echo "VERIFY_HERMES_LIVE_RUN must be true or false" >&2
   exit 1
