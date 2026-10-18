@@ -7,6 +7,8 @@ import lombok.Setter;
 @Setter
 public class TrainingGenerateDTO {
 
+    private String prompt;
+
     private String targetDirection;
 
     private Integer preferredCount;

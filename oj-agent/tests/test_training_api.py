@@ -39,6 +39,7 @@ def test_training_api_returns_generated_plan(monkeypatch):
         json={
             "trace_id": "trace-1",
             "user_id": 1,
+            "user_request": "补强哈希表基础",
             "candidate_questions": [{"question_id": 101, "title": "Two Sum"}],
         },
     )
@@ -54,7 +55,19 @@ def test_training_api_reports_unavailable_runtime(monkeypatch):
         raise RuntimeError("未配置可用的大模型。")
 
     monkeypatch.setattr(training_module, "build_training_plan", fail)
-    response = client.post("/api/training/plan", json={"trace_id": "trace-2", "user_id": 1})
+    response = client.post(
+        "/api/training/plan",
+        json={"trace_id": "trace-2", "user_id": 1, "user_request": "安排基础训练"},
+    )
 
     assert response.status_code == 503
     assert response.json()["detail"] == "未配置可用的大模型。"
+
+
+def test_training_api_rejects_blank_user_request():
+    response = client.post(
+        "/api/training/plan",
+        json={"trace_id": "trace-3", "user_id": 1, "user_request": "   "},
+    )
+
+    assert response.status_code == 422

@@ -18,6 +18,8 @@ def _hermes_settings(tmp_path: Path, monkeypatch, **changes):
         agent_runtime_provider="hermes",
         hermes_base_url="http://hermes.test:8642",
         hermes_api_key="sidecar-test-key",
+        hermes_provision_url="http://tools.test:8016/internal/profiles/ensure",
+        hermes_provision_key="provision-test-key",
         hermes_provider="deepseek",
         hermes_chat_model="deepseek-v4-pro",
         hermes_training_model="deepseek-v4-pro",
@@ -34,10 +36,19 @@ def _request(*, trace_id: str = "trace-1") -> AgentRunRequest:
         system_prompt="Return JSON.",
         user_prompt="Help me understand this problem.",
         capability="chat",
-        user_id="user-7",
+        user_id="7",
         trace_id=trace_id,
         conversation_id="question-42",
     )
+
+
+def _profile_provision_response(request: httpx.Request) -> httpx.Response | None:
+    if request.method != "POST" or request.url.path != "/internal/profiles/ensure":
+        return None
+    assert request.url.host == "tools.test"
+    assert request.headers["Authorization"] == "Bearer provision-test-key"
+    assert json.loads(request.content) == {"user_id": "7", "profile": "syncode-u7"}
+    return httpx.Response(200, json={"profile": "syncode-u7", "created": False})
 
 
 def test_hermes_runtime_creates_polls_and_resumes_session(tmp_path: Path, monkeypatch):
@@ -46,15 +57,18 @@ def test_hermes_runtime_creates_polls_and_resumes_session(tmp_path: Path, monkey
 
     def handler(request: httpx.Request) -> httpx.Response:
         nonlocal poll_count
+        provision_response = _profile_provision_response(request)
+        if provision_response is not None:
+            return provision_response
         assert request.headers["Authorization"] == "Bearer sidecar-test-key"
         assert request.headers["X-Hermes-Session-Key"].startswith("syncode:")
         assert request.headers["Idempotency-Key"].startswith("syncode-")
 
-        if request.method == "POST" and request.url.path == "/v1/runs":
+        if request.method == "POST" and request.url.path == "/p/syncode-u7/v1/runs":
             body = json.loads(request.content)
             post_bodies.append(body)
             return httpx.Response(202, json={"run_id": f"run-{len(post_bodies)}", "status": "started"})
-        if request.method == "GET" and request.url.path.startswith("/v1/runs/"):
+        if request.method == "GET" and request.url.path.startswith("/p/syncode-u7/v1/runs/"):
             poll_count += 1
             if poll_count == 1:
                 return httpx.Response(200, json={"status": "running", "session_id": "session-live-1"})
@@ -96,12 +110,15 @@ def test_hermes_runtime_creates_polls_and_resumes_session(tmp_path: Path, monkey
     assert post_bodies[1]["provider"] == "deepseek"
     assert post_bodies[1]["model"] == "deepseek-v4-pro"
     assert second_result.session_id == "session-live-2"
-    assert HermesSessionStore(tmp_path).get("user-7", "question-42") == "session-live-2"
+    assert HermesSessionStore(tmp_path).get("7", "question-42") == "session-live-2"
     client.close()
 
 
 def test_hermes_runtime_reports_terminal_failure(tmp_path: Path, monkeypatch):
     def handler(request: httpx.Request) -> httpx.Response:
+        provision_response = _profile_provision_response(request)
+        if provision_response is not None:
+            return provision_response
         if request.method == "POST":
             return httpx.Response(202, json={"run_id": "run-failed", "status": "started"})
         return httpx.Response(200, json={"status": "failed", "error": "provider unavailable"})
@@ -118,7 +135,10 @@ def test_hermes_runtime_stops_timed_out_run(tmp_path: Path, monkeypatch):
     stopped_runs: list[str] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        if request.method == "POST" and request.url.path == "/v1/runs":
+        provision_response = _profile_provision_response(request)
+        if provision_response is not None:
+            return provision_response
+        if request.method == "POST" and request.url.path == "/p/syncode-u7/v1/runs":
             return httpx.Response(202, json={"run_id": "run-timeout", "status": "started"})
         if request.method == "GET":
             return httpx.Response(200, json={"status": "running"})
@@ -135,7 +155,7 @@ def test_hermes_runtime_stops_timed_out_run(tmp_path: Path, monkeypatch):
 
     with pytest.raises(AgentRuntimeError, match="运行超时"):
         runtime.generate(_request())
-    assert stopped_runs == ["/v1/runs/run-timeout/stop"]
+    assert stopped_runs == ["/p/syncode-u7/v1/runs/run-timeout/stop"]
     client.close()
 
 
@@ -145,7 +165,10 @@ def test_hermes_runtime_denies_host_tool_and_continues_run(tmp_path: Path, monke
 
     def handler(request: httpx.Request) -> httpx.Response:
         nonlocal approval_resolved
-        if request.method == "POST" and request.url.path == "/v1/runs":
+        provision_response = _profile_provision_response(request)
+        if provision_response is not None:
+            return provision_response
+        if request.method == "POST" and request.url.path == "/p/syncode-u7/v1/runs":
             return httpx.Response(202, json={"run_id": "run-approval", "status": "started"})
         if request.method == "GET" and not approval_resolved:
             return httpx.Response(
@@ -191,7 +214,10 @@ def test_hermes_runtime_stops_approval_without_request_id(tmp_path: Path, monkey
     stopped_runs: list[str] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        if request.method == "POST" and request.url.path == "/v1/runs":
+        provision_response = _profile_provision_response(request)
+        if provision_response is not None:
+            return provision_response
+        if request.method == "POST" and request.url.path == "/p/syncode-u7/v1/runs":
             return httpx.Response(202, json={"run_id": "run-approval", "status": "started"})
         if request.method == "GET":
             return httpx.Response(200, json={"status": "waiting_for_approval", "approval": {}})
@@ -205,7 +231,19 @@ def test_hermes_runtime_stops_approval_without_request_id(tmp_path: Path, monkey
 
     with pytest.raises(AgentRuntimeError, match="缺少 request_id"):
         runtime.generate(_request())
-    assert stopped_runs == ["/v1/runs/run-approval/stop"]
+    assert stopped_runs == ["/p/syncode-u7/v1/runs/run-approval/stop"]
+    client.close()
+
+
+def test_hermes_runtime_rejects_non_numeric_user_id_before_provisioning(tmp_path: Path, monkeypatch):
+    client = httpx.Client(
+        base_url="http://hermes.test:8642/v1",
+        transport=httpx.MockTransport(lambda request: pytest.fail(f"Unexpected request: {request.url}")),
+    )
+    runtime = HermesAgentRuntime(_hermes_settings(tmp_path, monkeypatch), http_client=client)
+
+    with pytest.raises(AgentRuntimeError, match="user_id 为数字"):
+        runtime.generate(replace(_request(), user_id="user-7"))
     client.close()
 
 

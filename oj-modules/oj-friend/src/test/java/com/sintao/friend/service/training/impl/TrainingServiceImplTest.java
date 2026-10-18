@@ -37,6 +37,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -96,10 +97,12 @@ class TrainingServiceImplTest {
         exam.setEndTime(LocalDateTime.now().plusHours(2));
         exam.setStatus(1);
 
+        TrainingGenerateDTO generateDTO = new TrainingGenerateDTO();
+        generateDTO.setPrompt("两周内补强动态规划");
         AgentTrainingPlanRequest request = ReflectionTestUtils.invokeMethod(
                 trainingService,
                 "buildAgentRequest",
-                new TrainingGenerateDTO(),
+                generateDTO,
                 99L,
                 null,
                 Collections.emptyList(),
@@ -111,6 +114,37 @@ class TrainingServiceImplTest {
         assertEquals(1, request.getCandidateExams().size());
         assertEquals(9001L, request.getCandidateExams().get(0).getExamId());
         assertEquals("Stage Checkpoint", request.getCandidateExams().get(0).getTitle());
+        assertEquals("两周内补强动态规划", request.getUserRequest());
+        assertEquals("training-plan:99", request.getConversationId());
+    }
+
+    @Test
+    void generateShouldRejectMissingUserRequestBeforeLoadingTrainingData() {
+        ThreadLocalUtil.set(Constants.USER_ID, 99L);
+
+        assertThrows(com.sintao.common.security.exception.ServiceException.class,
+                () -> trainingService.generate(new TrainingGenerateDTO()));
+    }
+
+    @Test
+    void validateAgentResponseShouldRejectQuestionOutsideCandidateAllowlist() {
+        Question candidate = new Question();
+        candidate.setQuestionId(101L);
+        AgentTrainingPlanResponse.PlanTask task = new AgentTrainingPlanResponse.PlanTask();
+        task.setTaskType("question");
+        task.setQuestionId(999L);
+        AgentTrainingPlanResponse response = new AgentTrainingPlanResponse();
+        response.setTasks(List.of(task));
+
+        assertThrows(com.sintao.common.security.exception.ServiceException.class,
+                () -> ReflectionTestUtils.invokeMethod(
+                        trainingService,
+                        "validateAgentResponse",
+                        response,
+                        List.of(candidate),
+                        Collections.emptyList(),
+                        null
+                ));
     }
 
     @Test

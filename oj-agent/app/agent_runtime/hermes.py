@@ -1,5 +1,6 @@
 import hashlib
 from pathlib import Path
+import re
 import time
 from typing import Any
 
@@ -13,6 +14,7 @@ from app.llm.base import CHAT_CAPABILITY, TRAINING_CAPABILITY
 
 
 _TERMINAL_FAILURE_STATUSES = {"failed", "cancelled", "interrupted"}
+_USER_ID_PATTERN = re.compile(r"^[0-9]+$")
 
 
 class HermesAgentRuntime(AgentRuntime):
@@ -37,6 +39,8 @@ class HermesAgentRuntime(AgentRuntime):
         return bool(
             self.settings.hermes_base_url
             and self.settings.hermes_api_key
+            and self.settings.hermes_provision_url
+            and self.settings.hermes_provision_key
             and (self.settings.hermes_chat_model or self.settings.hermes_training_model)
         )
 
@@ -61,6 +65,9 @@ class HermesAgentRuntime(AgentRuntime):
             return self._generate_with_client(client, request)
 
     def _generate_with_client(self, client: httpx.Client, request: AgentRunRequest) -> AgentRunResult:
+        profile = self._profile_name(request.user_id)
+        self._ensure_profile(client, user_id=request.user_id, profile=profile)
+        api_prefix = self._profile_api_base_url(profile)
         session_key = self._session_key(request)
         headers = {
             "Authorization": f"Bearer {self.settings.hermes_api_key}",
@@ -78,7 +85,7 @@ class HermesAgentRuntime(AgentRuntime):
             if stored_session_id:
                 body["session_id"] = stored_session_id
 
-        created = self._request_json(client, "POST", "/runs", headers=headers, json=body)
+        created = self._request_json(client, "POST", f"{api_prefix}/runs", headers=headers, json=body)
         run_id = created.get("run_id")
         if not isinstance(run_id, str) or not run_id:
             raise AgentRuntimeError("Hermes 没有返回有效的 run_id。")
@@ -87,7 +94,7 @@ class HermesAgentRuntime(AgentRuntime):
         denied_approval_ids: set[str] = set()
         tool_decisions: list[dict[str, Any]] = []
         while True:
-            status_payload = self._request_json(client, "GET", f"/runs/{run_id}", headers=headers)
+            status_payload = self._request_json(client, "GET", f"{api_prefix}/runs/{run_id}", headers=headers)
             status = str(status_payload.get("status") or "").lower()
             session_id = status_payload.get("session_id")
             if request.conversation_id and isinstance(session_id, str) and session_id:
@@ -118,7 +125,7 @@ class HermesAgentRuntime(AgentRuntime):
                 approval = approval if isinstance(approval, dict) else {}
                 request_id = approval.get("request_id")
                 if not isinstance(request_id, str) or not request_id.strip():
-                    self._stop_run(client, run_id, headers)
+                    self._stop_run(client, api_prefix, run_id, headers)
                     raise AgentRuntimeError("Hermes 工具审批缺少 request_id，运行已停止。")
                 request_id = request_id.strip()
                 if request_id not in denied_approval_ids:
@@ -134,12 +141,12 @@ class HermesAgentRuntime(AgentRuntime):
                         )
                     )
                     if decision.decision is not ToolPolicyDecision.BLOCK:
-                        self._stop_run(client, run_id, headers)
+                        self._stop_run(client, api_prefix, run_id, headers)
                         raise AgentRuntimeError("Hermes 宿主机工具没有被 SynCode 权限策略拒绝，运行已停止。")
                     self._request_json(
                         client,
                         "POST",
-                        f"/runs/{run_id}/approval",
+                        f"{api_prefix}/runs/{run_id}/approval",
                         headers=headers,
                         json={"choice": "deny", "request_id": request_id},
                     )
@@ -165,7 +172,7 @@ class HermesAgentRuntime(AgentRuntime):
                 continue
 
             if time.monotonic() >= deadline:
-                self._stop_run(client, run_id, headers)
+                self._stop_run(client, api_prefix, run_id, headers)
                 raise AgentRuntimeError(f"Hermes 运行超时（run_id={run_id}）。")
 
             time.sleep(max(self.settings.hermes_poll_interval_seconds, 0.01))
@@ -181,15 +188,38 @@ class HermesAgentRuntime(AgentRuntime):
             raise AgentRuntimeError("Hermes API 返回了无效响应。")
         return payload
 
-    def _stop_run(self, client: httpx.Client, run_id: str, headers: dict[str, str]) -> None:
+    def _ensure_profile(self, client: httpx.Client, *, user_id: str, profile: str) -> None:
+        payload = self._request_json(
+            client,
+            "POST",
+            str(self.settings.hermes_provision_url),
+            headers={"Authorization": f"Bearer {self.settings.hermes_provision_key}"},
+            json={"user_id": user_id, "profile": profile},
+        )
+        if payload.get("profile") != profile:
+            raise AgentRuntimeError("Hermes Profile provision 返回了不匹配的 Profile。")
+
+    def _stop_run(
+        self,
+        client: httpx.Client,
+        api_prefix: str,
+        run_id: str,
+        headers: dict[str, str],
+    ) -> None:
         try:
-            client.post(f"/runs/{run_id}/stop", headers=headers)
+            client.post(f"{api_prefix}/runs/{run_id}/stop", headers=headers)
         except httpx.HTTPError:
             pass
 
     def _api_base_url(self) -> str:
         base_url = str(self.settings.hermes_base_url or "").rstrip("/")
         return base_url if base_url.endswith("/v1") else f"{base_url}/v1"
+
+    def _profile_api_base_url(self, profile: str) -> str:
+        base_url = str(self.settings.hermes_base_url or "").rstrip("/")
+        if base_url.endswith("/v1"):
+            base_url = base_url[:-3]
+        return f"{base_url}/p/{profile}/v1"
 
     @staticmethod
     def _idempotency_key(trace_id: str) -> str:
@@ -201,3 +231,10 @@ class HermesAgentRuntime(AgentRuntime):
         conversation_id = request.conversation_id or request.trace_id
         digest = HermesSessionStore.conversation_key(request.user_id, conversation_id)
         return f"syncode:{digest}"
+
+    @staticmethod
+    def _profile_name(user_id: str) -> str:
+        normalized = str(user_id).strip()
+        if not _USER_ID_PATTERN.fullmatch(normalized):
+            raise AgentRuntimeError("Hermes Profile 要求 user_id 为数字。")
+        return f"syncode-u{normalized}"

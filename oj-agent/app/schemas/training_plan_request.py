@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class SubmissionSnapshot(BaseModel):
@@ -83,6 +83,8 @@ class TrainingPlanRequest(BaseModel):
     user_id: int = Field(..., description="User id")
     # 可选的稳定会话标识，用于让 Agent Runtime 延续同一学习上下文
     conversation_id: str | None = Field(default=None, description="Conversation id")
+    # 用户点击生成时提交的自然语言训练诉求
+    user_request: str = Field(..., min_length=1, max_length=1000, description="User training request")
     # 用户当前的技术评级或等级，选填
     current_level: str | None = Field(default=None, description="Current level")
     # 用户设定的目标学习方向（比如：后端架构、算法竞赛等），选填
@@ -101,3 +103,11 @@ class TrainingPlanRequest(BaseModel):
     candidate_questions: list[QuestionCandidate] = Field(default_factory=list, description="Candidate questions")
     # 系统提供给计划生成算法的候选测试集合
     candidate_exams: list[ExamCandidate] = Field(default_factory=list, description="Candidate stage tests")
+
+    @field_validator("user_request")
+    @classmethod
+    def normalize_user_request(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("user_request must not be blank")
+        return normalized

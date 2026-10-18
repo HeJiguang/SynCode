@@ -8,6 +8,9 @@ function main() {
   const emptyHtml = renderToStaticMarkup(<TrainingActions direction="algorithm_foundation" tasks={[]} />);
 
   assert.match(emptyHtml, /data-testid="training-generate"/);
+  assert.match(emptyHtml, /data-testid="training-request"/);
+  assert.match(emptyHtml, /maxLength="1000"/);
+  assert.match(emptyHtml, /本轮训练诉求/);
   assert.doesNotMatch(emptyHtml, /training-task-finish-/);
   assert.doesNotMatch(emptyHtml, /training-task-actions-/);
   assert.doesNotMatch(emptyHtml, /Actions/);
