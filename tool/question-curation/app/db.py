@@ -20,6 +20,7 @@ def create_session_factory(database_url: str) -> sessionmaker[Session]:
 
 
 def init_db(engine) -> None:
+    # create_all only creates missing tables; rebuild incompatible tables first.
     _rebuild_candidate_problem_if_incompatible(engine)
     Base.metadata.create_all(engine)
 
