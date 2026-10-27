@@ -46,6 +46,9 @@ public class QuestionES {
     @Field(type = FieldType.Long)
     private Long spaceLimit;
 
+    @Field(type = FieldType.Text, index = false)
+    private String gradingConfigJson;
+
     @Field(type = FieldType.Text, analyzer = "standard", searchAnalyzer = "standard")
     private String content;
 

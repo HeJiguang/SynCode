@@ -31,6 +31,8 @@ public class Question extends BaseEntity {
 
     private Long spaceLimit;
 
+    private String gradingConfigJson;
+
     private String content;
 
     private String questionCase;

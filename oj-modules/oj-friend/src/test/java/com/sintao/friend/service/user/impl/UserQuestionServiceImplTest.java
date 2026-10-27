@@ -97,6 +97,32 @@ class UserQuestionServiceImplTest {
     }
 
     @Test
+    void submissionHistoryShouldSupportAllPracticeQuestionsForProfile() {
+        ThreadLocalUtil.set(Constants.USER_ID, 99L);
+
+        UserSubmit latest = new UserSubmit();
+        latest.setSubmitId(12L);
+        latest.setQuestionId(2L);
+        latest.setPass(1);
+        latest.setExeMessage("Accepted");
+
+        when(userSubmitMapper.selectSubmissionHistory(99L, null, null, 20)).thenReturn(List.of(latest));
+
+        List<UserSubmissionHistoryVO> history = userQuestionService.submissionHistory(null, null);
+
+        assertEquals(1, history.size());
+        assertEquals(12L, history.get(0).getSubmitId());
+        verify(userSubmitMapper).selectSubmissionHistory(99L, null, null, 20);
+    }
+
+    @Test
+    void submissionHistoryShouldReturnEmptyWhenAuthenticationContextIsMissing() {
+        List<UserSubmissionHistoryVO> history = userQuestionService.submissionHistory(null, null);
+
+        assertEquals(List.of(), history);
+    }
+
+    @Test
     void rabbitSubmitShouldPersistAcceptedRequestBeforePublishingMessage() {
         ThreadLocalUtil.set(Constants.USER_ID, 99L);
         UserSubmitDTO submitDTO = new UserSubmitDTO();

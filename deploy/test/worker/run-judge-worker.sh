@@ -7,6 +7,8 @@ name="syncode-test-judge-worker"
 env_file="/etc/syncode-judge-worker.env"
 worker_id="${SYNCODE_WORKER_ID:-3}"
 pool_size="${SYNCODE_SANDBOX_POOL_SIZE:-1}"
+execution_mode="${SANDBOX_EXECUTION_MODE:-go-judge}"
+runner_network="${GO_JUDGE_DOCKER_NETWORK:-syncode-judge-execution}"
 
 if [[ ! "$worker_id" =~ ^[0-9]+$ ]] || ((10#$worker_id > 1023)); then
     echo "SYNCODE_WORKER_ID must be between 0 and 1023" >&2
@@ -34,7 +36,21 @@ if docker container inspect "$name" >/dev/null 2>&1; then
     exit 1
 fi
 
-mkdir -p /app/user-code /app/user-code-pool /var/lib/syncode-judge-worker/id-state
+mkdir -p /var/lib/syncode-judge-worker/id-state
+
+execution_args=()
+if [[ "$execution_mode" == "go-judge" ]]; then
+    docker network inspect "$runner_network" >/dev/null
+    execution_args+=(--network "$runner_network")
+    execution_args+=(--env SANDBOX_EXECUTION_MODE=go-judge)
+    execution_args+=(--env "GO_JUDGE_ENDPOINT=${GO_JUDGE_ENDPOINT:-http://go-judge:5050}")
+else
+    mkdir -p /app/user-code /app/user-code-pool
+    execution_args+=(--network bridge --env "SANDBOX_EXECUTION_MODE=$execution_mode")
+    execution_args+=(--mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock)
+    execution_args+=(--mount type=bind,src=/app/user-code,dst=/app/user-code)
+    execution_args+=(--mount type=bind,src=/app/user-code-pool,dst=/app/user-code-pool)
+fi
 
 sandbox_env=()
 if [[ -n "$sandbox_image" ]]; then
@@ -47,7 +63,7 @@ fi
 
 docker run -d \
     --name "$name" \
-    --network bridge \
+    "${execution_args[@]}" \
     --add-host host.docker.internal:host-gateway \
     --cpus 1 \
     --memory 896m \
@@ -60,9 +76,6 @@ docker run -d \
     --env SYNCODE_ID_LOGICAL_CLOCK_ENABLED=true \
     --env SYNCODE_ID_LOGICAL_CLOCK_WORKER_ID="$worker_id" \
     --env SYNCODE_ID_LOGICAL_CLOCK_STATE_FILE=/app/id-state/high-watermark.properties \
-    --mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock \
-    --mount type=bind,src=/app/user-code,dst=/app/user-code \
-    --mount type=bind,src=/app/user-code-pool,dst=/app/user-code-pool \
     --mount type=bind,src=/var/lib/syncode-judge-worker/id-state,dst=/app/id-state \
     --health-cmd 'curl --fail --silent http://localhost:9204/actuator/health >/dev/null' \
     --health-interval 30s \

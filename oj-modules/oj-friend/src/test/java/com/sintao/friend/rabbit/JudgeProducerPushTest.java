@@ -7,6 +7,7 @@ import com.sintao.common.core.enums.JudgeAsyncStatus;
 import com.sintao.common.core.enums.JudgeTaskType;
 import com.sintao.common.redis.service.JudgeResultPushService;
 import com.sintao.common.redis.service.JudgeRuntimeStateService;
+import com.sintao.common.redis.service.JudgeCaseStore;
 import com.sintao.friend.domain.user.UserSubmit;
 import com.sintao.friend.mapper.user.UserSubmitMapper;
 import org.junit.jupiter.api.Test;
@@ -26,12 +27,38 @@ import static org.mockito.Mockito.when;
 class JudgeProducerPushTest {
 
     @Test
+    void publishesImmutableReferenceInsteadOfFullCaseLists() {
+        JudgeProducer producer = new JudgeProducer();
+        RabbitTemplate rabbit = mock(RabbitTemplate.class);
+        JudgeCaseStore store = mock(JudgeCaseStore.class);
+        ReflectionTestUtils.setField(producer, "rabbitTemplate", rabbit);
+        ReflectionTestUtils.setField(producer, "judgeCaseStore", store);
+        JudgeSubmitDTO payload = new JudgeSubmitDTO();
+        payload.setRequestId("req-ref");
+        payload.setInputList(java.util.List.of("input"));
+        payload.setOutputList(java.util.List.of("expected"));
+        when(store.save(payload.getInputList(), payload.getOutputList()))
+                .thenReturn(new JudgeCaseStore.Reference("a".repeat(64), 1));
+
+        producer.produceMsg(payload);
+
+        org.junit.jupiter.api.Assertions.assertNull(payload.getInputList());
+        org.junit.jupiter.api.Assertions.assertNull(payload.getOutputList());
+        org.junit.jupiter.api.Assertions.assertEquals(1, payload.getTestCaseCount());
+        verify(rabbit).convertAndSend(eq(RabbitMQConstants.OJ_JUDGE_EXCHANGE),
+                eq(RabbitMQConstants.JUDGE_SUBMIT_KEY), eq(payload),
+                any(MessagePostProcessor.class), any(CorrelationData.class));
+    }
+
+    @Test
     void examSubmissionShouldRouteToBatchQueue() {
         JudgeProducer producer = new JudgeProducer();
         RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
         ReflectionTestUtils.setField(producer, "rabbitTemplate", rabbitTemplate);
         JudgeSubmitDTO payload = new JudgeSubmitDTO();
         payload.setRequestId("req-batch");
+        payload.setTestCaseSetId("a".repeat(64));
+        payload.setTestCaseCount(1);
         payload.setExamId(99L);
 
         producer.produceMsg(payload);
@@ -53,6 +80,8 @@ class JudgeProducerPushTest {
         ReflectionTestUtils.setField(producer, "rabbitTemplate", rabbitTemplate);
         JudgeSubmitDTO payload = new JudgeSubmitDTO();
         payload.setRequestId("req-realtime");
+        payload.setTestCaseSetId("a".repeat(64));
+        payload.setTestCaseCount(1);
 
         producer.produceMsg(payload);
 

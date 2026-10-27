@@ -1,0 +1,26 @@
+# These source paths belong to the runner image, never the application checkout or host home.
+mount:
+  - {type: bind, source: /usr, target: /usr, readonly: true}
+  - {type: bind, source: /bin, target: /bin, readonly: true}
+  - {type: bind, source: /lib, target: /lib, readonly: true}
+  - {type: bind, source: /lib64, target: /lib64, readonly: true}
+  - {type: bind, source: /etc/alternatives, target: /etc/alternatives, readonly: true}
+  - {type: bind, source: /etc/ld.so.cache, target: /etc/ld.so.cache, readonly: true}
+  - {type: bind, source: /etc/java-17-openjdk, target: /etc/java-17-openjdk, readonly: true}
+  - {type: bind, source: /dev/null, target: /dev/null}
+  - {type: bind, source: /dev/zero, target: /dev/zero}
+  - {type: bind, source: /dev/random, target: /dev/random}
+  - {type: bind, source: /dev/urandom, target: /dev/urandom}
+  - {type: tmpfs, target: /w, data: "size=128m,nr_inodes=8192"}
+  - {type: tmpfs, target: /tmp, data: "size=128m,nr_inodes=8192"}
+proc: true
+workDir: /w
+hostName: judge
+domainName: judge
+uid: 1536
+gid: 1536
+symLink:
+  - {linkPath: /dev/fd, target: /proc/self/fd}
+  - {linkPath: /dev/stdin, target: /proc/self/fd/0}
+  - {linkPath: /dev/stdout, target: /proc/self/fd/1}
+  - {linkPath: /dev/stderr, target: /proc/self/fd/2}

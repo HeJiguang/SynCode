@@ -262,21 +262,13 @@ services:
       - ../env/runtime.env
     environment:
       SPRING_PROFILES_ACTIVE: swarm
-      SANDBOX_EXECUTION_MODE: ${SANDBOX_EXECUTION_MODE:-pool}
+      SANDBOX_EXECUTION_MODE: ${SANDBOX_EXECUTION_MODE:-go-judge}
+      GO_JUDGE_ENDPOINT: ${GO_JUDGE_ENDPOINT:-http://go-judge:5050}
       SYNCODE_ID_LOGICAL_CLOCK_ENABLED: "true"
       SYNCODE_ID_LOGICAL_CLOCK_WORKER_ID: "14"
       SYNCODE_ID_LOGICAL_CLOCK_STATE_FILE: /app/id-state/high-watermark.properties
     volumes:
       - judge_id_state:/app/id-state
-      - type: bind
-        source: ${DOCKER_SOCKET_PATH}
-        target: /var/run/docker.sock
-      - type: bind
-        source: ${JUDGE_HOST_USER_CODE_DIR}
-        target: /app/user-code
-      - type: bind
-        source: ${JUDGE_HOST_USER_CODE_POOL_DIR}
-        target: /app/user-code-pool
     networks:
       - backend
     deploy:

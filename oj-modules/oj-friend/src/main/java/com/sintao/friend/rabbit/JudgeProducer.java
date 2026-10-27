@@ -10,6 +10,7 @@ import com.sintao.common.core.enums.JudgeTaskType;
 import com.sintao.common.core.enums.ResultCode;
 import com.sintao.common.redis.service.JudgeResultPushService;
 import com.sintao.common.redis.service.JudgeRuntimeStateService;
+import com.sintao.common.redis.service.JudgeCaseStore;
 import com.sintao.common.security.exception.ServiceException;
 import com.sintao.friend.domain.user.UserSubmit;
 import com.sintao.friend.mapper.user.UserSubmitMapper;
@@ -38,6 +39,9 @@ public class JudgeProducer {
     @Autowired
     private JudgeResultPushService judgeResultPushService;
 
+    @Autowired
+    private JudgeCaseStore judgeCaseStore;
+
     @PostConstruct
     public void initCallbacks() {
         rabbitTemplate.setMandatory(true);
@@ -58,6 +62,14 @@ public class JudgeProducer {
 
     public void produceMsg(JudgeSubmitDTO judgeSubmitDTO) {
         try {
+            if (judgeSubmitDTO.getTestCaseSetId() == null) {
+                JudgeCaseStore.Reference ref = judgeCaseStore.save(
+                        judgeSubmitDTO.getInputList(), judgeSubmitDTO.getOutputList());
+                judgeSubmitDTO.setTestCaseSetId(ref.id());
+                judgeSubmitDTO.setTestCaseCount(ref.count());
+                judgeSubmitDTO.setInputList(null);
+                judgeSubmitDTO.setOutputList(null);
+            }
             JudgeTaskType taskType = JudgeTaskType.resolve(
                     judgeSubmitDTO.getTaskType(),
                     judgeSubmitDTO.getExamId()

@@ -22,6 +22,7 @@ import com.sintao.judge.mapper.UserSubmitMapper;
 import com.sintao.judge.service.IJudgeService;
 import com.sintao.judge.service.ISandboxPoolService;
 import com.sintao.judge.service.ISandboxService;
+import com.sintao.judge.sandbox.GoJudgeSandboxService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,7 +44,10 @@ public class JudgeServiceImpl implements IJudgeService {
     @Autowired(required = false)
     private ISandboxPoolService sandboxPoolService;
 
-    @Value("${sandbox.execution.mode:pool}")
+    @Autowired(required = false)
+    private GoJudgeSandboxService goJudgeSandboxService;
+
+    @Value("${sandbox.execution.mode:go-judge}")
     private String sandboxExecutionMode;
 
     @Autowired
@@ -58,7 +62,7 @@ public class JudgeServiceImpl implements IJudgeService {
     @Override
     public UserQuestionResultVO doJudgeJavaCode(JudgeSubmitDTO judgeSubmitDTO) {
         log.info("---- judge submit start ----");
-        SandBoxExecuteResult sandBoxExecuteResult = executeJavaCode(judgeSubmitDTO);
+        SandBoxExecuteResult sandBoxExecuteResult = executeJavaCode(judgeSubmitDTO, false);
         UserQuestionResultVO userQuestionResultVO = new UserQuestionResultVO();
         if (sandBoxExecuteResult != null && CodeRunStatus.SUCCEED.equals(sandBoxExecuteResult.getRunStatus())) {
             userQuestionResultVO = doJudge(judgeSubmitDTO, sandBoxExecuteResult, userQuestionResultVO);
@@ -70,6 +74,9 @@ public class JudgeServiceImpl implements IJudgeService {
                 userQuestionResultVO.setExeMessage(CodeRunStatus.UNKNOWN_FAILED.getMsg());
             }
             userQuestionResultVO.setScore(JudgeConstants.ERROR_SCORE);
+            if (sandBoxExecuteResult != null) {
+                userQuestionResultVO.setUserExeResultList(sandBoxExecuteResult.getCaseResults());
+            }
         }
         if (sandBoxExecuteResult != null) {
             userQuestionResultVO.setUseMemory(sandBoxExecuteResult.getUseMemory());
@@ -84,7 +91,7 @@ public class JudgeServiceImpl implements IJudgeService {
     @Override
     public UserCodeRunVO runJavaCode(JudgeSubmitDTO judgeSubmitDTO) {
         log.info("---- judge run start ----");
-        SandBoxExecuteResult sandBoxExecuteResult = executeJavaCode(judgeSubmitDTO);
+        SandBoxExecuteResult sandBoxExecuteResult = executeJavaCode(judgeSubmitDTO, true);
         UserCodeRunVO resultVO = new UserCodeRunVO();
         if (sandBoxExecuteResult == null) {
             resultVO.setRunStatus(CodeRunStatus.UNKNOWN_FAILED.name());
@@ -98,6 +105,21 @@ public class JudgeServiceImpl implements IJudgeService {
                 : sandBoxExecuteResult.getRunStatus().getMsg());
         resultVO.setUseMemory(sandBoxExecuteResult.getUseMemory());
         resultVO.setUseTime(sandBoxExecuteResult.getUseTime());
+
+        if (sandBoxExecuteResult.getCaseResults() != null) {
+            resultVO.setCaseResults(sandBoxExecuteResult.getCaseResults().stream().map(detail -> {
+                UserRunCaseVO value = new UserRunCaseVO();
+                value.setCaseId(detail.getCaseId());
+                value.setInput(detail.getInput());
+                value.setExpectedOutput(detail.getOutput());
+                value.setActualOutput(detail.getExeOutput());
+                value.setPassed(detail.getPassed());
+                value.setCustom(detail.getCustom());
+                value.setTruncated(detail.getTruncated());
+                return value;
+            }).toList());
+            return resultVO;
+        }
 
         if (!CodeRunStatus.SUCCEED.equals(sandBoxExecuteResult.getRunStatus())) {
             return resultVO;
@@ -127,7 +149,14 @@ public class JudgeServiceImpl implements IJudgeService {
         return resultVO;
     }
 
-    private SandBoxExecuteResult executeJavaCode(JudgeSubmitDTO judgeSubmitDTO) {
+    private SandBoxExecuteResult executeJavaCode(JudgeSubmitDTO judgeSubmitDTO, boolean sampleRun) {
+        if ("go-judge".equalsIgnoreCase(sandboxExecutionMode)) {
+            if (goJudgeSandboxService == null) throw new IllegalStateException("go-judge execution service is unavailable");
+            return goJudgeSandboxService.execute(judgeSubmitDTO, sampleRun);
+        }
+        if (judgeSubmitDTO.getTestCaseSetId() != null) {
+            throw new IllegalStateException("Referenced test sets require sandbox.execution.mode=go-judge");
+        }
         if ("standalone".equalsIgnoreCase(sandboxExecutionMode)) {
             return executeByStandaloneSandbox(judgeSubmitDTO);
         }
@@ -157,6 +186,16 @@ public class JudgeServiceImpl implements IJudgeService {
     private UserQuestionResultVO doJudge(JudgeSubmitDTO judgeSubmitDTO,
                                          SandBoxExecuteResult sandBoxExecuteResult,
                                          UserQuestionResultVO userQuestionResultVO) {
+        if (sandBoxExecuteResult.getAllCasesPassed() != null) {
+            // These outputs were already checked in full; caseResults contain bounded previews only.
+            userQuestionResultVO.setUserExeResultList(sandBoxExecuteResult.getCaseResults());
+            boolean passed = sandBoxExecuteResult.getAllCasesPassed();
+            userQuestionResultVO.setPass(passed ? Constants.TRUE : Constants.FALSE);
+            userQuestionResultVO.setScore(passed
+                    ? judgeSubmitDTO.getDifficulty() * JudgeConstants.DEFAULT_SCORE : JudgeConstants.ERROR_SCORE);
+            userQuestionResultVO.setExeMessage(passed ? CodeRunStatus.SUCCEED.getMsg() : CodeRunStatus.NOT_ALL_PASSED.getMsg());
+            return userQuestionResultVO;
+        }
         List<String> exeOutputList = sandBoxExecuteResult.getOutputList();
         List<String> outputList = judgeSubmitDTO.getOutputList();
         if (outputList.size() != exeOutputList.size()) {

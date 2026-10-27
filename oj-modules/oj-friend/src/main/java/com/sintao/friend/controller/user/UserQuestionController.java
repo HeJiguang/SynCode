@@ -71,9 +71,9 @@ public class UserQuestionController extends BaseController {
     }
 
     @GetMapping("/submission/list")
-    @Operation(summary = "提交记录", description = "查询当前登录用户在某道题下最近的提交记录列表")
+    @Operation(summary = "提交记录", description = "查询当前登录用户最近的提交记录列表；传入题目 ID 时按题目筛选")
     @Parameter(name = "examId", in = ParameterIn.QUERY, description = "测试ID，练习题可为空")
-    @Parameter(name = "questionId", in = ParameterIn.QUERY, description = "题目ID", required = true)
+    @Parameter(name = "questionId", in = ParameterIn.QUERY, description = "题目 ID，可选；不传时返回最近的练习提交")
     @ApiResponse(responseCode = "200", description = "成功返回提交记录列表")
     public R<List<UserSubmissionHistoryVO>> submissionHistory(
             @Parameter(description = "测试ID") Long examId,

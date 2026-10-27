@@ -8,13 +8,20 @@ import java.util.List;
 @Data
 public class SandBoxExecuteResult {
 
+    /** Non-null when outputs were checked incrementally, before preview truncation. */
+    private List<com.sintao.api.domain.UserExeResult> caseResults;
+
+    private Boolean allCasesPassed;
+
+    private Integer executedCaseCount;
+
     private CodeRunStatus runStatus;  //执行结果
 
     private String exeMessage;   //异常信息
 
     private List<String> outputList; //执行结果
 
-    private Long useMemory;  //占用内存  kb
+    private Long useMemory;  // 执行单元内存峰值，bytes
 
     private Long useTime;   //消耗时�?  ms
 

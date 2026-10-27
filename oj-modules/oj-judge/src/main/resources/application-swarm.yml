@@ -23,6 +23,12 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 sandbox:
+  execution:
+    mode: ${SANDBOX_EXECUTION_MODE:go-judge}
+  go-judge:
+    endpoint: ${GO_JUDGE_ENDPOINT:http://go-judge:5050}
+    token: ${GO_JUDGE_TOKEN:}
+    parallelism: ${GO_JUDGE_PARALLELISM:4}
   docker:
     host: ${SANDBOX_DOCKER_HOST:unix:///var/run/docker.sock}
     image: ${SANDBOX_DOCKER_IMAGE:syncode/oj-sandbox-multilang:1.0.0}

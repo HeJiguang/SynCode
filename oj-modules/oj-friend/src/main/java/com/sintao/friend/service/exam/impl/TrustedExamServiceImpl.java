@@ -896,6 +896,7 @@ public class TrustedExamServiceImpl implements ITrustedExamService {
         payload.setDifficulty(1);
         payload.setTimeLimit(question.getTimeLimit());
         payload.setSpaceLimit(question.getSpaceLimit());
+        payload.setGradingConfigJson(question.getGradingConfigJson());
         payload.setUserCode(answer.getAnswerContent());
         List<String> inputs = new ArrayList<>();
         List<String> outputs = new ArrayList<>();

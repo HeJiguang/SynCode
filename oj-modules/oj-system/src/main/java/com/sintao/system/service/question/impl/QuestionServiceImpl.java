@@ -183,6 +183,10 @@ public class QuestionServiceImpl implements IQuestionService {
             throw new ServiceException(ResultCode.FAILED_PARAMS_VALIDATE);
         }
         if (type == QuestionType.PROGRAMMING) {
+            String checker = gradingConfig.path("checker").asText("text");
+            if (!Set.of("text", "exact", "tokens", "unorderedLines", "unorderedTriples").contains(checker)) {
+                throw new ServiceException(ResultCode.FAILED_PARAMS_VALIDATE);
+            }
             if (request.getTimeLimit() == null || request.getTimeLimit() <= 0
                     || request.getSpaceLimit() == null || request.getSpaceLimit() <= 0
                     || !readArray(request.getQuestionCase())) {
