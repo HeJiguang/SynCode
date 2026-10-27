@@ -3,6 +3,8 @@ package com.sintao.common.redis.config;
 import com.sintao.common.redis.service.JudgeRuntimeStateService;
 import com.sintao.common.redis.service.JudgeResultPushService;
 import com.sintao.common.redis.service.RedisService;
+import com.sintao.common.redis.service.JudgeCaseStore;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
@@ -17,6 +19,16 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 @AutoConfiguration
 @AutoConfigureBefore(RedisAutoConfiguration.class)
 public class RedisConfig extends CachingConfigurerSupport {
+
+    @Bean
+    public JudgeCaseStore judgeCaseStore(RedisConnectionFactory connectionFactory,
+            @Value("${judge.cases.ttl-hours:168}") long ttlHours,
+            @Value("${judge.cases.max-count:10000}") int maxCount,
+            @Value("${judge.cases.max-case-bytes:33554432}") int maxCaseBytes,
+            @Value("${judge.cases.max-set-bytes:134217728}") long maxSetBytes) {
+        return new JudgeCaseStore(new StringRedisTemplate(connectionFactory), ttlHours,
+                maxCount, maxCaseBytes, maxSetBytes);
+    }
 
     @Bean
     @Primary

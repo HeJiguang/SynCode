@@ -70,12 +70,21 @@ export async function getProblemDetail(
 
 export async function getSubmissionHistory(questionId?: string, token?: string | null, examId?: string | null): Promise<SubmissionRecord[]> {
   if (!token) return getSubmissionMockFallback();
-  return fetchLiveSubmissionHistory(questionId, token, examId);
+  try {
+    return await fetchLiveSubmissionHistory(questionId, token, examId);
+  } catch {
+    // A missing history service must not prevent the authenticated profile page from rendering.
+    return [];
+  }
 }
 
 export async function getTrainingSnapshot(token?: string | null): Promise<TrainingSnapshot> {
   if (!token) return getTrainingMockFallback();
-  return fetchLiveTrainingSnapshot(token);
+  try {
+    return await fetchLiveTrainingSnapshot(token);
+  } catch {
+    return getTrainingMockFallback();
+  }
 }
 
 export async function getExamList(options: DataSourceOptions = {}): Promise<ExamSummary[]> {
@@ -97,7 +106,11 @@ export async function getExamDetail(examId: string, token?: string | null): Prom
 
 export async function getUserProfile(token?: string | null): Promise<UserProfile> {
   if (!token) return getUserMockFallback();
-  return fetchLiveUserProfile(token);
+  try {
+    return await fetchLiveUserProfile(token);
+  } catch {
+    return getUserMockFallback();
+  }
 }
 
 export async function getPublicMessages(token?: string | null, options: DataSourceOptions = {}): Promise<PublicMessage[]> {

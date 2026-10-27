@@ -138,6 +138,9 @@ public class UserQuestionServiceImpl implements IUserQuestionService {
     @Override
     public List<UserSubmissionHistoryVO> submissionHistory(Long examId, Long questionId) {
         Long userId = ThreadLocalUtil.get(Constants.USER_ID, Long.class);
+        if (userId == null) {
+            return List.of();
+        }
         return userSubmitMapper.selectSubmissionHistory(userId, examId, questionId, 20).stream()
                 .map(this::toSubmissionHistoryVO)
                 .collect(Collectors.toList());
@@ -173,6 +176,11 @@ public class UserQuestionServiceImpl implements IUserQuestionService {
     private QuestionES loadQuestion(Long questionId) {
         QuestionES questionES = questionRepository.findById(questionId).orElse(null);
         if (questionES != null) {
+            // Old ES documents predate checker propagation; recover server-authored rules from DB.
+            if (questionES.getGradingConfigJson() == null) {
+                Question question = questionMapper.selectById(questionId);
+                if (question != null) questionES.setGradingConfigJson(question.getGradingConfigJson());
+            }
             return questionES;
         }
         Question question = questionMapper.selectById(questionId);

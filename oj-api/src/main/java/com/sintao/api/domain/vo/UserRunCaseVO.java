@@ -7,6 +7,10 @@ import lombok.Setter;
 @Setter
 public class UserRunCaseVO {
 
+    private String caseId;
+
+    private Boolean truncated;
+
     private String input;
 
     private String expectedOutput;

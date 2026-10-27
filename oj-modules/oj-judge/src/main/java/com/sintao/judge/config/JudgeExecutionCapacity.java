@@ -2,15 +2,23 @@ package com.sintao.judge.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Component
 public class JudgeExecutionCapacity {
 
     private final int value;
 
-    public JudgeExecutionCapacity(@Value("${sandbox.execution.mode:pool}") String executionMode,
+    @Autowired
+    public JudgeExecutionCapacity(@Value("${sandbox.execution.mode:go-judge}") String executionMode,
                                   @Value("${sandbox.docker.pool.size:4}") int poolSize,
+                                  @Value("${sandbox.go-judge.parallelism:4}") int runnerParallelism,
                                   @Value("${judge.scheduler.workers:0}") int configuredWorkers) {
+        this.value = resolve(executionMode,
+                "go-judge".equalsIgnoreCase(executionMode) ? runnerParallelism : poolSize, configuredWorkers);
+    }
+
+    public JudgeExecutionCapacity(String executionMode, int poolSize, int configuredWorkers) {
         this.value = resolve(executionMode, poolSize, configuredWorkers);
     }
 

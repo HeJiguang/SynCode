@@ -20,6 +20,7 @@ runtime-logs/
 temp.txt
 
 # Local-only runtime / study materials
+/docs/SynCode技术文档.md
 user-code-pool/
 Java-微服务的编程测评系统课件/
 板书/

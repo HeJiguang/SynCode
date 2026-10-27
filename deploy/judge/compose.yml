@@ -1,0 +1,39 @@
+services:
+  go-judge:
+    build:
+      context: .
+      args:
+        GO_JUDGE_IMAGE: ${GO_JUDGE_IMAGE:-criyle/go-judge:v1.13.3}
+    image: syncode/go-judge:1.13.3
+    # The trusted supervisor requires namespaces/cgroups. User processes run as UID 1536
+    # in inner sandboxes, with read-only dependencies, isolated network and seccomp.
+    privileged: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5050:5050"
+    environment:
+      ES_AUTH_TOKEN: ${GO_JUDGE_TOKEN:?Set GO_JUDGE_TOKEN before starting the runner}
+    command:
+      - -http-addr=:5050
+      - -mount-conf=/etc/go-judge/mount.yaml
+      - -parallelism=${GO_JUDGE_PARALLELISM:-4}
+      - -pre-fork=${GO_JUDGE_PARALLELISM:-4}
+      - -enable-cpu-rate
+      - -no-fallback
+      - -file-timeout=15m
+      - -output-limit=32m
+      - -copy-out-limit=64m
+      - -src-prefix=/nonexistent-user-source
+    shm_size: 512m
+    pids_limit: 1024
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "3"
+    networks:
+      - execution
+
+networks:
+  execution:
+    name: syncode-judge-execution

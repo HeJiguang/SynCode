@@ -42,8 +42,9 @@ export async function fetchLiveSubmissionHistory(questionId?: string, token?: st
   if (questionId) params.set("questionId", questionId);
   if (examId) params.set("examId", examId);
 
+  const query = params.toString();
   const payload = await requestJson<ApiEnvelope<BackendSubmissionRow[]>>(
-    `/friend/user/question/submission/list?${params.toString()}`,
+    `/friend/user/question/submission/list${query ? `?${query}` : ""}`,
     { token }
   );
 

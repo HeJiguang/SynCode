@@ -40,6 +40,14 @@ public class JudgeSubmitDTO {
 
     private String userCode;
 
+    /** Server-authored grading rules, e.g. {"checker":"unorderedTriples"}. */
+    private String gradingConfigJson;
+
+    /** Content-addressed test set. MQ messages carry this reference instead of all cases. */
+    private String testCaseSetId;
+
+    private Integer testCaseCount;
+
     private List<String> inputList;
 
     private List<String> outputList;

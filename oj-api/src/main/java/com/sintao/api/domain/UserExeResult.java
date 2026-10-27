@@ -7,6 +7,16 @@ import lombok.Setter;
 @Setter
 public class UserExeResult {
 
+    private String caseId;
+
+    private Boolean passed;
+
+    private Boolean custom;
+
+    private String message;
+
+    private Boolean truncated;
+
     private String input;
 
     private String output;   //鏈熸湜杈撳嚭
