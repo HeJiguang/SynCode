@@ -2,6 +2,8 @@
 
 This directory is the source of truth for database changes made after the Phase 1 trusted-exam baseline.
 
+Question-bank outbox rollout and recovery: [QUESTION_CONSISTENCY.md](QUESTION_CONSISTENCY.md).
+
 ## Tool and ownership
 
 - Use Flyway Community with MySQL 8.

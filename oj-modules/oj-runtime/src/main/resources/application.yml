@@ -101,3 +101,8 @@ management:
   endpoint:
     health:
       show-details: never
+
+# Enable after V2026102801 and the question index baseline rebuild.
+question:
+  sync:
+    enabled: ${QUESTION_SYNC_ENABLED:false}

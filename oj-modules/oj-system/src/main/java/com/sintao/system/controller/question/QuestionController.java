@@ -63,7 +63,7 @@ public class QuestionController extends BaseController {
     }
 
     @DeleteMapping("/delete")
-    @Operation(summary = "删除题目", description = "根据题目 ID 删除题目，同时从 ES 和 Redis 中移除")
+    @Operation(summary = "删除题目", description = "根据题目 ID 删除题目，搜索与缓存异步同步")
     @Parameter(name = "questionId", in = ParameterIn.QUERY, description = "题目ID", required = true)
     @ApiResponse(responseCode = "1000", description = "删除成功")
     @ApiResponse(responseCode = "2000", description = "题目不存在或服务异常")

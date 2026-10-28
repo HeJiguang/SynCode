@@ -24,13 +24,11 @@ import com.sintao.common.redis.service.JudgeRuntimeStateService;
 import com.sintao.common.security.exception.ServiceException;
 import com.sintao.friend.domain.question.Question;
 import com.sintao.friend.domain.question.QuestionCase;
-import com.sintao.friend.domain.question.es.QuestionES;
 import com.sintao.friend.domain.user.UserSubmit;
 import com.sintao.friend.domain.user.dto.UserRunDTO;
 import com.sintao.friend.domain.user.dto.UserSubmitDTO;
 import com.sintao.friend.domain.user.vo.AsyncSubmitResponseVO;
 import com.sintao.friend.domain.user.vo.UserSubmissionHistoryVO;
-import com.sintao.friend.elasticsearch.FriendQuestionRepository;
 import com.sintao.friend.mapper.question.QuestionMapper;
 import com.sintao.friend.mapper.user.UserSubmitMapper;
 import com.sintao.friend.rabbit.JudgeProducer;
@@ -47,9 +45,6 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class UserQuestionServiceImpl implements IUserQuestionService {
-
-    @Autowired
-    private FriendQuestionRepository questionRepository;
 
     @Autowired
     private QuestionMapper questionMapper;
@@ -69,9 +64,10 @@ public class UserQuestionServiceImpl implements IUserQuestionService {
     @Override
     public R<UserCodeRunVO> run(UserRunDTO runDTO) {
         requireProgramType(runDTO.getProgramType());
-        RunPayload runPayload = buildRunPayload(runDTO.getQuestionId(), runDTO.getCustomInputs());
+        Question question = loadQuestion(runDTO.getQuestionId());
+        RunPayload runPayload = buildRunPayload(question, runDTO.getCustomInputs());
         JudgeSubmitDTO judgeSubmitDTO = assembleJudgeSubmitDTO(
-                runDTO.getQuestionId(),
+                question,
                 runDTO.getExamId(),
                 runDTO.getProgramType(),
                 runDTO.getUserCode(),
@@ -85,7 +81,7 @@ public class UserQuestionServiceImpl implements IUserQuestionService {
     public R<UserQuestionResultVO> submit(UserSubmitDTO submitDTO) {
         requireProgramType(submitDTO.getProgramType());
         JudgeSubmitDTO judgeSubmitDTO = assembleJudgeSubmitDTO(
-                submitDTO.getQuestionId(),
+                loadQuestion(submitDTO.getQuestionId()),
                 submitDTO.getExamId(),
                 submitDTO.getProgramType(),
                 submitDTO.getUserCode(),
@@ -99,7 +95,7 @@ public class UserQuestionServiceImpl implements IUserQuestionService {
     public AsyncSubmitResponseVO rabbitSubmit(UserSubmitDTO submitDTO) {
         requireProgramType(submitDTO.getProgramType());
         JudgeSubmitDTO judgeSubmitDTO = assembleJudgeSubmitDTO(
-                submitDTO.getQuestionId(),
+                loadQuestion(submitDTO.getQuestionId()),
                 submitDTO.getExamId(),
                 submitDTO.getProgramType(),
                 submitDTO.getUserCode(),
@@ -146,20 +142,19 @@ public class UserQuestionServiceImpl implements IUserQuestionService {
                 .collect(Collectors.toList());
     }
 
-    private JudgeSubmitDTO assembleJudgeSubmitDTO(Long questionId,
+    private JudgeSubmitDTO assembleJudgeSubmitDTO(Question question,
                                                   Long examId,
                                                   Integer programType,
                                                   String userCode,
                                                   List<String> inputOverrides,
                                                   List<String> outputOverrides) {
-        QuestionES questionES = loadQuestion(questionId);
         JudgeSubmitDTO judgeSubmitDTO = new JudgeSubmitDTO();
-        BeanUtil.copyProperties(questionES, judgeSubmitDTO);
+        BeanUtil.copyProperties(question, judgeSubmitDTO);
         judgeSubmitDTO.setUserId(ThreadLocalUtil.get(Constants.USER_ID, Long.class));
         judgeSubmitDTO.setExamId(examId);
         judgeSubmitDTO.setTaskType(examId == null ? JudgeTaskType.REALTIME : JudgeTaskType.BATCH);
         judgeSubmitDTO.setProgramType(programType);
-        judgeSubmitDTO.setUserCode(assembleUserCode(programType, userCode, questionES.getMainFuc()));
+        judgeSubmitDTO.setUserCode(assembleUserCode(programType, userCode, question.getMainFuc()));
 
         if (inputOverrides != null && outputOverrides != null) {
             judgeSubmitDTO.setInputList(inputOverrides);
@@ -167,30 +162,16 @@ public class UserQuestionServiceImpl implements IUserQuestionService {
             return judgeSubmitDTO;
         }
 
-        List<QuestionCase> questionCaseList = extractQuestionCaseList(questionES.getQuestionCase());
+        List<QuestionCase> questionCaseList = extractQuestionCaseList(question.getQuestionCase());
         judgeSubmitDTO.setInputList(questionCaseList.stream().map(QuestionCase::getInput).toList());
         judgeSubmitDTO.setOutputList(questionCaseList.stream().map(QuestionCase::getOutput).toList());
         return judgeSubmitDTO;
     }
 
-    private QuestionES loadQuestion(Long questionId) {
-        QuestionES questionES = questionRepository.findById(questionId).orElse(null);
-        if (questionES != null) {
-            // Old ES documents predate checker propagation; recover server-authored rules from DB.
-            if (questionES.getGradingConfigJson() == null) {
-                Question question = questionMapper.selectById(questionId);
-                if (question != null) questionES.setGradingConfigJson(question.getGradingConfigJson());
-            }
-            return questionES;
-        }
+    private Question loadQuestion(Long questionId) {
         Question question = questionMapper.selectById(questionId);
-        if (question == null) {
-            throw new ServiceException(ResultCode.FAILED);
-        }
-        QuestionES fallback = new QuestionES();
-        BeanUtil.copyProperties(question, fallback);
-        questionRepository.save(fallback);
-        return fallback;
+        if (question == null) throw new ServiceException(ResultCode.FAILED_NOT_EXISTS);
+        return question;
     }
 
     private List<QuestionCase> extractQuestionCaseList(String questionCaseJson) {
@@ -200,9 +181,8 @@ public class UserQuestionServiceImpl implements IUserQuestionService {
         return JSONUtil.toList(LegacyJsonRepair.escapeControlCharsInStrings(questionCaseJson), QuestionCase.class);
     }
 
-    private RunPayload buildRunPayload(Long questionId, List<String> customInputs) {
-        QuestionES questionES = loadQuestion(questionId);
-        List<QuestionCase> sampleCases = extractQuestionCaseList(questionES.getQuestionCase()).stream()
+    private RunPayload buildRunPayload(Question question, List<String> customInputs) {
+        List<QuestionCase> sampleCases = extractQuestionCaseList(question.getQuestionCase()).stream()
                 .limit(2)
                 .collect(Collectors.toList());
         List<String> inputList = sampleCases.stream()

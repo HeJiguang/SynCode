@@ -6,7 +6,7 @@ import com.sintao.common.core.enums.QuestionResType;
 import com.sintao.common.redis.service.JudgeRuntimeStateService;
 import com.sintao.common.core.utils.ThreadLocalUtil;
 import com.sintao.api.domain.dto.JudgeSubmitDTO;
-import com.sintao.friend.domain.question.es.QuestionES;
+import com.sintao.friend.domain.question.Question;
 import com.sintao.friend.domain.user.UserSubmit;
 import com.sintao.friend.domain.user.dto.UserSubmitDTO;
 import com.sintao.friend.domain.user.vo.UserSubmissionHistoryVO;
@@ -129,11 +129,11 @@ class UserQuestionServiceImplTest {
         submitDTO.setQuestionId(1L);
         submitDTO.setProgramType(ProgramType.JAVA.getValue());
         submitDTO.setUserCode("class Main { }");
-        QuestionES questionES = new QuestionES();
+        Question questionES = new Question();
         questionES.setQuestionId(1L);
         questionES.setQuestionCase("[{\"input\":\"1 2\",\"output\":\"3\"}]");
         questionES.setMainFuc("public static void main(String[] args){}");
-        when(questionRepository.findById(1L)).thenReturn(Optional.of(questionES));
+        when(questionMapper.selectById(1L)).thenReturn(questionES);
         when(userSubmitMapper.insert(any(UserSubmit.class))).thenReturn(1);
 
         userQuestionService.rabbitSubmit(submitDTO);
@@ -158,11 +158,11 @@ class UserQuestionServiceImplTest {
         submitDTO.setQuestionId(1L);
         submitDTO.setProgramType(ProgramType.CPP.getValue());
         submitDTO.setUserCode(source);
-        QuestionES questionES = new QuestionES();
+        Question questionES = new Question();
         questionES.setQuestionId(1L);
         questionES.setQuestionCase("[{\"input\":\"1 2\",\"output\":\"3\"}]");
         questionES.setMainFuc("public static void main(String[] args){}");
-        when(questionRepository.findById(1L)).thenReturn(Optional.of(questionES));
+        when(questionMapper.selectById(1L)).thenReturn(questionES);
         when(userSubmitMapper.insert(any(UserSubmit.class))).thenReturn(1);
 
         userQuestionService.rabbitSubmit(submitDTO);
@@ -171,6 +171,28 @@ class UserQuestionServiceImplTest {
         verify(judgeProducer).produceMsg(messageCaptor.capture());
         assertEquals(ProgramType.CPP.getValue(), messageCaptor.getValue().getProgramType());
         assertEquals(source, messageCaptor.getValue().getUserCode());
+    }
+
+    @Test
+    void runShouldLoadAuthoritativeQuestionOnlyOnce() {
+        com.sintao.friend.domain.user.dto.UserRunDTO request = new com.sintao.friend.domain.user.dto.UserRunDTO();
+        request.setQuestionId(1L);
+        request.setProgramType(ProgramType.CPP.getValue());
+        request.setUserCode("int main(){}");
+        Question question = new Question();
+        question.setQuestionId(1L);
+        question.setTimeLimit(1000L);
+        question.setQuestionCase("[{\"input\":\"1 2\",\"output\":\"3\"}]");
+        when(questionMapper.selectById(1L)).thenReturn(question);
+
+        userQuestionService.run(request);
+
+        verify(questionMapper, org.mockito.Mockito.times(1)).selectById(1L);
+        org.mockito.Mockito.verifyNoInteractions(questionRepository);
+        ArgumentCaptor<JudgeSubmitDTO> payload = ArgumentCaptor.forClass(JudgeSubmitDTO.class);
+        verify(remoteJudgeService).runJavaCode(payload.capture());
+        assertEquals(List.of("1 2"), payload.getValue().getInputList());
+        assertEquals(1000L, payload.getValue().getTimeLimit());
     }
 
     private Object readField(Object target, String fieldName) {

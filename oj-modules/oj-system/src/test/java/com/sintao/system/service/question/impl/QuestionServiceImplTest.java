@@ -7,8 +7,6 @@ import com.sintao.common.security.exception.ServiceException;
 import com.sintao.system.domain.question.dto.QuestionAddDTO;
 import com.sintao.system.domain.question.dto.QuestionEditDTO;
 import com.sintao.system.domain.question.Question;
-import com.sintao.system.elasticsearch.SystemQuestionRepository;
-import com.sintao.system.manager.QuestionCacheManager;
 import com.sintao.system.mapper.question.QuestionMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,9 +66,7 @@ class QuestionServiceImplTest {
     @Test
     void editingQuestionShouldPersistLanguageStarters() {
         QuestionMapper mapper = mock(QuestionMapper.class);
-        SystemQuestionRepository repository = mock(SystemQuestionRepository.class);
         ReflectionTestUtils.setField(service, "questionMapper", mapper);
-        ReflectionTestUtils.setField(service, "questionRepository", repository);
         Question existing = new Question();
         existing.setQuestionId(1L);
         existing.setStarterCodeJson("{\"java\":\"old\"}");
@@ -90,17 +86,12 @@ class QuestionServiceImplTest {
 
         assertEquals(request.getStarterCodeJson(), existing.getStarterCodeJson());
         verify(mapper).updateById(existing);
-        verify(repository).save(any());
     }
 
     @Test
     void addingProgrammingQuestionWithoutStartersShouldGenerateAllJudgeLanguages() throws Exception {
         QuestionMapper mapper = mock(QuestionMapper.class);
-        SystemQuestionRepository repository = mock(SystemQuestionRepository.class);
-        QuestionCacheManager cacheManager = mock(QuestionCacheManager.class);
         ReflectionTestUtils.setField(service, "questionMapper", mapper);
-        ReflectionTestUtils.setField(service, "questionRepository", repository);
-        ReflectionTestUtils.setField(service, "questionCacheManager", cacheManager);
 
         QuestionAddDTO request = baseQuestion("PROGRAMMING");
         request.setTimeLimit(1000L);
@@ -121,9 +112,7 @@ class QuestionServiceImplTest {
     @Test
     void editingQuestionShouldNotClobberAuthoredStartersWithGeneratedOnes() {
         QuestionMapper mapper = mock(QuestionMapper.class);
-        SystemQuestionRepository repository = mock(SystemQuestionRepository.class);
         ReflectionTestUtils.setField(service, "questionMapper", mapper);
-        ReflectionTestUtils.setField(service, "questionRepository", repository);
         Question existing = new Question();
         existing.setQuestionId(2L);
         existing.setQuestionType("PROGRAMMING");

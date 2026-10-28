@@ -32,7 +32,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.elasticsearch.NoSuchIndexException;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -58,17 +57,13 @@ public class QuestionServiceImpl implements IQuestionService {
 
     @Override
     public TableDataInfo list(QuestionQueryDTO questionQueryDTO) {
-        long count = countIndexedQuestions();
-        if (count <= 0) {
-            refreshQuestion();
-        }
         Sort sort = Sort.by(Sort.Direction.DESC, "createTime");
         Pageable pageable = PageRequest.of(questionQueryDTO.getPageNum() - 1, questionQueryDTO.getPageSize(), sort);
         Integer difficulty = questionQueryDTO.getDifficulty();
         String keyword = questionQueryDTO.getKeyword();
         Page<QuestionES> questionESPage;
         if (difficulty == null && StrUtil.isEmpty(keyword)) {
-            questionESPage = questionRepository.findAll(pageable);
+            questionESPage = questionRepository.findLive(pageable);
         } else if (StrUtil.isEmpty(keyword)) {
             questionESPage = questionRepository.findQuestionByDifficulty(difficulty, pageable);
         } else if (difficulty == null) {
@@ -87,34 +82,32 @@ public class QuestionServiceImpl implements IQuestionService {
 
     @Override
     public List<QuestionVO> hotList() {
-        Long total = questionCacheManager.getHostListSize();
-        List<Long> hotQuestionIdList;
-        if (total == null || total <= 0) {
-            PageHelper.startPage(Constants.HOST_QUESTION_LIST_START, Constants.HOST_QUESTION_LIST_END);
-            hotQuestionIdList = userSubmitMapper.selectHostQuestionList();
-            questionCacheManager.refreshHotQuestionList(hotQuestionIdList);
-        } else {
-            hotQuestionIdList = questionCacheManager.getHostList();
+        List<Long> ids;
+        try {
+            ids = questionCacheManager.getHostList();
+            if (CollectionUtil.isNotEmpty(ids)) return assembleQuestionVOList(ids);
+            String generation = questionCacheManager.hotGeneration();
+            ids = loadHotIds();
+            questionCacheManager.refreshHotQuestionList(ids, generation);
+        } catch (org.springframework.dao.DataAccessException failure) {
+            log.warn("Redis hot-list unavailable; reading MySQL");
+            ids = loadHotIds();
         }
-        return assembleQuestionVOList(hotQuestionIdList);
+        return assembleQuestionVOList(ids);
+    }
+
+    private List<Long> loadHotIds() {
+        PageHelper.startPage(Constants.HOST_QUESTION_LIST_START, Constants.HOST_QUESTION_LIST_END);
+        return userSubmitMapper.selectHostQuestionList();
     }
 
     @Override
     public QuestionDetailVO detail(Long questionId) {
-        QuestionES questionES = findIndexedQuestion(questionId);
         QuestionDetailVO questionDetailVO = new QuestionDetailVO();
-        if (questionES != null) {
-            backfillStarterCode(questionES);
-            BeanUtil.copyProperties(questionES, questionDetailVO);
-            questionDetailVO.setStarterCode(parseStarterCode(questionES.getStarterCodeJson(), questionES.getDefaultCode()));
-            questionDetailVO.setExampleCases(extractExampleCases(questionES.getQuestionCase()));
-            return questionDetailVO;
-        }
         Question question = questionMapper.selectById(questionId);
         if (question == null) {
             return null;
         }
-        refreshQuestion();
         BeanUtil.copyProperties(question, questionDetailVO);
         questionDetailVO.setStarterCode(parseStarterCode(question.getStarterCodeJson(), question.getDefaultCode()));
         questionDetailVO.setExampleCases(extractExampleCases(question.getQuestionCase()));
@@ -123,59 +116,37 @@ public class QuestionServiceImpl implements IQuestionService {
 
     @Override
     public String preQuestion(Long questionId) {
-        Long listSize = questionCacheManager.getListSize();
-        if (listSize == null || listSize <= 0) {
-            questionCacheManager.refreshCache();
-        }
-        return navigateQuestion(() -> questionCacheManager.preQuestion(questionId));
+        return navigate(questionId, -1);
     }
 
     @Override
     public String nextQuestion(Long questionId) {
-        Long listSize = questionCacheManager.getListSize();
-        if (listSize == null || listSize <= 0) {
-            questionCacheManager.refreshCache();
-        }
-        return navigateQuestion(() -> questionCacheManager.nextQuestion(questionId));
+        return navigate(questionId, 1);
     }
 
-    private void refreshQuestion() {
-        List<Question> questionList = questionMapper.selectList(new LambdaQueryWrapper<>());
-        if (CollectionUtil.isEmpty(questionList)) {
-            return;
-        }
-        List<QuestionES> questionESList = BeanUtil.copyToList(questionList, QuestionES.class);
-        questionRepository.saveAll(questionESList);
-    }
-
-    private long countIndexedQuestions() {
+    private String navigate(Long questionId, int direction) {
         try {
-            return questionRepository.count();
-        } catch (NoSuchIndexException ex) {
-            log.info("question index missing, will rebuild from database");
-            return 0L;
-        }
-    }
-
-    private QuestionES findIndexedQuestion(Long questionId) {
-        try {
-            return questionRepository.findById(questionId).orElse(null);
-        } catch (NoSuchIndexException ex) {
-            log.info("question index missing while reading detail, will rebuild from database, questionId={}", questionId);
-            return null;
-        }
-    }
-
-    private String navigateQuestion(java.util.function.Supplier<Object> navigation) {
-        try {
-            return navigation.get().toString();
-        } catch (ServiceException exception) {
-            if (exception.getResultCode() != ResultCode.FAILED_NOT_EXISTS) {
-                throw exception;
+            if (questionCacheManager.getListSize() == null || questionCacheManager.getListSize() == 0) {
+                questionCacheManager.refreshCache();
             }
-            questionCacheManager.refreshCache();
-            return navigation.get().toString();
+            try {
+                Object id = direction < 0 ? questionCacheManager.preQuestion(questionId) : questionCacheManager.nextQuestion(questionId);
+                if (id != null && questionMapper.selectById(Long.valueOf(id.toString())) != null) return id.toString();
+            } catch (ServiceException failure) {
+                // Re-evaluate boundaries and missing IDs against authoritative ordering below.
+            }
+        } catch (org.springframework.dao.DataAccessException failure) {
+            log.warn("Redis navigation unavailable; reading MySQL");
         }
+        List<Long> ids = questionMapper.selectList(new LambdaQueryWrapper<Question>()
+                .select(Question::getQuestionId).orderByDesc(Question::getCreateTime)
+                .orderByDesc(Question::getQuestionId)).stream().map(Question::getQuestionId).toList();
+        int index = ids.indexOf(questionId);
+        if (index < 0) throw new ServiceException(ResultCode.FAILED_NOT_EXISTS);
+        int next = index + direction;
+        if (next < 0) throw new ServiceException(ResultCode.FAILED_FIRST_QUESTION);
+        if (next >= ids.size()) throw new ServiceException(ResultCode.FAILED_LAST_QUESTION);
+        return ids.get(next).toString();
     }
 
     private List<QuestionVO> assembleQuestionVOList(List<Long> hotQuestionIdList) {
@@ -210,23 +181,6 @@ public class QuestionServiceImpl implements IQuestionService {
                 .limit(2)
                 .map(this::toQuestionCaseVO)
                 .collect(Collectors.toList());
-    }
-
-    /**
-     * Index documents written before starter_code_json existed miss the multi-language starters.
-     * Heal them from the database on access instead of waiting for a full reindex.
-     */
-    private void backfillStarterCode(QuestionES questionES) {
-        if (StrUtil.isNotBlank(questionES.getStarterCodeJson())) {
-            return;
-        }
-        Question question = questionMapper.selectById(questionES.getQuestionId());
-        if (question == null || StrUtil.isBlank(question.getStarterCodeJson())) {
-            return;
-        }
-        questionES.setStarterCodeJson(question.getStarterCodeJson());
-        questionES.setMainFuc(question.getMainFuc());
-        questionRepository.save(questionES);
     }
 
     private Map<String, String> parseStarterCode(String starterCodeJson, String legacyJavaCode) {

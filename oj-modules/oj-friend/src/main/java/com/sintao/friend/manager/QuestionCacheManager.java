@@ -1,6 +1,5 @@
 package com.sintao.friend.manager;
 
-import cn.hutool.core.collection.CollectionUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.sintao.common.core.constants.CacheConstants;
 import com.sintao.common.core.enums.ResultCode;
@@ -31,13 +30,11 @@ public class QuestionCacheManager {
     }
 
     public void refreshCache() {
+        String generation = redisService.listGeneration(CacheConstants.QUESTION_LIST);
         List<Question> questionList = questionMapper.selectList(new LambdaQueryWrapper<Question>()
-                .select(Question::getQuestionId).orderByDesc(Question::getCreateTime));
-        if (CollectionUtil.isEmpty(questionList)) {
-            return;
-        }
+                .select(Question::getQuestionId).orderByDesc(Question::getCreateTime).orderByDesc(Question::getQuestionId));
         List<Long> questionIdList = questionList.stream().map(Question::getQuestionId).toList();
-        redisService.rightPushAll(CacheConstants.QUESTION_LIST, questionIdList);
+        redisService.replaceVersionedList(CacheConstants.QUESTION_LIST, generation, questionIdList, 300);
     }
 
     public Long preQuestion(Long questionId) {
@@ -69,11 +66,16 @@ public class QuestionCacheManager {
                 CacheConstants.DEFAULT_START, CacheConstants.DEFAULT_END, Long.class);
     }
 
+    public String hotGeneration() {
+        return redisService.listGeneration(CacheConstants.QUESTION_HOST_LIST);
+    }
+
     public void refreshHotQuestionList(List<Long> hotQuestionIdList) {
-        if (CollectionUtil.isEmpty(hotQuestionIdList)) {
-            return;
-        }
-        redisService.rightPushAll(CacheConstants.QUESTION_HOST_LIST, hotQuestionIdList);
+        refreshHotQuestionList(hotQuestionIdList, hotGeneration());
+    }
+
+    public void refreshHotQuestionList(List<Long> hotQuestionIdList, String generation) {
+        redisService.replaceVersionedList(CacheConstants.QUESTION_HOST_LIST, generation, hotQuestionIdList, 300);
     }
 }
 
