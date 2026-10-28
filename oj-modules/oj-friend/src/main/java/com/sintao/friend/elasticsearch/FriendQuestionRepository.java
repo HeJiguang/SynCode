@@ -10,13 +10,17 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface FriendQuestionRepository extends ElasticsearchRepository<QuestionES, Long> {
 
+    @Query("{\"bool\":{\"must_not\":[{\"term\":{\"deleted\":true}}]}}")
+    Page<QuestionES> findLive(Pageable pageable);
+
+    @Query("{\"bool\":{\"filter\":[{\"term\":{\"difficulty\":?0}}],\"must_not\":[{\"term\":{\"deleted\":true}}]}}")
     Page<QuestionES> findQuestionByDifficulty(Integer difficulty, Pageable pageable);
 
     //select  * from tb_question where (title like '%aaa%' or content like '%bbb%')  and difficulty = 1
-    @Query("{\"bool\": {\"should\": [{ \"match\": { \"title\": \"?0\" } }, { \"match\": { \"content\": \"?1\" } }], \"minimum_should_match\": 1, \"must\": [{\"term\": {\"difficulty\": \"?2\"}}]}}")
+    @Query("{\"bool\": {\"should\": [{ \"match\": { \"title\": \"?0\" } }, { \"match\": { \"content\": \"?1\" } }], \"must_not\":[{\"term\":{\"deleted\":true}}], \"minimum_should_match\": 1, \"must\": [{\"term\": {\"difficulty\": \"?2\"}}]}}")
     Page<QuestionES> findByTitleOrContentAndDifficulty(String keywordTitle, String keywordContent,Integer difficulty,  Pageable pageable);
 
-    @Query("{\"bool\": {\"should\": [{ \"match\": { \"title\": \"?0\" } }, { \"match\": { \"content\": \"?1\" } }], \"minimum_should_match\": 1}}")
+    @Query("{\"bool\": {\"should\": [{ \"match\": { \"title\": \"?0\" } }, { \"match\": { \"content\": \"?1\" } }], \"must_not\":[{\"term\":{\"deleted\":true}}], \"minimum_should_match\": 1}}")
     Page<QuestionES> findByTitleOrContent(String keywordTitle, String keywordContent, Pageable pageable);
 
 }

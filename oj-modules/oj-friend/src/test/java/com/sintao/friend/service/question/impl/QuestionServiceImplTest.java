@@ -49,8 +49,14 @@ class QuestionServiceImplTest {
     @InjectMocks
     private QuestionServiceImpl questionService;
 
+    @org.junit.jupiter.api.BeforeEach
+    void initializeTableMetadata() {
+        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(
+            new org.apache.ibatis.builder.MapperBuilderAssistant(new org.apache.ibatis.session.Configuration(), "test"), Question.class);
+    }
+
     @Test
-    void listShouldRebuildIndexWhenQuestionIndexDoesNotExist() {
+    void listShouldReadSearchProjectionWithoutWriting() {
         QuestionQueryDTO queryDTO = new QuestionQueryDTO();
         queryDTO.setPageNum(1);
         queryDTO.setPageSize(10);
@@ -69,9 +75,7 @@ class QuestionServiceImplTest {
         questionES.setEstimatedMinutes(15);
         questionES.setTrainingEnabled(1);
 
-        when(questionRepository.count()).thenThrow(new NoSuchIndexException("idx_question"));
-        when(questionMapper.selectList(any())).thenReturn(List.of(question));
-        when(questionRepository.findAll(any(org.springframework.data.domain.Pageable.class)))
+        when(questionRepository.findLive(any(org.springframework.data.domain.Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(questionES)));
 
         TableDataInfo result = questionService.list(queryDTO);
@@ -83,41 +87,39 @@ class QuestionServiceImplTest {
         assertEquals("array,hash", row.getKnowledgeTags());
         assertEquals(15, row.getEstimatedMinutes());
         assertEquals(1, row.getTrainingEnabled());
-        verify(questionRepository).saveAll(any());
+        org.mockito.Mockito.verifyNoMoreInteractions(questionRepository);
     }
 
     @Test
-    void detailShouldFallbackToDatabaseWhenQuestionIndexDoesNotExist() {
+    void detailShouldReadDatabaseWithoutContactingElasticsearch() {
         Question question = new Question();
         question.setQuestionId(101L);
         question.setTitle("Only Cloud Question");
         question.setDifficulty(1);
         question.setContent("from db");
 
-        when(questionRepository.findById(101L)).thenThrow(new NoSuchIndexException("idx_question"));
         when(questionMapper.selectById(101L)).thenReturn(question);
-        when(questionMapper.selectList(any())).thenReturn(List.of(question));
 
         QuestionDetailVO detail = questionService.detail(101L);
 
         assertNotNull(detail);
         assertEquals(101L, detail.getQuestionId());
         assertEquals("Only Cloud Question", detail.getTitle());
-        verify(questionRepository).saveAll(any());
+        org.mockito.Mockito.verifyNoMoreInteractions(questionRepository);
     }
 
     @Test
-    void preQuestionShouldRefreshCacheAndRetryWhenQuestionIsMissingFromRedisIndex() {
+    void preQuestionShouldUseDatabaseOrderingWhenQuestionIsMissingFromCache() {
         when(questionCacheManager.getListSize()).thenReturn(1L);
-        when(questionCacheManager.preQuestion(101L))
-                .thenThrow(new ServiceException(ResultCode.FAILED_NOT_EXISTS))
-                .thenReturn(100L);
-        doNothing().when(questionCacheManager).refreshCache();
+        when(questionCacheManager.preQuestion(101L)).thenThrow(new ServiceException(ResultCode.FAILED_NOT_EXISTS));
+        Question first = new Question(); first.setQuestionId(100L);
+        Question second = new Question(); second.setQuestionId(101L);
+        when(questionMapper.selectList(any())).thenReturn(List.of(first, second));
 
         String previousQuestionId = questionService.preQuestion(101L);
 
         assertEquals("100", previousQuestionId);
-        verify(questionCacheManager).refreshCache();
+        verify(questionMapper).selectList(any());
     }
 
     @Test
@@ -129,9 +131,7 @@ class QuestionServiceImplTest {
         question.setContent("from db");
         question.setDefaultCode("import java.util.*;");
 
-        when(questionRepository.findById(102L)).thenReturn(Optional.empty());
         when(questionMapper.selectById(102L)).thenReturn(question);
-        when(questionMapper.selectList(any())).thenReturn(List.of(question));
 
         QuestionDetailVO detail = questionService.detail(102L);
 
@@ -146,7 +146,7 @@ class QuestionServiceImplTest {
 
     @Test
     void detailShouldExpandInvalidStarterJsonToAllJudgeLanguages() {
-        QuestionES questionES = new QuestionES();
+        Question questionES = new Question();
         questionES.setQuestionId(103L);
         questionES.setTitle("Broken Starter JSON");
         questionES.setDifficulty(1);
@@ -154,7 +154,7 @@ class QuestionServiceImplTest {
         questionES.setStarterCodeJson("{not-json");
         questionES.setDefaultCode("class Legacy {}");
 
-        when(questionRepository.findById(103L)).thenReturn(Optional.of(questionES));
+        when(questionMapper.selectById(103L)).thenReturn(questionES);
 
         QuestionDetailVO detail = questionService.detail(103L);
 
@@ -165,7 +165,7 @@ class QuestionServiceImplTest {
 
     @Test
     void detailShouldKeepAuthoredStartersAndFillMissingJavaFromLegacyCode() {
-        QuestionES questionES = new QuestionES();
+        Question questionES = new Question();
         questionES.setQuestionId(104L);
         questionES.setTitle("Partial Starter JSON");
         questionES.setDifficulty(1);
@@ -173,7 +173,7 @@ class QuestionServiceImplTest {
         questionES.setStarterCodeJson("{\"cpp\":\"int main(){}\",\"python\":\"pass\",\"go\":\"x\"}");
         questionES.setDefaultCode("class LegacyMain {}");
 
-        when(questionRepository.findById(104L)).thenReturn(Optional.of(questionES));
+        when(questionMapper.selectById(104L)).thenReturn(questionES);
 
         QuestionDetailVO detail = questionService.detail(104L);
 
@@ -184,7 +184,7 @@ class QuestionServiceImplTest {
 
     @Test
     void detailShouldExpandJavaOnlyStarterJsonToAllJudgeLanguages() {
-        QuestionES questionES = new QuestionES();
+        Question questionES = new Question();
         questionES.setQuestionId(106L);
         questionES.setTitle("Legacy Java Only Starter");
         questionES.setDifficulty(1);
@@ -192,7 +192,7 @@ class QuestionServiceImplTest {
         questionES.setStarterCodeJson("{\"java\":\"class AuthoredMain {}\"}");
         questionES.setDefaultCode("class AuthoredMain {}");
 
-        when(questionRepository.findById(106L)).thenReturn(Optional.of(questionES));
+        when(questionMapper.selectById(106L)).thenReturn(questionES);
 
         QuestionDetailVO detail = questionService.detail(106L);
 
@@ -205,8 +205,8 @@ class QuestionServiceImplTest {
     }
 
     @Test
-    void detailShouldHealStaleIndexDocumentFromDatabase() {
-        QuestionES questionES = new QuestionES();
+    void detailShouldUseAuthoritativeDatabaseWithoutHealingIndex() {
+        Question questionES = new Question();
         questionES.setQuestionId(105L);
         questionES.setTitle("Stale Index Document");
         questionES.setDifficulty(1);
@@ -217,7 +217,6 @@ class QuestionServiceImplTest {
         question.setQuestionId(105L);
         question.setStarterCodeJson("{\"java\":\"class Authored {}\",\"cpp\":\"int main(){}\"}");
 
-        when(questionRepository.findById(105L)).thenReturn(Optional.of(questionES));
         when(questionMapper.selectById(105L)).thenReturn(question);
 
         QuestionDetailVO detail = questionService.detail(105L);
@@ -225,6 +224,6 @@ class QuestionServiceImplTest {
         assertNotNull(detail);
         assertEquals("class Authored {}", detail.getStarterCode().get("java"));
         assertEquals("int main(){}", detail.getStarterCode().get("cpp"));
-        verify(questionRepository).save(questionES);
+        org.mockito.Mockito.verifyNoInteractions(questionRepository);
     }
 }

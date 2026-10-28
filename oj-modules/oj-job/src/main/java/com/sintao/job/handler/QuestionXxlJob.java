@@ -1,6 +1,5 @@
 package com.sintao.job.handler;
 
-import cn.hutool.core.collection.CollectionUtil;
 import com.sintao.common.core.constants.CacheConstants;
 import com.sintao.common.core.constants.Constants;
 import com.sintao.common.redis.service.RedisService;
@@ -26,13 +25,10 @@ public class QuestionXxlJob {
     @XxlJob("hostQuestionListHandler")
     public void hostQuestionListHandler() {
         log.info("----- 题目热门列表统计开始 ------");
+        String generation = redisService.listGeneration(CacheConstants.QUESTION_HOST_LIST);
         PageHelper.startPage(Constants.HOST_QUESTION_LIST_START, Constants.HOST_QUESTION_LIST_END);
         List<Long> questionIdList = userSubmitMapper.selectHostQuestionList();
-        if (CollectionUtil.isEmpty(questionIdList)) {
-            return;
-        }
-        redisService.deleteObject(CacheConstants.QUESTION_HOST_LIST);
-        redisService.rightPushAll(CacheConstants.QUESTION_HOST_LIST, questionIdList);
+        redisService.replaceVersionedList(CacheConstants.QUESTION_HOST_LIST, generation, questionIdList, 300);
         log.info("----- 题目热门列表统计结束 ------");
     }
 }

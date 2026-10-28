@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
@@ -16,6 +17,49 @@ import java.util.concurrent.TimeUnit;
 
 @Component
 public class RedisService {
+
+    private static final DefaultRedisScript<Long> REPLACE_LIST = new DefaultRedisScript<>(
+            "if (redis.call('get',KEYS[2]) or '0') ~= ARGV[1] then return 0 end " +
+            "if redis.call('exists',KEYS[3]) == 1 then redis.call('rename',KEYS[3],KEYS[1]); " +
+            "redis.call('expire',KEYS[1],ARGV[2]); else redis.call('del',KEYS[1]); end return 1", Long.class);
+    private static final DefaultRedisScript<Long> INVALIDATE_LIST = new DefaultRedisScript<>(
+            "redis.call('set',KEYS[2],ARGV[1]); return redis.call('del',KEYS[1])", Long.class);
+
+    /** Capture BEFORE querying MySQL so invalidation rejects an obsolete rebuild. */
+    public String listGeneration(String key) {
+        String generation = strings().opsForValue().get(key + ":generation");
+        return generation == null ? "0" : generation;
+    }
+
+    public void invalidateVersionedList(String key) {
+        strings().execute(INVALIDATE_LIST, List.of(key, key + ":generation"), java.util.UUID.randomUUID().toString());
+    }
+
+    public <T> boolean replaceVersionedList(String key, String generation, Collection<T> values, long ttlSeconds) {
+        String temporary = key + ":tmp:" + java.util.UUID.randomUUID();
+        try {
+            if (values != null && !values.isEmpty()) {
+                // Publish the entire temporary list atomically with a TTL via a session transaction.
+                redisTemplate.execute(new org.springframework.data.redis.core.SessionCallback<Object>() {
+                    @Override
+                    public Object execute(org.springframework.data.redis.core.RedisOperations operations) {
+                        operations.multi();
+                        operations.opsForList().rightPushAll(temporary, values);
+                        operations.expire(temporary, 60, TimeUnit.SECONDS);
+                        return operations.exec();
+                    }
+                });
+            }
+            return Long.valueOf(1).equals(strings().execute(REPLACE_LIST,
+                    List.of(key, key + ":generation", temporary), generation, Long.toString(ttlSeconds)));
+        } finally {
+            redisTemplate.delete(temporary);
+        }
+    }
+
+    private StringRedisTemplate strings() {
+        return new StringRedisTemplate(redisTemplate.getConnectionFactory());
+    }
 
     private static final DefaultRedisScript<Long> COMPARE_AND_DELETE = new DefaultRedisScript<>(
             "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",

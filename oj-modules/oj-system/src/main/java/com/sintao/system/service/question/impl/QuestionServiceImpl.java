@@ -16,16 +16,14 @@ import com.sintao.system.domain.question.Question;
 import com.sintao.system.domain.question.dto.QuestionAddDTO;
 import com.sintao.system.domain.question.dto.QuestionEditDTO;
 import com.sintao.system.domain.question.dto.QuestionQueryDTO;
-import com.sintao.system.domain.question.es.QuestionES;
 import com.sintao.system.domain.question.vo.QuestionDetailVO;
 import com.sintao.system.domain.question.vo.QuestionVO;
-import com.sintao.system.elasticsearch.SystemQuestionRepository;
-import com.sintao.system.manager.QuestionCacheManager;
 import com.sintao.system.mapper.question.QuestionMapper;
 import com.sintao.system.service.question.IQuestionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -39,12 +37,6 @@ public class QuestionServiceImpl implements IQuestionService {
 
     @Autowired
     private QuestionMapper questionMapper;
-
-    @Autowired
-    private SystemQuestionRepository questionRepository;
-
-    @Autowired
-    private QuestionCacheManager questionCacheManager;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -64,6 +56,7 @@ public class QuestionServiceImpl implements IQuestionService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean add(QuestionAddDTO questionAddDTO) {
         normalizeAndValidate(questionAddDTO);
         List<Question> questionList = questionMapper.selectList(new LambdaQueryWrapper<Question>()
@@ -82,10 +75,6 @@ public class QuestionServiceImpl implements IQuestionService {
         if (insert <= 0) {
             return false;
         }
-        QuestionES questionES = new QuestionES();
-        BeanUtil.copyProperties(question, questionES);
-        questionRepository.save(questionES);
-        questionCacheManager.addCache(question.getQuestionId());
         return true;
     }
 
@@ -101,6 +90,7 @@ public class QuestionServiceImpl implements IQuestionService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int edit(QuestionEditDTO questionEditDTO) {
         normalizeAndValidate(questionEditDTO);
         Question oldQuestion = questionMapper.selectById(questionEditDTO.getQuestionId());
@@ -130,20 +120,16 @@ public class QuestionServiceImpl implements IQuestionService {
                     MultiLanguageStarterCodes.buildStarterJson(questionEditDTO.getDefaultCode()));
         }
         oldQuestion.setMainFuc(questionEditDTO.getMainFuc());
-        QuestionES questionES = new QuestionES();
-        BeanUtil.copyProperties(oldQuestion, questionES);
-        questionRepository.save(questionES);
         return questionMapper.updateById(oldQuestion);
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int delete(Long questionId) {
         Question question = questionMapper.selectById(questionId);
         if (question == null) {
             throw new ServiceException(ResultCode.FAILED_NOT_EXISTS);
         }
-        questionRepository.deleteById(questionId);
-        questionCacheManager.deleteCache(questionId);
         return questionMapper.deleteById(questionId);
     }
 

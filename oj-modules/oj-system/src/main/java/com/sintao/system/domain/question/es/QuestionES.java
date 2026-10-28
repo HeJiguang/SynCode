@@ -15,6 +15,15 @@ import java.time.LocalDateTime;
 @Document(indexName = "idx_question")
 public class QuestionES {
 
+    @Field(type = FieldType.Long)
+    private Long revision;
+
+    @Field(type = FieldType.Boolean)
+    private Boolean deleted;
+
+    @Field(type = FieldType.Keyword)
+    private String contentHash;
+
     @Id
     @Field(type = FieldType.Long)
     private Long questionId;

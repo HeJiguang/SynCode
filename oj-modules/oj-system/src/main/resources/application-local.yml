@@ -15,5 +15,19 @@ spring:
       host: ${REDIS_HOST:127.0.0.1}
       port: ${REDIS_PORT:16379}
       password: ${REDIS_PASSWORD:change-me-local}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_DEFAULT_USER:admin}
+    password: ${RABBITMQ_DEFAULT_PASS:change-me-local}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
   elasticsearch:
     uris: ${SPRING_ELASTICSEARCH_URIS:http://127.0.0.1:9200}
+
+# Enable only after the outbox migration and baseline index rollout.
+question:
+  sync:
+    enabled: ${QUESTION_SYNC_ENABLED:false}
